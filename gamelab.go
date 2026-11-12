@@ -19,19 +19,20 @@ var embeddedGamesJSON []byte
 
 // GameInfo describes a title in the FPS Predictor catalog.
 type GameInfo struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Genre      string  `json:"genre"`
-	Weight     float64 `json:"weight"`
-	SteamAppID int     `json:"steamAppId"`
-	PosterURL  string  `json:"posterUrl"`
-	HeaderURL  string  `json:"headerUrl,omitempty"`
-	Category   string  `json:"category"`
-	Year       int     `json:"year,omitempty"`
-	Badge      string  `json:"badge,omitempty"`
-	Engine     string  `json:"engine,omitempty"`
-	Synthetic  bool    `json:"synthetic,omitempty"`
-	FromSteam  bool    `json:"fromSteam,omitempty"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Genre       string  `json:"genre"`
+	Weight      float64 `json:"weight"`
+	SteamAppID  int     `json:"steamAppId"`
+	PosterURL   string  `json:"posterUrl"`
+	HeaderURL   string  `json:"headerUrl,omitempty"`
+	Category    string  `json:"category"`
+	Year        int     `json:"year,omitempty"`
+	Badge       string  `json:"badge,omitempty"`
+	Engine      string  `json:"engine,omitempty"`
+	Synthetic   bool    `json:"synthetic,omitempty"`
+	FromSteam   bool    `json:"fromSteam,omitempty"`
+	InstallPath string  `json:"installPath,omitempty"`
 }
 
 // FPSPrediction is estimated average FPS across quality presets.
@@ -64,22 +65,27 @@ type FPSPrediction struct {
 	Warnings     []string `json:"warnings"`
 	Category     string   `json:"category"`
 	Verdict      string   `json:"verdict"`
-	VerdictLevel string   `json:"verdictLevel"`
+	VerdictLevel string   `json:"verdictLevel"` // filter: ok|warn|bad (derived from Fit.Level)
+	SourceNote   string   `json:"sourceNote"`
+	ArchConfirm  string   `json:"archConfirm"`
+	UpscaleHint  string   `json:"upscaleHint,omitempty"`
+	// Phase 4 - fit for this PC (primary UI; FPS numbers are not shown).
+	Fit GameFitVerdict `json:"fit"`
 }
 
 // SystemPowerProfile is the live hardware scorecard used by GamePulse.
 type SystemPowerProfile struct {
-	GPUName        string  `json:"gpuName"`
-	IsIntegrated   bool    `json:"isIntegrated"`
-	VRAMGB         float64 `json:"vramGB"`
-	GPUPowerScore  float64 `json:"gpuPowerScore"`
-	CPUName        string  `json:"cpuName"`
-	CPUCores       int     `json:"cpuCores"`
-	CPUThreads     int     `json:"cpuThreads"`
-	CPUFreqMHz     float64 `json:"cpuFreqMHz"`
-	CPUPowerScore  float64 `json:"cpuPowerScore"`
-	RAMGB          float64 `json:"ramGB"`
-	IsDualChannel  bool    `json:"isDualChannel"`
+	GPUName       string  `json:"gpuName"`
+	IsIntegrated  bool    `json:"isIntegrated"`
+	VRAMGB        float64 `json:"vramGB"`
+	GPUPowerScore float64 `json:"gpuPowerScore"`
+	CPUName       string  `json:"cpuName"`
+	CPUCores      int     `json:"cpuCores"`
+	CPUThreads    int     `json:"cpuThreads"`
+	CPUFreqMHz    float64 `json:"cpuFreqMHz"`
+	CPUPowerScore float64 `json:"cpuPowerScore"`
+	RAMGB         float64 `json:"ramGB"`
+	IsDualChannel bool    `json:"isDualChannel"`
 }
 
 type qualityPreset string
@@ -108,7 +114,7 @@ type gameReqSet struct {
 var gameCatalog []GameInfo
 var steamCache = map[string]GameInfo{}
 
-// Per-game requirement tables — BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
+// Per-game requirement tables - BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
 var gameRequirements = map[string]gameReqSet{
 	"cyberpunk": {
 		Low:   gameReq{55, 55, 38, 3},
@@ -125,10 +131,10 @@ var gameRequirements = map[string]gameReqSet{
 		Heavy: true,
 	},
 	"gtav": {
-		Low:   gameReq{60, 28, 30, 1},
-		Med:   gameReq{58, 38, 36, 2},
-		High:  gameReq{55, 48, 42, 3},
-		Ultra: gameReq{50, 58, 48, 4},
+		Low:   gameReq{110, 22, 24, 2},
+		Med:   gameReq{100, 32, 30, 2},
+		High:  gameReq{74, 48, 36, 3},
+		Ultra: gameReq{72, 50, 40, 4},
 	},
 	"cs2": {
 		Low:   gameReq{90, 30, 40, 1},
@@ -143,10 +149,10 @@ var gameRequirements = map[string]gameReqSet{
 		Ultra: gameReq{65, 52, 55, 3},
 	},
 	"tanksblitz": {
-		Low:   gameReq{60, 18, 25, 0.5},
-		Med:   gameReq{60, 22, 28, 0.5},
-		High:  gameReq{60, 26, 32, 1},
-		Ultra: gameReq{60, 30, 35, 1},
+		Low:    gameReq{60, 18, 25, 0.5},
+		Med:    gameReq{60, 22, 28, 0.5},
+		High:   gameReq{60, 26, 32, 1},
+		Ultra:  gameReq{60, 30, 35, 1},
 		CapFPS: 60,
 	},
 	"fortnite": {
@@ -278,17 +284,32 @@ func badgeForCategory(cat string, year int) string {
 	}
 }
 
-// ListGames returns the GamePulse catalog.
+// ListGames returns the GamePulse catalog merged with installed Steam/Epic titles.
 func (a *App) ListGames() []GameInfo {
-	out := make([]GameInfo, len(gameCatalog))
-	copy(out, gameCatalog)
-	return out
+	base := make([]GameInfo, len(gameCatalog))
+	copy(base, gameCatalog)
+	for i := range base {
+		base[i] = normalizeGameInfo(base[i])
+	}
+	out := mergeGameCatalog(base, installedGameLibraries())
+	if a == nil {
+		return out
+	}
+	filtered := out[:0]
+	for _, g := range out {
+		if a.isUserHiddenGameID(g.ID) {
+			continue
+		}
+		filtered = append(filtered, g)
+	}
+	return filtered
 }
 
 // GameMeta is an alias used by the online Steam search API surface.
 type GameMeta = GameInfo
 
 // SearchGames filters the local embedded catalog only (fast).
+// Matching is null-safe, case-insensitive, and Unicode-aware (incl. Cyrillic).
 func (a *App) SearchGames(query string) []GameInfo {
 	raw := strings.TrimSpace(query)
 	q := strings.ToLower(raw)
@@ -297,13 +318,21 @@ func (a *App) SearchGames(query string) []GameInfo {
 	}
 	aliases := expandSearchAliases(q)
 	out := make([]GameInfo, 0)
-	for _, g := range gameCatalog {
+	for _, g := range a.ListGames() {
+		g = normalizeGameInfo(g)
+		if g.ID == "" || g.Name == "" {
+			continue
+		}
 		name := strings.ToLower(g.Name)
 		id := strings.ToLower(g.ID)
 		genre := strings.ToLower(g.Genre)
-		hit := strings.Contains(name, q) || strings.Contains(id, q) || strings.Contains(genre, q)
+		badge := strings.ToLower(g.Badge)
+		hit := strings.Contains(name, q) || strings.Contains(id, q) || strings.Contains(genre, q) || strings.Contains(badge, q)
 		if !hit {
 			for _, al := range aliases {
+				if al == "" {
+					continue
+				}
 				if strings.Contains(name, al) || strings.Contains(id, al) {
 					hit = true
 					break
@@ -317,25 +346,47 @@ func (a *App) SearchGames(query string) []GameInfo {
 	return out
 }
 
-// SearchGamesOnline queries the full Steam store catalog.
+// SearchGamesOnline cascades: local CIS DB → Steam Store → RAWG, then caches covers.
 func (a *App) SearchGamesOnline(query string) []GameMeta {
 	raw := strings.TrimSpace(query)
 	if raw == "" {
 		return nil
 	}
+	if local := findLocalGameEntry(raw); local != nil {
+		g := gameInfoFromDBEntry(local)
+		steamCache[strings.ToLower(g.ID)] = g
+		return []GameMeta{g}
+	}
 	aliases := expandSearchAliases(strings.ToLower(raw))
 	hits := searchSteamStore(raw)
 	if len(hits) == 0 && len(aliases) > 0 {
 		hits = searchSteamStore(aliases[0])
+		if e := findLocalGameEntry(aliases[0]); e != nil && len(hits) == 0 {
+			g := gameInfoFromDBEntry(e)
+			steamCache[strings.ToLower(g.ID)] = g
+			return []GameMeta{g}
+		}
 	}
 	if len(hits) == 0 {
-		// Legacy community endpoint as fallback.
 		hits = searchSteamApps(raw)
 	}
-	for _, g := range hits {
-		steamCache[strings.ToLower(g.ID)] = g
+	if len(hits) == 0 {
+		hits = searchRAWGGames(raw)
+		if len(hits) == 0 && len(aliases) > 0 {
+			hits = searchRAWGGames(aliases[0])
+		}
+	}
+	for i := range hits {
+		g := &hits[i]
+		if g.PosterURL != "" {
+			g.PosterURL = EnsureCoverCached(g.Name, g.PosterURL)
+		}
+		if g.HeaderURL != "" {
+			g.HeaderURL = EnsureCoverCached(g.Name+"-hdr", g.HeaderURL)
+		}
+		steamCache[strings.ToLower(g.ID)] = *g
 		if g.SteamAppID > 0 {
-			steamCache[fmt.Sprintf("steam:%d", g.SteamAppID)] = g
+			steamCache[fmt.Sprintf("steam:%d", g.SteamAppID)] = *g
 		}
 	}
 	return hits
@@ -635,7 +686,7 @@ func classifyTitle(name string, yearHint int) (cat string, year int, badge, genr
 	case containsAny(q, mobaHints):
 		cat, weight, genre, badge = "moba", 0.58, "MOBA", "eSports"
 	default:
-		// Unknown modern titles — mid AAA, not automatic "heavy unplayable".
+		// Unknown modern titles - mid AAA, not automatic "heavy unplayable".
 		cat, weight, genre, badge = "aaa", 0.95, "Action", "AAA"
 		if year >= 2020 {
 			badge = "AAA Next-Gen"
@@ -681,19 +732,22 @@ func resolveGame(gameID string) GameInfo {
 			steamCache[strings.ToLower(enriched.ID)] = enriched
 			return enriched
 		}
-		return cached
+		return withCachedCover(cached)
 	}
 	for _, g := range gameCatalog {
 		if strings.EqualFold(g.ID, id) || strings.EqualFold(g.Name, id) {
-			return g
+			return withCachedCover(g)
 		}
+	}
+	if e := findLocalGameEntry(id); e != nil {
+		return gameInfoFromDBEntry(e)
 	}
 	if strings.HasPrefix(strings.ToLower(id), "steam:") {
 		appStr := strings.TrimPrefix(strings.ToLower(id), "steam:")
 		if appID, err := strconv.Atoi(appStr); err == nil && appID > 0 {
 			g := gameFromSteamHit("Steam App "+appStr, appID, true)
 			steamCache[strings.ToLower(g.ID)] = g
-			return g
+			return withCachedCover(g)
 		}
 	}
 	if strings.HasPrefix(strings.ToLower(id), "custom:") {
@@ -702,46 +756,140 @@ func resolveGame(gameID string) GameInfo {
 	return synthesizeGame(id)
 }
 
+func withCachedCover(g GameInfo) GameInfo {
+	if strings.TrimSpace(g.PosterURL) == "" {
+		if e := findLocalGameEntryForInfo(g); e != nil && strings.TrimSpace(e.Cover) != "" {
+			g.PosterURL = e.Cover
+			if g.HeaderURL == "" {
+				g.HeaderURL = e.Cover
+			}
+		}
+	}
+	if g.PosterURL != "" {
+		g.PosterURL = EnsureCoverCached(g.Name, g.PosterURL)
+	}
+	if g.HeaderURL != "" {
+		g.HeaderURL = EnsureCoverCached(g.Name+"-hdr", g.HeaderURL)
+	}
+	return g
+}
+
+func canonicalReqID(game GameInfo) string {
+	id := strings.ToLower(strings.TrimSpace(game.ID))
+	name := strings.ToLower(game.Name)
+	switch {
+	case id == "gtav" || id == "gta5" || id == "gta v" || game.SteamAppID == 271590:
+		return "gtav"
+	case strings.Contains(name, "grand theft auto v") || name == "gta v" || name == "gta 5" || name == "gta5":
+		return "gtav"
+	default:
+		return ""
+	}
+}
+
+// vramShortfall is true only when a discrete card's dedicated memory is confidently below the preset.
+// A 0 reading or the 32-bit AdapterRAM ceiling (~4 GB) on an 8 GB card is not a real shortage.
+func vramShortfall(sys SystemPowerProfile, reqGB float64) bool {
+	if reqGB <= 0 || sys.IsIntegrated {
+		return false
+	}
+	gb := sys.VRAMGB
+	if gb <= 0.5 {
+		return false
+	}
+	if gb >= 3.7 && gb <= 4.05 {
+		n := strings.ToLower(sys.GPUName)
+		if strings.Contains(n, "2060 super") || strings.Contains(n, "2070") || strings.Contains(n, "2080") ||
+			strings.Contains(n, "3060") || strings.Contains(n, "3070") || strings.Contains(n, "3080") {
+			return false
+		}
+	}
+	return gb+0.5 < reqGB
+}
+
 func requirementsFor(game GameInfo) gameReqSet {
-	if req, ok := gameRequirements[strings.ToLower(game.ID)]; ok {
+	var req gameReqSet
+	found := false
+	if id := canonicalReqID(game); id != "" {
+		if r, ok := gameRequirements[id]; ok {
+			req, found = r, true
+		}
+	}
+	if !found {
+		if r, ok := gameRequirements[strings.ToLower(game.ID)]; ok {
+			req, found = r, true
+		}
+	}
+	if !found {
+		// Year-first classification so pre-2017 titles are never treated as modern AAA VRAM hogs.
+		cat := strings.ToLower(game.Category)
+		if game.Year > 0 && game.Year <= 2016 {
+			cat = "classic"
+		} else if game.Year > 0 && game.Year <= 2012 {
+			cat = "classic"
+		}
+		switch cat {
+		case "classic":
+			req = gameReqSet{
+				Low: gameReq{120, 5, 5, 0.5}, Med: gameReq{110, 8, 8, 1},
+				High: gameReq{100, 14, 12, 2}, Ultra: gameReq{90, 22, 18, 3},
+				CapFPS: 240, Heavy: false,
+			}
+		case "indie":
+			req = gameReqSet{
+				Low: gameReq{100, 14, 22, 0.5}, Med: gameReq{90, 20, 28, 1},
+				High: gameReq{80, 28, 34, 1.5}, Ultra: gameReq{70, 36, 40, 2},
+			}
+		case "shooter", "moba":
+			req = gameReqSet{
+				Low: gameReq{80, 28, 34, 1}, Med: gameReq{70, 38, 42, 2},
+				High: gameReq{60, 50, 50, 3}, Ultra: gameReq{55, 60, 55, 4},
+			}
+		case "sports", "sim":
+			req = gameReqSet{
+				Low: gameReq{70, 30, 32, 1}, Med: gameReq{65, 42, 40, 2},
+				High: gameReq{60, 55, 48, 4}, Ultra: gameReq{55, 68, 55, 6},
+			}
+		default:
+			// Modern AAA baseline - still capped by year below.
+			req = gameReqSet{
+				Low: gameReq{50, 48, 40, 3}, Med: gameReq{50, 62, 50, 5},
+				High: gameReq{55, 74, 58, 8}, Ultra: gameReq{50, 88, 68, 10},
+				Heavy: true,
+			}
+		}
+	}
+	req = applyLocalDBRequirements(game, req)
+	return scaleReqVRAMByYear(req, game.Year)
+}
+
+// scaleReqVRAMByYear caps VRAM demand so old titles never look "tight" on mid-range cards.
+// ≤2016 → ≤3 GB, 2017–2020 → ≤6 GB, ≥2021 AAA → ≤8 GB recommended.
+func scaleReqVRAMByYear(req gameReqSet, year int) gameReqSet {
+	if year <= 0 {
 		return req
 	}
-	// Steam IDs mapped via category / year.
-	if game.Year > 0 && game.Year <= 2012 {
-		game.Category = "classic"
-	}
-	switch strings.ToLower(game.Category) {
-	case "classic":
-		return gameReqSet{
-			Low:    gameReq{120, 5, 5, 0.25},
-			Med:    gameReq{110, 5, 5, 0.25},
-			High:   gameReq{100, 6, 6, 0.5},
-			Ultra:  gameReq{90, 8, 8, 0.5},
-			CapFPS: 240,
-			Heavy:  false,
-		}
-	case "indie":
-		return gameReqSet{
-			Low: gameReq{100, 14, 22, 0.5}, Med: gameReq{90, 20, 28, 1},
-			High: gameReq{80, 28, 34, 1.5}, Ultra: gameReq{70, 36, 40, 2},
-		}
-	case "shooter", "moba":
-		return gameReqSet{
-			Low: gameReq{80, 28, 34, 1}, Med: gameReq{70, 38, 42, 2},
-			High: gameReq{60, 50, 50, 3}, Ultra: gameReq{55, 60, 55, 4},
-		}
-	case "sports", "sim":
-		return gameReqSet{
-			Low: gameReq{70, 30, 32, 1}, Med: gameReq{65, 42, 40, 2},
-			High: gameReq{60, 55, 48, 4}, Ultra: gameReq{55, 68, 55, 6},
-		}
+	var capGB float64
+	switch {
+	case year <= 2016:
+		capGB = 3
+		req.Heavy = false
+	case year <= 2020:
+		capGB = 6
 	default:
-		return gameReqSet{
-			Low: gameReq{50, 48, 40, 3}, Med: gameReq{50, 62, 50, 5},
-			High: gameReq{55, 74, 58, 8}, Ultra: gameReq{50, 88, 68, 10},
-			Heavy: true,
-		}
+		capGB = 8
 	}
+	clamp := func(r gameReq) gameReq {
+		if r.ReqVRAMGB > capGB {
+			r.ReqVRAMGB = capGB
+		}
+		return r
+	}
+	req.Low = clamp(req.Low)
+	req.Med = clamp(req.Med)
+	req.High = clamp(req.High)
+	req.Ultra = clamp(req.Ultra)
+	return req
 }
 
 func minInt(a, b int) int {
@@ -877,10 +1025,10 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 		rec = "low"
 	}
 
-	verdict, level := dynamicVerdict(sys, reqSet, lowAvg, medAvg, highAvg)
-	if classic && lowAvg >= 60 {
-		verdict, level = "fpsVerdictSmoothMax", "ok"
-	}
+	a.mu.RLock()
+	diskSnaps := diskFreeFromMetrics(a.metrics.Disks)
+	a.mu.RUnlock()
+	fit := EvaluateGameFit(sys, game, reqSet, diskSnaps)
 
 	badge := game.Badge
 	if badge == "" {
@@ -889,6 +1037,19 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 	poster := game.PosterURL
 	if poster == "" {
 		poster = game.HeaderURL
+	}
+
+	filterLevel := fitLevelToFilter(fit.Level)
+	verdictKey := "fitVerdictUnknown"
+	switch fit.Level {
+	case "excellent":
+		verdictKey = "fitVerdictExcellent"
+	case "ok":
+		verdictKey = "fitVerdictOk"
+	case "tight":
+		verdictKey = "fitVerdictTight"
+	case "wont":
+		verdictKey = "fitVerdictWont"
 	}
 
 	return FPSPrediction{
@@ -919,8 +1080,39 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 		Note:         note,
 		Warnings:     warnings,
 		Category:     game.Category,
-		Verdict:      verdict,
-		VerdictLevel: level,
+		Verdict:      verdictKey,
+		VerdictLevel: filterLevel,
+		SourceNote:   "Ориентировочно: сравнение классов CPU/GPU/VRAM с мин./рек. требованиями",
+		ArchConfirm:  "",
+		UpscaleHint:  "",
+		Fit:          fit,
+	}
+}
+
+func archConfirmLabel(gpu string) string {
+	g := strings.ToLower(gpu)
+	switch {
+	case strings.Contains(g, "4060"), strings.Contains(g, "4070"), strings.Contains(g, "4080"), strings.Contains(g, "4090"), strings.Contains(g, "ada"):
+		return "Подтверждено архитектурой Ada Lovelace"
+	case strings.Contains(g, "3060"), strings.Contains(g, "3070"), strings.Contains(g, "3080"), strings.Contains(g, "3090"), strings.Contains(g, "ampere"):
+		return "Подтверждено архитектурой Ampere"
+	case strings.Contains(g, "2060"), strings.Contains(g, "2070"), strings.Contains(g, "2080"), strings.Contains(g, "turing"):
+		return "Подтверждено архитектурой Turing"
+	case strings.Contains(g, "1660"), strings.Contains(g, "1650"), strings.Contains(g, "gtX 16"):
+		return "Подтверждено архитектурой Turing"
+	case strings.Contains(g, "7800"), strings.Contains(g, "7700"), strings.Contains(g, "7600"), strings.Contains(g, "rdna 3"):
+		return "Подтверждено архитектурой RDNA3"
+	case strings.Contains(g, "6800"), strings.Contains(g, "6700"), strings.Contains(g, "6600"), strings.Contains(g, "rdna2"), strings.Contains(g, "rx 6"):
+		return "Подтверждено архитектурой RDNA2"
+	case strings.Contains(g, "radeon"), strings.Contains(g, "rx "):
+		return "Подтверждено архитектурой Radeon"
+	case strings.Contains(g, "uhd"), strings.Contains(g, "iris"), strings.Contains(g, "vega"), strings.Contains(g, "graphics"):
+		return "Оценка для встроенной графики (iGPU)"
+	default:
+		if strings.TrimSpace(gpu) == "" {
+			return "Базовая оценка по профилю GPU"
+		}
+		return "Подтверждено по профилю GPU: " + gpu
 	}
 }
 
@@ -970,7 +1162,6 @@ func estimatePreset(sys SystemPowerProfile, req gameReq, preset qualityPreset, c
 
 	vramMul := 1.0
 	warn = ""
-	effectiveVRAM := sys.VRAMGB
 	if sys.IsIntegrated {
 		// iGPU borrows system RAM; only punish heavier presets.
 		if preset == presetHigh || preset == presetUltra {
@@ -979,7 +1170,7 @@ func estimatePreset(sys SystemPowerProfile, req gameReq, preset qualityPreset, c
 				warn = "fpsWarnVRAM"
 			}
 		}
-	} else if req.ReqVRAMGB > 0 && effectiveVRAM+0.05 < req.ReqVRAMGB {
+	} else if vramShortfall(sys, req.ReqVRAMGB) {
 		vramMul = 0.70
 		warn = "fpsWarnVRAM"
 	}
@@ -1112,7 +1303,7 @@ func calcGPUPowerScore(name string, integrated bool, vramGB float64) float64 {
 	case strings.Contains(n, "3060"):
 		score = 60
 	case strings.Contains(n, "2060 super"):
-		score = 55
+		score = 72
 	case strings.Contains(n, "2070 super"):
 		score = 62
 	case strings.Contains(n, "2080"):

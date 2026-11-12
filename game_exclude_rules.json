@@ -1,0 +1,45 @@
+{
+  "exactNames": [
+    "Epic Games Launcher",
+    "Godot Engine",
+    "Unity Hub",
+    "Steam",
+    "Steamworks Common Redistributables",
+    "Epic Online Services",
+    "Epic Games Launcher Prerequisites"
+  ],
+  "namePatterns": [
+    "(?i)^Unreal Engine(\\s+\\d+(\\.\\d+)*)?$",
+    "(?i)^Unity Hub$",
+    "(?i)^Unity Editor(\\s+\\d+(\\.\\d+)*)?$",
+    "(?i)^Godot Engine(\\s+\\d+(\\.\\d+)*)?$",
+    "(?i)^Proton(\\s|$)",
+    "(?i)^Steam Linux Runtime",
+    "(?i)^Steamworks Common Redistributables$",
+    "(?i)^Epic Games Launcher$"
+  ],
+  "epicNamespaces": [
+    "ue",
+    "unrealengine",
+    "unrealenginetool"
+  ],
+  "epicAppNamePatterns": [
+    "(?i)^ue_\\d",
+    "(?i)^epicgameslauncher",
+    "(?i)^epicgamesservices",
+    "(?i)^eos(overlay)?"
+  ],
+  "pathContains": [
+    "\\Epic Games\\Launcher\\",
+    "\\Epic Games\\UE_",
+    "\\Epic\\EpicGamesLauncher\\",
+    "\\Unity Hub\\",
+    "\\Unity\\Hub\\",
+    "\\Unity\\Editor\\",
+    "\\Godot\\",
+    "\\GodotEngine\\",
+    "\\Steam\\steamapps\\common\\Steamworks Shared",
+    "\\Proton",
+    "\\SteamLinuxRuntime"
+  ]
+}

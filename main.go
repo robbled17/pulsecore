@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"os"
+	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -12,22 +14,32 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// App icon source for tray / docs; Windows EXE icon comes from build/windows/icon.ico.
+//
+//go:embed build/appicon.png
+var appIcon []byte
+
 func main() {
+	_ = appIcon // keep embed referenced; Wails packages build/windows/icon.ico into the EXE
+	for _, arg := range os.Args[1:] {
+		if strings.EqualFold(arg, "--dev") {
+			appDevMode = true
+		}
+	}
 	app := NewApp()
-	startSystray(app)
 
 	err := wails.Run(&options.App{
 		Title:             "PulseCore",
-		Width:             1020,
-		Height:            680,
-		MinWidth:          880,
+		Width:             1280,
+		Height:            800,
+		MinWidth:          760,
 		MinHeight:         560,
 		DisableResize:     false,
 		Fullscreen:        false,
 		Frameless:         true,
 		StartHidden:       false,
-		HideWindowOnClose: true,
-		BackgroundColour:  &options.RGBA{R: 10, G: 12, B: 16, A: 1},
+		HideWindowOnClose: false,
+		BackgroundColour:  &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -43,10 +55,9 @@ func main() {
 			DisableWindowIcon:                 false,
 			DisableFramelessWindowDecorations: false,
 			BackdropType:                      windows.Mica,
-			Theme:                             windows.Dark,
+			Theme:                             windows.SystemDefault,
 		},
 	})
-	quitSystray()
 	if err != nil {
 		println("Error:", err.Error())
 	}

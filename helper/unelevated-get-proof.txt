@@ -1,0 +1,673 @@
+﻿elevated= false
+pid= 9032
+{
+  "cpu": {
+    "ccdTempsC": [
+      50.500003814697266
+    ],
+    "clockMHz": 3988.8333333333335,
+    "loadPercent": 32.540000915527344,
+    "name": "AMD Ryzen 5 3600",
+    "ok": true,
+    "powerW": 49.11945724487305,
+    "tctlC": 53.00000762939453,
+    "tdieC": 53.00000762939453
+  },
+  "diskCount": 3,
+  "disks": [
+    {
+      "attrs": [
+        {
+          "current": 100,
+          "id": 1,
+          "name": "Read Error Rate",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 5,
+          "name": "Reallocated Sectors Count",
+          "raw": "2",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 9,
+          "name": "Power-On Hours",
+          "raw": "2816",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 12,
+          "name": "Power Cycle Count",
+          "raw": "1120",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 160,
+          "name": "Uncorrectable sectors count when read/write",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 161,
+          "name": "Number of Valid Spare Blocks",
+          "raw": "95",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 163,
+          "name": "Number of Initial Invalid Blocks",
+          "raw": "19",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 164,
+          "name": "Total Erase Count",
+          "raw": "34340",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 165,
+          "name": "Maximum Erase Count",
+          "raw": "66",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 166,
+          "name": "Minimum Erase Count",
+          "raw": "6",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 167,
+          "name": "Average Erase Count",
+          "raw": "52",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 168,
+          "name": "Max Erase Count of Spec",
+          "raw": "5050",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 169,
+          "name": "Remain Life",
+          "raw": "99",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 175,
+          "name": "Program fail count in worst die",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 176,
+          "name": "Erase fail count in worst die",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 177,
+          "name": "Total Wear Level Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 178,
+          "name": "Runtime Invalid Block Count",
+          "raw": "2",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 181,
+          "name": "Total Program Fail Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 182,
+          "name": "Total Erase Fail Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 192,
+          "name": "Power-Off Retract Count",
+          "raw": "116",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 194,
+          "name": "Temperature",
+          "raw": "36",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 195,
+          "name": "Hardware ECC Recovered",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 196,
+          "name": "Reallocation Event Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 197,
+          "name": "Current Pending Sector Count",
+          "raw": "2",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 198,
+          "name": "Uncorrectable Error Count Off-line",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 199,
+          "name": "Ultra DMA CRC Error Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 232,
+          "name": "Available Reserved Space",
+          "raw": "95",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 241,
+          "name": "Total LBA Written",
+          "raw": "250930",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 242,
+          "name": "Total LBA Read",
+          "raw": "609023",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 245,
+          "name": "Flash Write Sector Count",
+          "raw": "334248",
+          "threshold": 0,
+          "worst": 100
+        }
+      ],
+      "healthOk": true,
+      "healthPercent": 99,
+      "interface": "SATA",
+      "letter": "C",
+      "model": "COMPIT",
+      "powerOnHours": 2816,
+      "serial": "ST325632301213",
+      "status": "good",
+      "tempC": 36,
+      "tempOk": true,
+      "totalWritesBytes": 7841000000000
+    },
+    {
+      "attrs": [
+        {
+          "current": 200,
+          "id": 1,
+          "name": "Read Error Rate",
+          "raw": "10",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 174,
+          "id": 3,
+          "name": "Spin-Up Time",
+          "raw": "2258",
+          "threshold": 0,
+          "worst": 171
+        },
+        {
+          "current": 97,
+          "id": 4,
+          "name": "Start/Stop Count",
+          "raw": "3172",
+          "threshold": 0,
+          "worst": 97
+        },
+        {
+          "current": 200,
+          "id": 5,
+          "name": "Reallocated Sectors Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 200,
+          "id": 7,
+          "name": "Seek Error Rate",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 88,
+          "id": 9,
+          "name": "Power-On Hours",
+          "raw": "9131",
+          "threshold": 0,
+          "worst": 88
+        },
+        {
+          "current": 100,
+          "id": 10,
+          "name": "Spin Retry Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 11,
+          "name": "Recalibration Retries",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 98,
+          "id": 12,
+          "name": "Power Cycle Count",
+          "raw": "2682",
+          "threshold": 0,
+          "worst": 98
+        },
+        {
+          "current": 200,
+          "id": 192,
+          "name": "Power-off Retract Count",
+          "raw": "151",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 199,
+          "id": 193,
+          "name": "Load/Unload Cycle Count",
+          "raw": "3029",
+          "threshold": 0,
+          "worst": 199
+        },
+        {
+          "current": 112,
+          "id": 194,
+          "name": "Temperature",
+          "raw": "31",
+          "threshold": 0,
+          "worst": 103
+        },
+        {
+          "current": 200,
+          "id": 196,
+          "name": "Reallocation Event Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 200,
+          "id": 197,
+          "name": "Current Pending Sector Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 200,
+          "id": 198,
+          "name": "Uncorrectable Sector Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 200,
+          "id": 199,
+          "name": "UltraDMA CRC Error Count",
+          "raw": "1",
+          "threshold": 0,
+          "worst": 200
+        },
+        {
+          "current": 200,
+          "id": 200,
+          "name": "Write Error Rate",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 200
+        }
+      ],
+      "healthOk": false,
+      "healthPercent": null,
+      "interface": "SATA",
+      "letter": "E",
+      "model": "WDC WD10EZEX-08M2NA0",
+      "powerOnHours": 9131,
+      "serial": " WD-WCC3FAHUW34V",
+      "status": "unknown",
+      "tempC": 31,
+      "tempOk": true,
+      "totalWritesBytes": null
+    },
+    {
+      "attrs": [
+        {
+          "current": 100,
+          "id": 1,
+          "name": "Read Error Rate",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 5,
+          "name": "Reallocated Sectors Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 9,
+          "name": "Power-On Hours",
+          "raw": "3132",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 12,
+          "name": "Power Cycle Count",
+          "raw": "799",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 160,
+          "name": "Uncorrectable sectors count when read/write",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 161,
+          "name": "Number of Valid Spare Blocks",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 163,
+          "name": "Number of Initial Invalid Blocks",
+          "raw": "517",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 164,
+          "name": "Total Erase Count",
+          "raw": "152",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 165,
+          "name": "Maximum Erase Count",
+          "raw": "208",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 166,
+          "name": "Minimum Erase Count",
+          "raw": "109",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 167,
+          "name": "Average Erase Count",
+          "raw": "151",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 168,
+          "name": "Max Erase Count of Spec",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 169,
+          "name": "Remain Life",
+          "raw": "100",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 175,
+          "name": "Program fail count in worst die",
+          "raw": "87425045",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 176,
+          "name": "Erase fail count in worst die",
+          "raw": "1653459",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 177,
+          "name": "Total Wear Level Count",
+          "raw": "13772696",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 178,
+          "name": "Runtime Invalid Block Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 181,
+          "name": "Total Program Fail Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 182,
+          "name": "Total Erase Fail Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 192,
+          "name": "Power-Off Retract Count",
+          "raw": "159",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 194,
+          "name": "Temperature",
+          "raw": "40",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 195,
+          "name": "Hardware ECC Recovered",
+          "raw": "26516",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 196,
+          "name": "Reallocation Event Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 197,
+          "name": "Current Pending Sector Count",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 198,
+          "name": "Uncorrectable Error Count Off-line",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 199,
+          "name": "Ultra DMA CRC Error Count",
+          "raw": "15",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 232,
+          "name": "Available Reserved Space",
+          "raw": "0",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 241,
+          "name": "Total LBA Written",
+          "raw": "364643",
+          "threshold": 0,
+          "worst": 100
+        },
+        {
+          "current": 100,
+          "id": 242,
+          "name": "Total LBA Read",
+          "raw": "452597",
+          "threshold": 0,
+          "worst": 100
+        }
+      ],
+      "healthOk": true,
+      "healthPercent": 100,
+      "interface": "SATA",
+      "letter": "D",
+      "model": "SSD 480GB ",
+      "powerOnHours": 3132,
+      "serial": "GS24T1S48001021079",
+      "status": "good",
+      "tempC": 40,
+      "tempOk": true,
+      "totalWritesBytes": 11395000000000
+    }
+  ],
+  "ok": true
+}

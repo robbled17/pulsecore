@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "restore": {
+    "C:\\Projects\\pulsecore\\helper\\PulseCoreHelper\\PulseCoreHelper.csproj": {}
+  },
+  "projects": {
+    "C:\\Projects\\pulsecore\\helper\\PulseCoreHelper\\PulseCoreHelper.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "C:\\Projects\\pulsecore\\helper\\PulseCoreHelper\\PulseCoreHelper.csproj",
+        "projectName": "PulseCoreHelper",
+        "projectPath": "C:\\Projects\\pulsecore\\helper\\PulseCoreHelper\\PulseCoreHelper.csproj",
+        "packagesPath": "C:\\Users\\777\\AppData\\Local\\Temp\\cursor-sandbox-cache\\41742ee0d7fb082add0a0eb7b65b2874\\nuget",
+        "outputPath": "C:\\Projects\\pulsecore\\helper\\PulseCoreHelper\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\777\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        }
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "dependencies": {
+            "LibreHardwareMonitorLib": {
+              "target": "Package",
+              "version": "[0.9.6, )"
+            },
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "System.IO.Pipes.AccessControl": {
+              "target": "Package",
+              "version": "[5.0.0, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.428\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
+        }
+      }
+    }
+  }
+}

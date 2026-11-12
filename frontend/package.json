@@ -4,8 +4,12 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
+    "test": "node scripts/i18n-check.mjs && node scripts/test-disks-render.mjs && node scripts/test-msg-contract.mjs",
+    "test:i18n": "node scripts/i18n-check.mjs",
+    "prebuild": "npm test",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:exe": "cd .. && wails build -o pulsecore.exe"
   },
   "devDependencies": {
     "vite": "^7.0.0"

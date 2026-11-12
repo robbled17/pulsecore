@@ -1,0 +1,101 @@
+﻿=== PulseCore LHM Step-0 prototype ===
+Time: 2026-11-11 12:52:44
+Machine: DESKTOP-DFA8PRM
+OS: Microsoft Windows NT 10.0.19045.0
+Process: x64  Admin: True
+LibreHardwareMonitorLib: 0.9.6.0
+
+--- Windows Defender ---
+AMServiceEnabled          : True
+AntispywareEnabled        : True
+RealTimeProtectionEnabled : True
+IoavProtectionEnabled     : True
+BehaviorMonitorEnabled    : True
+
+--- Memory Integrity / VBS / HVCI ---
+VirtualizationBasedSecurityStatus : 0 (0=Off,1=Enabled,2=Running)
+SecurityServicesConfigured        : 0
+SecurityServicesRunning           : 0 (1=Credential Guard, 2=HVCI/Memory Integrity, 3=System Guard Secure Launch)
+HVCI registry key: absent (Memory Integrity typically OFF)
+VulnerableDriverBlocklistEnable: (absent)
+
+--- Kernel drivers (LHM-related) ---
+LibreHardwareMonitorLib 0.9.6 uses PawnIO (not legacy WinRing0).
+PawnIO: Status=Running, StartType=Manual
+WinRing0: not installed / not found as service
+WinRing0x64: not installed / not found as service
+WinRing0_1_2_0: not installed / not found as service
+inpoutx64: not installed / not found as service
+WMI driver: PawnIO  State=Running  Path=C:\Windows\system32\DriverStore\FileRepository\pawnio.inf_amd64_a92d2610b0f4c4c8\PawnIO.sys
+
+Computer.Open(): OK
+CPU hardware: AMD Ryzen 5 3600
+  [Voltage] Core (SVI2 TFN) = 1,33
+  [Voltage] Core #1 VID = 1,33
+  [Voltage] Core #2 VID = 1,33
+  [Voltage] Core #3 VID = 1,33
+  [Voltage] Core #4 VID = 1,33
+  [Voltage] Core #5 VID = 1,34
+  [Voltage] Core #6 VID = 1,34
+  [Voltage] SoC (SVI2 TFN) = 1,09
+  [Current] EDC = 71,05
+  [Current] TDC = 16,49
+  [Power] Core #1 (SMU) = 3,22 W
+  [Power] Core #2 (SMU) = 3,82 W
+  [Power] Core #3 (SMU) = 2,84 W
+  [Power] Core #4 (SMU) = 2,99 W
+  [Power] Core #5 (SMU) = 3,37 W
+  [Power] Core #6 (SMU) = 3,11 W
+  [Power] Package = 51,76 W
+  [Clock] Bus Speed = 99,82 MHz
+  [Clock] Core #1 = 3993 MHz
+  [Clock] Core #1 (Effective) = 1602,5 MHz
+  [Clock] Core #2 = 3993 MHz
+  [Clock] Core #2 (Effective) = 1849 MHz
+  [Clock] Core #3 = 3993 MHz
+  [Clock] Core #3 (Effective) = 1194,5 MHz
+  [Clock] Core #4 = 3993 MHz
+  [Clock] Core #4 (Effective) = 1278 MHz
+  [Clock] Core #5 = 3993 MHz
+  [Clock] Core #5 (Effective) = 1463,5 MHz
+  [Clock] Core #6 = 3993 MHz
+  [Clock] Core #6 (Effective) = 1324 MHz
+  [Clock] Cores (Average Effective) = 1452 MHz
+  [Clock] Cores (Average) = 3993 MHz
+  [Clock] Fabric = 1600 MHz
+  [Clock] Memory = 1600 MHz
+  [Clock] Uncore = 1600 MHz
+  [Temperature] CCD1 (Tdie) = 51,75 °C
+  [Temperature] Core (Tctl/Tdie) = 56,5 °C
+  [Temperature] SoC = 39,57 °C
+  [Load] CPU Core #1 = 88,46 %
+  [Load] CPU Core #10 = 61,54 %
+  [Load] CPU Core #11 = 73,08 %
+  [Load] CPU Core #12 = 61,54 %
+  [Load] CPU Core #2 = 57,69 %
+  [Load] CPU Core #3 = 57,69 %
+  [Load] CPU Core #4 = 92,31 %
+  [Load] CPU Core #5 = 46,15 %
+  [Load] CPU Core #6 = 65,38 %
+  [Load] CPU Core #7 = 73,08 %
+  [Load] CPU Core #8 = 57,69 %
+  [Load] CPU Core #9 = 61,54 %
+  [Load] CPU Core Max = 92,31 %
+  [Load] CPU Total = 66,35 %
+  [Factor] Core #1 = 40
+  [Factor] Core #2 = 40
+  [Factor] Core #3 = 40
+  [Factor] Core #4 = 40
+  [Factor] Core #5 = 40
+  [Factor] Core #6 = 40
+
+--- Summary (CPU) ---
+Tctl/Tdie/Package °C : 51,8
+Core temp max °C     : 56,5
+CPU Total load %     : 66,4
+Core clock max MHz   : 3993
+Package power W      : 51,8
+Driver/sensors usable: YES (CPU temperatures present)
+
+Compare with HWiNFO (CPU package / Tctl/Tdie / clocks / load) while both run.
+Result file: C:\Projects\pulsecore\prototypes\lhm-temp-proto\lhm-proto-result.txt

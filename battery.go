@@ -41,29 +41,67 @@ func wearLabel(wear float64) string {
 	}
 }
 
-// collectBattery uses GetSystemPowerStatus + root\WMI battery classes (not only Win32_Battery).
-func collectBattery() BatteryMetrics {
-	out := BatteryMetrics{
-		Status:     "AC",
-		StatusText: "Питание: Стандартный ATX блок питания (От сети 220V)",
+func desktopPower() BatteryMetrics {
+	return BatteryMetrics{
+		Status:     "Desktop",
+		StatusText: "Настольный ПК",
+		WearLabel:  "Питание: Стандартный ATX блок питания (От сети 220V)",
 		Available:  false,
 		PluggedIn:  true,
 		Percent:    100,
+		DeviceName: "Нет аккумулятора",
 	}
+}
+
+// win32BatteryCount queries Win32_Battery. ok is false when WMI itself cannot be asked.
+func win32BatteryCount() (int, bool) {
+	ensureOLE()
+	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	if err != nil {
+		return 0, false
+	}
+	defer locator.Release()
+	dl, err := locator.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return 0, false
+	}
+	defer dl.Release()
+	cimRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+	if err != nil {
+		return 0, false
+	}
+	cim := cimRaw.ToIDispatch()
+	defer cim.Release()
+	qRaw, err := oleutil.CallMethod(cim, "ExecQuery", "SELECT DeviceID FROM Win32_Battery")
+	if err != nil {
+		return 0, false
+	}
+	q := qRaw.ToIDispatch()
+	defer q.Release()
+	c, err := oleutil.GetProperty(q, "Count")
+	if err != nil {
+		return 0, false
+	}
+	return int(c.Val), true
+}
+
+// collectBattery uses GetSystemPowerStatus + Win32_Battery.
+// No Win32_Battery instance means a desktop PC, even if the power API reports a phantom percent.
+func collectBattery() BatteryMetrics {
+	if n, ok := win32BatteryCount(); ok && n == 0 {
+		return desktopPower()
+	}
+
+	out := desktopPower()
 
 	st, ok := readSystemPowerStatus()
 	if !ok {
 		return enrichBatteryWMI(out)
 	}
 
-	// 255 = unknown / no battery present on most Windows builds.
-	if st.BatteryLifePercent == 255 {
-		out.Available = false
-		out.PluggedIn = st.ACLineStatus == 1
-		out.Status = "Desktop"
-		out.StatusText = "Стационарный ПК (Блок питания)"
-		out.WearLabel = "Питание: Стандартный ATX блок питания (От сети 220V)"
-		return out
+	// 255 = unknown. BatteryFlag bit 0x80 = no battery installed.
+	if st.BatteryLifePercent == 255 || st.BatteryFlag&0x80 != 0 {
+		return desktopPower()
 	}
 
 	out.Available = true

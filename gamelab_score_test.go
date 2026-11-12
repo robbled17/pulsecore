@@ -38,6 +38,45 @@ func TestRTX2060SuperCyberpunkMed(t *testing.T) {
 	}
 }
 
+func TestRTX2060SuperScoreAndGTAV(t *testing.T) {
+	score := calcGPUPowerScore("NVIDIA GeForce RTX 2060 SUPER", false, 8)
+	if score < 70 || score > 75 {
+		t.Fatalf("2060 Super GPUPowerScore = %v, want 70-75", score)
+	}
+	sys := SystemPowerProfile{
+		GPUName: "NVIDIA GeForce RTX 2060 SUPER", GPUPowerScore: score, CPUPowerScore: 70,
+		CPUCores: 6, IsIntegrated: false, IsDualChannel: true, RAMGB: 16, VRAMGB: 8,
+	}
+	req := requirementsFor(GameInfo{ID: "gta5", Name: "Grand Theft Auto V", SteamAppID: 271590, Category: "aaa"})
+	high, highRange, highWarn := estimatePreset(sys, req.High, presetHigh, 0)
+	ultra, ultraRange, ultraWarn := estimatePreset(sys, req.Ultra, presetUltra, 0)
+	if highWarn != "" || ultraWarn != "" {
+		t.Fatalf("unexpected VRAM warning high=%q ultra=%q", highWarn, ultraWarn)
+	}
+	if high < 95 || high > 130 {
+		t.Fatalf("GTA V High avg %d (%s), want 95-130", high, highRange)
+	}
+	if ultra < 95 || ultra > 130 {
+		t.Fatalf("GTA V Ultra avg %d (%s), want 95-130", ultra, ultraRange)
+	}
+}
+
+func TestAdapterRAM32BitCap(t *testing.T) {
+	// 8 GiB truncated to 32 bits is 0; a signed 4 GiB-1 reading must not become empty.
+	if adapterRAMBytes(0) != 0 {
+		t.Fatal("zero")
+	}
+	if got := adapterRAMBytes(-1); got != 0xFFFFFFFF {
+		t.Fatalf("signed cap = %d", got)
+	}
+	if !vramBytesLookCapped(4*1024*1024*1024 - 1) {
+		t.Fatal("4GB-1 should look capped")
+	}
+	if got := knownDiscreteVRAMBytes("NVIDIA GeForce RTX 2060 SUPER"); got != 8*1024*1024*1024 {
+		t.Fatalf("known vram %d", got)
+	}
+}
+
 func TestIntegratedSingleChannelPenalty(t *testing.T) {
 	dual := SystemPowerProfile{
 		GPUPowerScore: 18, CPUPowerScore: 42, CPUCores: 4,

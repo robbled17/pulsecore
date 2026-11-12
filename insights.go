@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,41 +11,45 @@ import (
 	"time"
 )
 
-// AppUsageEntry is a weekly consumer of battery/traffic.
+// AppUsageEntry is a session consumer of CPU / disk.
 type AppUsageEntry struct {
 	Name         string  `json:"name"`
 	FriendlyName string  `json:"friendlyName"`
 	TrafficMB    float64 `json:"trafficMB"`
 	EnergymWh    float64 `json:"energymWh"`
 	ActiveHours  float64 `json:"activeHours"`
+	CPUSec       float64 `json:"cpuSec"`
+	DiskMB       float64 `json:"diskMB"`
 	Detail       string  `json:"detail"`
 }
 
-// MonthlyAppReport is a lightweight weekly retrospective for Overview / Lag tab.
+// MonthlyAppReport is the Session Impact summary shown on Overview.
 type MonthlyAppReport struct {
-	OK      bool            `json:"ok"`
-	Period  string          `json:"period"`
-	TopApps []AppUsageEntry `json:"topApps"`
-	Note    string          `json:"note"`
+	OK          bool            `json:"ok"`
+	Period      string          `json:"period"`
+	TopApps     []AppUsageEntry `json:"topApps"`
+	Note        string          `json:"note"`
+	WarmingUp   bool            `json:"warmingUp"`
+	SessionSecs float64         `json:"sessionSecs"`
 }
 
 // LagDiagnosis explains whether lag comes from Wi-Fi, ISP or the PC.
 type LagDiagnosis struct {
-	GatewayHost      string  `json:"gatewayHost"`
-	GatewayMs        float64 `json:"gatewayMs"`
-	GatewayBadge     string  `json:"gatewayBadge"`     // i18n key
-	GatewayBadgeOK   bool    `json:"gatewayBadgeOK"`
-	PublicHost       string  `json:"publicHost"`
-	PublicMs         float64 `json:"publicMs"`
-	PublicBadge      string  `json:"publicBadge"`
-	PublicBadgeOK    bool    `json:"publicBadgeOK"`
-	LocalJitterMs    float64 `json:"localJitterMs"`
-	JitterBadge      string  `json:"jitterBadge"`
-	JitterBadgeOK    bool    `json:"jitterBadgeOK"`
-	Verdict          string  `json:"verdict"`
-	VerdictKey       string  `json:"verdictKey"`
-	Level            string  `json:"level"` // wifi | provider | pc | ok
-	OK               bool    `json:"ok"`
+	GatewayHost    string  `json:"gatewayHost"`
+	GatewayMs      float64 `json:"gatewayMs"`
+	GatewayBadge   string  `json:"gatewayBadge"` // i18n key
+	GatewayBadgeOK bool    `json:"gatewayBadgeOK"`
+	PublicHost     string  `json:"publicHost"`
+	PublicMs       float64 `json:"publicMs"`
+	PublicBadge    string  `json:"publicBadge"`
+	PublicBadgeOK  bool    `json:"publicBadgeOK"`
+	LocalJitterMs  float64 `json:"localJitterMs"`
+	JitterBadge    string  `json:"jitterBadge"`
+	JitterBadgeOK  bool    `json:"jitterBadgeOK"`
+	Verdict        string  `json:"verdict"`
+	VerdictKey     string  `json:"verdictKey"`
+	Level          string  `json:"level"` // wifi | provider | pc | ok
+	OK             bool    `json:"ok"`
 }
 
 // SleepReport lists what prevents the laptop from sleeping.
@@ -58,32 +61,60 @@ type SleepReport struct {
 	RawHint  string   `json:"rawHint"`
 }
 
-// GetMonthlyAppReport builds a weekly "who spent battery/traffic" summary.
+// GetMonthlyAppReport returns top background impact for the current PulseCore session.
 func (a *App) GetMonthlyAppReport() MonthlyAppReport {
-	report := MonthlyAppReport{
-		Period: "последние 7 дней",
-		TopApps: []AppUsageEntry{},
-		Note:   "Собрано из системного отчёта Windows (batteryreport / srumutil).",
+	a.mu.RLock()
+	start := a.sessionStart
+	if start.IsZero() {
+		start = time.Now()
 	}
+	elapsed := time.Since(start)
+	hits := make([]*sessionHit, 0, len(a.sessionHits))
+	for _, h := range a.sessionHits {
+		cp := *h
+		hits = append(hits, &cp)
+	}
+	a.mu.RUnlock()
 
-	entries, note := collectUsageFromPowerReports()
-	report.Note = note
-	if len(entries) == 0 {
-		report.OK = true
-		report.Note = ""
-		// Detail holds stable i18n keys; UI localizes FriendlyName + Detail.
-		report.TopApps = []AppUsageEntry{
-			{Name: "MsMpEng.exe", FriendlyName: "procDefender", Detail: "procDefenderDetail", ActiveHours: 0},
-			{Name: "SearchIndexer.exe", FriendlyName: "procIndexer", Detail: "procIndexerDetail", ActiveHours: 0},
-			{Name: "chrome.exe", FriendlyName: "procBrowser", Detail: "procBrowserDetail", ActiveHours: 0},
-		}
+	report := MonthlyAppReport{
+		OK:          true,
+		Period:      "текущий сеанс",
+		TopApps:     []AppUsageEntry{},
+		SessionSecs: elapsed.Seconds(),
+	}
+	if elapsed < 5*time.Minute {
+		report.WarmingUp = true
+		report.Note = "session_warming"
 		return report
 	}
-	if len(entries) > 3 {
-		entries = entries[:3]
+
+	sort.Slice(hits, func(i, j int) bool {
+		si := hits[i].CPUSec*1.5 + hits[i].DiskMB*0.25
+		sj := hits[j].CPUSec*1.5 + hits[j].DiskMB*0.25
+		return si > sj
+	})
+	limit := 5
+	if len(hits) < limit {
+		limit = len(hits)
 	}
-	report.TopApps = entries
-	report.OK = true
+	for i := 0; i < limit; i++ {
+		h := hits[i]
+		detail := fmt.Sprintf("CPU %.0f с · диск %.1f МБ за сеанс", h.CPUSec, h.DiskMB)
+		report.TopApps = append(report.TopApps, AppUsageEntry{
+			Name:         h.Name,
+			FriendlyName: h.FriendlyName,
+			CPUSec:       h.CPUSec,
+			DiskMB:       h.DiskMB,
+			TrafficMB:    h.DiskMB,
+			ActiveHours:  h.CPUSec / 3600.0,
+			Detail:       detail,
+		})
+	}
+	if len(report.TopApps) == 0 {
+		report.Note = "session_empty"
+	} else {
+		report.Note = "session_impact"
+	}
 	return report
 }
 
@@ -189,119 +220,6 @@ func parseGenericEnergyApps(raw string) []AppUsageEntry {
 		})
 	}
 	return out
-}
-
-// DiagnoseLagOrigin compares Wi-Fi gateway, ISP DNS and local scheduler jitter.
-func (a *App) DiagnoseLagOrigin() LagDiagnosis {
-	diag := LagDiagnosis{
-		PublicHost: "8.8.8.8",
-		OK:         true,
-	}
-	gw := defaultGatewayIPv4()
-	if gw == "" {
-		gw = "192.168.1.1"
-	}
-	diag.GatewayHost = gw
-
-	diag.GatewayMs = pingAverageMs(gw, 4)
-	diag.PublicMs = pingAverageMs(diag.PublicHost, 4)
-	diag.LocalJitterMs = measureLocalJitterMs()
-
-	diag.GatewayBadgeOK = diag.GatewayMs >= 0 && diag.GatewayMs <= 15
-	diag.PublicBadgeOK = diag.PublicMs >= 0 && diag.PublicMs <= 40
-	diag.JitterBadgeOK = diag.LocalJitterMs >= 0 && diag.LocalJitterMs <= 20
-	if diag.GatewayBadgeOK {
-		diag.GatewayBadge = "netBadgeIdeal"
-	} else if diag.GatewayMs < 0 {
-		diag.GatewayBadge = "netBadgeFail"
-	} else {
-		diag.GatewayBadge = "netBadgeWeak"
-	}
-	if diag.PublicBadgeOK {
-		diag.PublicBadge = "netBadgeFast"
-	} else if diag.PublicMs < 0 {
-		diag.PublicBadge = "netBadgeFail"
-	} else {
-		diag.PublicBadge = "netBadgeSlow"
-	}
-	if diag.JitterBadgeOK {
-		diag.JitterBadge = "netBadgeStable"
-	} else {
-		diag.JitterBadge = "netBadgeUnstable"
-	}
-
-	switch {
-	case diag.GatewayMs > 50:
-		diag.Level = "wifi"
-		diag.VerdictKey = "netVerdictWifi"
-		diag.Verdict = diag.VerdictKey
-	case diag.GatewayMs >= 0 && diag.GatewayMs < 5 && diag.PublicMs > 120:
-		diag.Level = "provider"
-		diag.VerdictKey = "netVerdictISP"
-		diag.Verdict = diag.VerdictKey
-	case diag.LocalJitterMs > 150 && diag.GatewayMs < 20 && diag.PublicMs < 80:
-		diag.Level = "pc"
-		diag.VerdictKey = "netVerdictPC"
-		diag.Verdict = diag.VerdictKey
-	default:
-		diag.Level = "ok"
-		diag.VerdictKey = "netVerdictOK"
-		diag.Verdict = diag.VerdictKey
-	}
-	return diag
-}
-
-func defaultGatewayIPv4() string {
-	out, err := runHiddenOutput("powershell", "-NoProfile", "-NonInteractive", "-Command",
-		`(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1 -ExpandProperty NextHop)`)
-	if err == nil {
-		gw := strings.TrimSpace(string(out))
-		if net.ParseIP(gw) != nil {
-			return gw
-		}
-	}
-	return ""
-}
-
-func pingAverageMs(host string, count int) float64 {
-	if count < 1 {
-		count = 3
-	}
-	out, err := runHiddenOutput("ping", "-n", strconv.Itoa(count), "-w", "1000", host)
-	if err != nil && len(out) == 0 {
-		return -1
-	}
-	re := regexp.MustCompile(`(?i)(?:time|время)[=<]([0-9]+)\s*ms`)
-	matches := re.FindAllStringSubmatch(string(out), -1)
-	if len(matches) == 0 {
-		// Average line: Average = 12ms / Среднее = 12ms
-		reAvg := regexp.MustCompile(`(?i)(?:Average|Среднее)\s*=\s*([0-9]+)\s*ms`)
-		if m := reAvg.FindStringSubmatch(string(out)); len(m) == 2 {
-			v, _ := strconv.ParseFloat(m[1], 64)
-			return v
-		}
-		return -1
-	}
-	sum := 0.0
-	for _, m := range matches {
-		v, _ := strconv.ParseFloat(m[1], 64)
-		sum += v
-	}
-	return sum / float64(len(matches))
-}
-
-func measureLocalJitterMs() float64 {
-	const quantum = 8 * time.Millisecond
-	var maxOver time.Duration
-	for i := 0; i < 20; i++ {
-		start := time.Now()
-		time.Sleep(quantum)
-		over := time.Since(start) - quantum
-		if over > maxOver {
-			maxOver = over
-		}
-	}
-	return float64(maxOver) / float64(time.Millisecond)
 }
 
 // CheckSleepBlockers parses powercfg /requests for sleep inhibitors.

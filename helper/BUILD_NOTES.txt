@@ -1,0 +1,18 @@
+PulseCoreHelper (net472, framework-dependent, win-x64)
+======================================================
+
+Output: helper/dist/  (~3.7 MB total)
+Main EXE: PulseCoreHelper.exe (~52 KB) + LibreHardwareMonitorLib and deps.
+
+Requires: .NET Framework 4.8 (preinstalled on Windows 10/11).
+Does NOT require .NET 8 runtime.
+
+Modes:
+  PulseCoreHelper.exe serve      — named pipe server (admin)
+  PulseCoreHelper.exe install [-pawnio path\to\PawnIO_setup.exe]
+  PulseCoreHelper.exe uninstall
+  PulseCoreHelper.exe probe      — one-shot JSON to stdout
+
+Official PawnIO setup (verified SHA256 for 2.2.0):
+  https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe
+  SHA256: 1F519A22E47187F70A1379A48CA604981C4FCF694F4E65B734AAA74A9FBA3032

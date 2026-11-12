@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -14,8 +16,6 @@ import (
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/robbled17/zeropulse/internal/diag"
-	"github.com/robbled17/zeropulse/internal/store"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -27,13 +27,13 @@ import (
 
 const (
 	defaultPollMS   = 1000
-	mainWindowW     = 1020
-	mainWindowH     = 680
+	mainWindowW     = 1280
+	mainWindowH     = 800
 	miniHUDW        = 280
 	miniHUDH        = 56
-	gameOverlayW    = 340
-	gameOverlayH    = 64
-	mainMinW        = 880
+	gameOverlayW    = 460
+	gameOverlayH    = 52
+	mainMinW        = 760
 	mainMinH        = 560
 	createNoWindow  = 0x08000000 // CREATE_NO_WINDOW
 	lagSpikeCore    = 95.0
@@ -49,24 +49,26 @@ var (
 	procMessageBeep           = modUser32.NewProc("MessageBeep")
 	procGetForegroundWindow   = modUser32.NewProc("GetForegroundWindow")
 	procGetWindowThreadProcId = modUser32.NewProc("GetWindowThreadProcessId")
-	modKernel32 = windows.NewLazySystemDLL("kernel32.dll")
+	modKernel32               = windows.NewLazySystemDLL("kernel32.dll")
 )
 
 // App is the PulseCore application backend.
 type App struct {
 	ctx context.Context
 
-	mu           sync.RWMutex
-	metrics      SystemMetrics
+	mu            sync.RWMutex
+	metrics       SystemMetrics
 	lagEvents     []LagEvent
 	stutterEvents []StutterEvent
 	vampires      []VampireProcess
+	vampTracks    map[string]*vampTrack
 	pollInterval  time.Duration
 	miniHUD       bool
 	gameOverlay   bool
 	hidden        bool
 	powerMode     string
 	language      string
+	activeTab     string
 	periphFP      string
 	cpuName       string
 	gpuName       string
@@ -83,71 +85,110 @@ type App struct {
 	workerOnce   sync.Once
 	flightOnce   sync.Once
 	ecoPIDs      map[int32]bool
-	blackBox     *diag.BlackBox
-	uiVisible    bool // when false, skip heavy frontend emits (Stage 12 also)
-	lastEcoDelta diag.EcoDelta
-	stats        *store.StatsManager
-	statsSavedAt time.Time
+	prefs        appPrefs
 
-	leakWatch    *diag.LeakWatch
-	radarPrevCPU map[int32]float64
-	lastRadar    []diag.RadarEntry
-	lastLeaks    []diag.LeakSuspect
+	lastBattery     time.Time
+	cachedBat       BatteryMetrics
+	lastTemp        time.Time
+	cachedTemp      float64
+	tempUnavailable bool
+	lastGPU         time.Time
+	cachedGPUPct    float64
+	cachedVRAMUsed  float64
+	cachedVRAMShare float64
+	cachedVRAMDed   float64
+	cachedGPUTemp   float64
+	cachedGPUTempOK bool
+	cachedGPUPowerW float64
+	cachedGPUPowerOK bool
+	cachedGPUClockCore float64
+	cachedGPUClockMem  float64
+	nvidiaMissing   bool
+	cachedTempSource string
+	cachedTempLabelRu string
+	cachedTempLabelEn string
+	lastDisk        time.Time
+	cachedDisks     []DiskMetrics
+	lastVamp        time.Time
 
-	gameModeEnabled bool
-	gameModeActive  bool
-	gameModeName    string
-	gameModePID     int32
-	gameModeSince   time.Time
-
-	netPrevSent uint64
-	netPrevRecv uint64
-	netPrevAt   time.Time
-
-	trayCPU int
-	trayRAM int
+	sessionStart time.Time
+	sessionHits  map[string]*sessionHit
+	lastSession  time.Time
+	lagRing          RingBuffer
+	bb               *blackBox
+	ecoExitConfirmed bool
+	forceQuit        bool
+	stats            *statsEngine
+	gameDet          *gameDetectState
+	gameBook         *gameBook
+	lastStatsTick    time.Time
+	tray             *trayManager
+	radar            *processRadar
+	memWatch         *memoryWatch
+	health           *healthEngine
+	startupScan      *startupCache
+	netMon           *networkMonitor
+	netCheck         *netCheckCache
+	intel            *intelligenceEngine
+	prepareGame        *prepareGameState
+	diskSMARTCache     map[string]DiskHealthReport // drive letter → last SMART
+	diskSMARTCacheAt   map[string]time.Time
+	diskWatch          *diskWatchEngine
+	smartFixJournal    *smartFixJournalEngine
+	dismissedProblems  *dismissedProblemsEngine
+	cleanHistory       *cleanHistoryEngine
 }
 
 // SystemMetrics is a full snapshot of live hardware state.
 type SystemMetrics struct {
-	Timestamp      string             `json:"timestamp"`
-	CPUName        string             `json:"cpuName"`
-	CPUPercent     float64            `json:"cpuPercent"`
-	CPUPerCore     []float64          `json:"cpuPerCore"`
-	GPUName        string             `json:"gpuName"`
-	GPUPercent     float64            `json:"gpuPercent"`
-	VRAMUsedMB     float64            `json:"vramUsedMB"`
-	VRAMTotalMB    float64            `json:"vramTotalMB"`
-	VRAMSharedMB   float64            `json:"vramSharedMB"`
-	VRAMDedicatedMB float64           `json:"vramDedicatedMB"`
-	RAMPercent     float64            `json:"ramPercent"`
-	RAMUsedMB      uint64             `json:"ramUsedMB"`
-	RAMTotalMB     uint64             `json:"ramTotalMB"`
-	SwapPercent    float64            `json:"swapPercent"`
-	SwapUsedMB     uint64             `json:"swapUsedMB"`
-	SwapTotalMB    uint64             `json:"swapTotalMB"`
-	Disks          []DiskMetrics      `json:"disks"`
-	Battery        BatteryMetrics     `json:"battery"`
-	Hardware       HardwareInfo       `json:"hardware"`
-	TemperatureC   float64            `json:"temperatureC"`
-	PowerMode      string             `json:"powerMode"`
-	PollIntervalMS int                `json:"pollIntervalMS"`
-	MiniHUD        bool               `json:"miniHUD"`
-	Language       string             `json:"language"`
-	LagEvents      []LagEvent         `json:"lagEvents"`
-	StutterEvents  []StutterEvent     `json:"stutterEvents"`
-	Vampires       []VampireProcess   `json:"vampires"`
+	Timestamp       string           `json:"timestamp"`
+	CPUName         string           `json:"cpuName"`
+	CPUPercent      float64          `json:"cpuPercent"`
+	CPUPerCore      []float64        `json:"cpuPerCore"`
+	GPUName         string           `json:"gpuName"`
+	GPUPercent      float64          `json:"gpuPercent"`
+	VRAMUsedMB      float64          `json:"vramUsedMB"`
+	VRAMTotalMB     float64          `json:"vramTotalMB"`
+	VRAMSharedMB    float64          `json:"vramSharedMB"`
+	VRAMDedicatedMB float64          `json:"vramDedicatedMB"`
+	RAMPercent      float64          `json:"ramPercent"`
+	RAMUsedMB       uint64           `json:"ramUsedMB"`
+	RAMTotalMB      uint64           `json:"ramTotalMB"`
+	SwapPercent     float64          `json:"swapPercent"`
+	SwapUsedMB      uint64           `json:"swapUsedMB"`
+	SwapTotalMB     uint64           `json:"swapTotalMB"`
+	Disks           []DiskMetrics    `json:"disks"`
+	Battery         BatteryMetrics   `json:"battery"`
+	Hardware        HardwareInfo     `json:"hardware"`
+	TemperatureC              float64 `json:"temperatureC"`
+	TemperatureAvailable      bool    `json:"temperatureAvailable"`
+	TemperatureSource         string  `json:"temperatureSource"` // hwinfo|lhm|acpi|""
+	TemperatureSourceLabelRu  string  `json:"temperatureSourceLabelRu"`
+	TemperatureSourceLabelEn  string  `json:"temperatureSourceLabelEn"`
+	GPUTemperatureC           float64 `json:"gpuTemperatureC"`
+	GPUTemperatureAvailable   bool    `json:"gpuTemperatureAvailable"`
+	GPUPowerW                 float64 `json:"gpuPowerW"`
+	GPUPowerAvailable         bool    `json:"gpuPowerAvailable"`
+	GPUClockCoreMHz           float64 `json:"gpuClockCoreMHz"`
+	GPUClockMemMHz            float64 `json:"gpuClockMemMHz"`
+	PowerMode                 string  `json:"powerMode"`
+	PollIntervalMS  int              `json:"pollIntervalMS"`
+	MiniHUD         bool             `json:"miniHUD"`
+	Language        string           `json:"language"`
+	LagEvents       []LagEvent       `json:"lagEvents"`
+	StutterEvents   []StutterEvent   `json:"stutterEvents"`
+	Vampires        []VampireProcess `json:"vampires"`
 }
 
 // DiskMetrics describes a mounted volume and its IO throughput.
 type DiskMetrics struct {
-	Mount      string  `json:"mount"`
-	UsedGB     float64 `json:"usedGB"`
-	TotalGB    float64 `json:"totalGB"`
-	Percent    float64 `json:"percent"`
-	ReadMBps   float64 `json:"readMBps"`
-	WriteMBps  float64 `json:"writeMBps"`
-	FreeGB     float64 `json:"freeGB"`
+	Mount     string  `json:"mount"`
+	UsedGB    float64 `json:"usedGB"`
+	TotalGB   float64 `json:"totalGB"`
+	Percent   float64 `json:"percent"`
+	ReadMBps  float64 `json:"readMBps"`
+	WriteMBps float64 `json:"writeMBps"`
+	FreeGB    float64 `json:"freeGB"`
 }
 
 // BatteryMetrics describes AC/DC power state.
@@ -190,50 +231,75 @@ type VampireProcess struct {
 	Score        float64 `json:"score"`
 	EcoMode      bool    `json:"ecoMode"`
 	Frozen       bool    `json:"frozen"` // alias of EcoMode for UI compatibility
+	ReasonRu     string  `json:"reasonRu"`
+	ReasonEn     string  `json:"reasonEn"`
 }
 
 // NewApp constructs the application shell.
 func NewApp() *App {
 	return &App{
-		pollInterval: time.Duration(defaultPollMS) * time.Millisecond,
-		powerMode:    "balanced",
-		language:     "ru",
-		prevDiskIO:   make(map[string]disk.IOCountersStat),
-		lastLagAt:    make(map[int]time.Time),
+		pollInterval:  time.Duration(defaultPollMS) * time.Millisecond,
+		powerMode:     "balanced",
+		language:      "ru",
+		activeTab:     "overview",
+		prevDiskIO:    make(map[string]disk.IOCountersStat),
+		lastLagAt:     make(map[int]time.Time),
 		lagEvents:     make([]LagEvent, 0, maxLagEvents),
 		stutterEvents: make([]StutterEvent, 0, maxStutterEvents),
 		vampires:      make([]VampireProcess, 0),
 		stopWorker:    make(chan struct{}),
 		ecoPIDs:       make(map[int32]bool),
-		blackBox:      diag.NewBlackBox(),
-		uiVisible:     true,
-		leakWatch:     diag.NewLeakWatch(),
-		radarPrevCPU:  make(map[int32]float64),
+		prefs:         defaultPrefs(),
+		sessionStart:  time.Now(),
+		sessionHits:   make(map[string]*sessionHit),
+		bb:            newBlackBox(),
 	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.loadPrefs()
+	a.loadEcoState()
+	a.loadStats()
+	a.loadDiskWatch()
+	a.loadSmartFixJournal()
+	a.loadGameBook()
+	if a.prefs.StartMinimized {
+		runtime.WindowHide(ctx)
+	}
 	a.staticHW = collectStaticHardware()
 	a.cpuName = a.staticHW.cpuName
 	a.gpuName = a.staticHW.gpuName
 	a.gpuTotalVRAM = a.staticHW.gpuVRAM
-	a.loadPersistedConfig()
 	a.workerOnce.Do(func() {
 		go a.metricsWorker()
 	})
 	a.flightOnce.Do(func() {
-		a.startFlightRecorder()
+		// Lag Black Box detector (replaces the old Flight Recorder tick as the
+		// authoritative incident source). Legacy SmoothnessStatus still works.
+		a.startLagDetector()
 	})
+	a.startTray()
 	go a.peripheralsWatchdog()
-	go a.gameModeWorker()
-	_ = a.ensureStats()
 }
 
 func (a *App) shutdown(ctx context.Context) {
-	a.persistConfig()
-	if sm := a.ensureStats(); sm != nil {
-		_ = sm.Save()
+	setGameTimerPeriod(false)
+	a.persistEcoState()
+	a.flushStats(true)
+	a.flushDiskWatch()
+	a.flushSmartFixJournal()
+	if h := a.health; h != nil {
+		h.mu.Lock()
+		h.dirty = true
+		a.flushHealthLocked(h)
+		h.mu.Unlock()
+	}
+	if e := a.intel; e != nil {
+		e.mu.Lock()
+		e.dirty = true
+		a.flushIntelLocked(e)
+		e.mu.Unlock()
 	}
 	select {
 	case <-a.stopWorker:
@@ -242,80 +308,162 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
-func (a *App) loadPersistedConfig() {
-	cfg := store.LoadConfig()
-	a.mu.Lock()
-	if cfg.Language != "" {
-		a.language = cfg.Language
-	}
-	if cfg.PollIntervalMS >= 500 {
-		a.pollInterval = time.Duration(cfg.PollIntervalMS) * time.Millisecond
-	}
-	a.gameModeEnabled = cfg.GameMode
-	a.mu.Unlock()
-}
-
-func (a *App) persistConfig() {
-	a.mu.RLock()
-	cfg := store.AppConfig{
-		Language:       a.language,
-		PollIntervalMS: int(a.pollInterval / time.Millisecond),
-		GameMode:       a.gameModeEnabled,
-	}
-	a.mu.RUnlock()
-	_ = store.SaveConfig(cfg)
-}
-
 func (a *App) metricsWorker() {
-	ticker := time.NewTicker(a.pollInterval)
-	defer ticker.Stop()
-
 	a.collectOnce()
+	for {
+		if !a.pauseCollect() {
+			return
+		}
+		a.collectOnce()
+	}
+}
 
+// pauseCollect blocks the sampler for at least one second (or the chosen slower interval)
+// and returns false when the app is shutting down.
+func (a *App) pauseCollect() bool {
+	a.mu.RLock()
+	wait := a.pollInterval
+	a.mu.RUnlock()
+	if wait < time.Second {
+		wait = time.Second
+	}
+	deadline := time.Now().Add(wait)
 	for {
 		select {
 		case <-a.stopWorker:
-			return
+			return false
 		case <-a.ctx.Done():
-			return
-		case <-ticker.C:
-			a.mu.RLock()
-			interval := a.pollInterval
-			a.mu.RUnlock()
-			if interval != 0 && ticker != nil {
-				ticker.Reset(interval)
-			}
-			a.collectOnce()
+			return false
+		default:
 		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return true
+		}
+		step := time.Second
+		if remaining < step {
+			step = remaining
+		}
+		time.Sleep(step)
 	}
 }
 
 func (a *App) collectOnce() {
-	snapshot := a.buildSnapshot()
-	a.pushLiveSnapshot(snapshot)
-	prevLagCount := 0
-	a.mu.RLock()
-	prevLagCount = len(a.lagEvents)
-	a.mu.RUnlock()
-	a.LagSpotterCheck(snapshot.CPUPerCore, snapshot.CPUPercent)
-	a.mu.RLock()
-	newLagCount := len(a.lagEvents)
-	a.mu.RUnlock()
-	if newLagCount > prevLagCount {
-		// Attribute core-spike lags through VerdictEngine using the snapshot ring.
-		a.recordLagFromSpotter(350)
+	if a.ctx != nil {
+		select {
+		case <-a.ctx.Done():
+			return
+		default:
+		}
 	}
-	vampires := a.GetVampireProcesses()
-	realTemp := snapshot.TemperatureC
-	if realTemp <= 0 {
-		snapshot.TemperatureC = estimateTempFromLoad(snapshot.CPUPercent)
+
+	now := time.Now()
+	cpuPct, perCore := sampleCPULoad()
+	vm, _ := mem.VirtualMemory()
+	var sm *mem.SwapMemoryStat
+	if s, err := mem.SwapMemory(); err == nil {
+		sm = s
+	}
+
+	a.mu.RLock()
+	tab := a.activeTab
+	a.mu.RUnlock()
+	if tab == "" {
+		tab = "overview"
+	}
+
+	disks := a.disksForTab(tab, now)
+	bat := a.batteryCached(now)
+	gpuPct, vramUsed, vramShared, vramDedicated := a.gpuCached(now, tab)
+	temp := a.tempCached(now, cpuPct, tab)
+	a.mu.RLock()
+	tempReal := temp > 0 && !a.tempUnavailable
+	a.mu.RUnlock()
+	if tempReal {
+		a.TriggerThermalCheck(temp)
+	}
+
+	// Core spikes are cheap (no process walk). The culprit process is resolved only when a spike fires.
+	a.LagSpotterCheck(perCore, cpuPct)
+
+	a.mu.RLock()
+	vampDue := a.lastVamp.IsZero() || now.Sub(a.lastVamp) >= 2*time.Second
+	sessionDue := a.lastSession.IsZero() || now.Sub(a.lastSession) >= 2*time.Second
+	a.mu.RUnlock()
+	var vamps []VampireProcess
+	ranVamps := false
+	if tab == "lag" && vampDue {
+		vamps = a.GetVampireProcesses()
+		a.mu.Lock()
+		a.vampires = vamps
+		a.lastVamp = time.Now()
+		a.lastSession = time.Now()
+		a.mu.Unlock()
+		a.accrueSessionFromVampires(vamps, 2.0)
+		ranVamps = true
 	} else {
-		a.TriggerThermalCheck(realTemp)
+		a.mu.RLock()
+		vamps = append([]VampireProcess(nil), a.vampires...)
+		a.mu.RUnlock()
 	}
+	if sessionDue && !ranVamps {
+		a.accumulateSessionMetrics(2.0)
+		a.mu.Lock()
+		a.lastSession = time.Now()
+		a.mu.Unlock()
+	}
+	a.pushBlackBoxSnapshot(now, cpuPct, perCore, vm, sm, disks, gpuPct, temp)
+
+	intervalSec := 1.0
+	a.mu.RLock()
+	if !a.lastStatsTick.IsZero() {
+		intervalSec = now.Sub(a.lastStatsTick).Seconds()
+	}
+	a.mu.RUnlock()
+	if intervalSec < 0.2 {
+		intervalSec = 0.2
+	}
+	if intervalSec > 10 {
+		intervalSec = 10
+	}
+	gpuTemp, gpuTempOK, _, _, _, _ := a.gpuExtras()
+	if !gpuTempOK {
+		gpuTemp = 0
+	}
+	a.recordStatsTick(cpuPct, gpuPct, temp, gpuTemp, intervalSec)
+	a.tickGameDetect(now, gpuPct, cpuPct)
+	diskBusy := 0.0
+	diskOK := len(disks) > 0
+	if diskOK {
+		var rw float64
+		for _, d := range disks {
+			rw += d.ReadMBps + d.WriteMBps
+		}
+		diskBusy = math.Min(100, rw*2.5)
+	}
+	a.mu.RLock()
+	tempOK := temp > 0 && !a.tempUnavailable
+	gpuOK := !a.nvidiaMissing
+	a.mu.RUnlock()
+	ramPct := 0.0
+	swapPct := 0.0
+	if vm != nil {
+		ramPct = vm.UsedPercent
+	}
+	if sm != nil {
+		swapPct = sm.UsedPercent
+	}
+	sysUsed, sysOK := systemDiskUsedPct(disks)
+	a.recordHealthTick(now, cpuPct, ramPct, swapPct, gpuPct, temp, diskBusy, sysUsed, tempOK, gpuOK, diskOK, sysOK)
+	a.recordIntelligenceTick(now, cpuPct, ramPct, gpuPct, temp, tempOK, gpuOK, a.isGameSessionActive())
+	a.mu.Lock()
+	a.lastStatsTick = now
+	a.mu.Unlock()
+
+	snapshot := a.buildSnapshot(now, cpuPct, perCore, vm, sm, disks, bat, gpuPct, vramUsed, vramShared, vramDedicated, temp)
 
 	a.mu.Lock()
 	a.metrics = snapshot
-	a.vampires = vampires
 	a.metrics.LagEvents = append([]LagEvent(nil), a.lagEvents...)
 	a.metrics.StutterEvents = append([]StutterEvent(nil), a.stutterEvents...)
 	a.metrics.Vampires = append([]VampireProcess(nil), a.vampires...)
@@ -323,38 +471,106 @@ func (a *App) collectOnce() {
 	a.metrics.PollIntervalMS = int(a.pollInterval / time.Millisecond)
 	a.metrics.MiniHUD = a.miniHUD
 	a.metrics.Language = a.language
-	hidden := a.hidden
-	lagHit := newLagCount > prevLagCount
 	a.mu.Unlock()
-
-	a.recordStatsTick(a.GetMetrics(), lagHit)
-	a.observeRadarAndLeaks()
-	a.updateTrayLiveStats(snapshot.CPUPercent, snapshot.RAMPercent)
-
-	if a.ctx != nil && !hidden {
-		runtime.EventsEmit(a.ctx, "metrics:update", a.GetMetrics())
-	}
 }
 
-func (a *App) buildSnapshot() SystemMetrics {
-	now := time.Now()
-
-	overall, _ := cpu.Percent(0, false)
-	perCore, _ := cpu.Percent(0, true)
-	cpuPct := 0.0
-	if len(overall) > 0 {
-		cpuPct = overall[0]
+func (a *App) disksForTab(tab string, now time.Time) []DiskMetrics {
+	a.mu.RLock()
+	cached := append([]DiskMetrics(nil), a.cachedDisks...)
+	due := a.lastDisk.IsZero() || now.Sub(a.lastDisk) >= 2*time.Second
+	a.mu.RUnlock()
+	if tab != "overview" || !due {
+		return cached
 	}
-
-	vm, _ := mem.VirtualMemory()
-	sm, _ := mem.SwapMemory()
-
 	disks := a.collectDisks(now)
+	a.mu.Lock()
+	a.cachedDisks = append([]DiskMetrics(nil), disks...)
+	a.lastDisk = time.Now()
+	a.mu.Unlock()
+	return disks
+}
+
+func (a *App) batteryCached(now time.Time) BatteryMetrics {
+	a.mu.RLock()
+	cached := a.cachedBat
+	last := a.lastBattery
+	a.mu.RUnlock()
+	if !last.IsZero() && now.Sub(last) < 60*time.Second {
+		return cached
+	}
 	bat := collectBattery()
-	gpuPct, vramUsed, vramShared, vramDedicated := a.collectGPUUsage()
+	a.mu.Lock()
+	a.cachedBat = bat
+	a.lastBattery = time.Now()
+	a.mu.Unlock()
+	return bat
+}
 
-	temp := readCPUTemperature()
+func (a *App) gpuCached(now time.Time, tab string) (pct, used, shared, dedicated float64) {
+	a.mu.RLock()
+	pct, used, shared, dedicated = a.cachedGPUPct, a.cachedVRAMUsed, a.cachedVRAMShare, a.cachedVRAMDed
+	last := a.lastGPU
+	missing := a.nvidiaMissing
+	mini := a.miniHUD
+	a.mu.RUnlock()
+	need := tab == "overview" || tab == "hardware" || mini
+	if missing || !need || (!last.IsZero() && now.Sub(last) < 5*time.Second) {
+		return pct, used, shared, dedicated
+	}
+	pct, used, shared, dedicated = a.collectGPUUsage()
+	a.mu.Lock()
+	a.cachedGPUPct = pct
+	a.cachedVRAMUsed = used
+	a.cachedVRAMShare = shared
+	a.cachedVRAMDed = dedicated
+	a.lastGPU = time.Now()
+	a.mu.Unlock()
+	return pct, used, shared, dedicated
+}
 
+func (a *App) gpuExtras() (temp float64, tempOK bool, powerW float64, powerOK bool, clockCore, clockMem float64) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.cachedGPUTemp, a.cachedGPUTempOK, a.cachedGPUPowerW, a.cachedGPUPowerOK, a.cachedGPUClockCore, a.cachedGPUClockMem
+}
+
+func (a *App) tempCached(now time.Time, cpuPct float64, tab string) float64 {
+	_ = cpuPct // never invent a fake °C from load - show unavailable instead
+	a.mu.RLock()
+	cached := a.cachedTemp
+	last := a.lastTemp
+	a.mu.RUnlock()
+	need := tab == "overview" || tab == "hardware" || tab == "health" || tab == "home"
+	if !need && !last.IsZero() {
+		return cached // may be 0 = unknown
+	}
+	if !last.IsZero() && now.Sub(last) < 30*time.Second {
+		return cached
+	}
+	maybeResetExternalTempProbes()
+	reading := readCPUTemperatureSmart()
+	a.mu.Lock()
+	a.lastTemp = time.Now()
+	if reading.OK && reading.TempC > 0 {
+		a.tempUnavailable = false
+		a.cachedTemp = reading.TempC
+		a.cachedTempSource = reading.Source
+		a.cachedTempLabelRu = reading.LabelRu
+		a.cachedTempLabelEn = reading.LabelEn
+	} else {
+		// Do not permanently latch: HWiNFO/LHM may start later. Keep showing unavailable.
+		a.tempUnavailable = true
+		a.cachedTemp = 0
+		a.cachedTempSource = ""
+		a.cachedTempLabelRu = ""
+		a.cachedTempLabelEn = ""
+	}
+	out := a.cachedTemp
+	a.mu.Unlock()
+	return out
+}
+
+func (a *App) buildSnapshot(now time.Time, cpuPct float64, perCore []float64, vm *mem.VirtualMemoryStat, sm *mem.SwapMemoryStat, disks []DiskMetrics, bat BatteryMetrics, gpuPct, vramUsed, vramShared, vramDedicated, temp float64) SystemMetrics {
 	a.mu.RLock()
 	cpuName := a.cpuName
 	gpuName := a.gpuName
@@ -372,7 +588,19 @@ func (a *App) buildSnapshot() SystemMetrics {
 	vamps := append([]VampireProcess(nil), a.vampires...)
 	a.mu.RUnlock()
 
+	gpuTemp, gpuTempOK, gpuPower, gpuPowerOK, gpuClockCore, gpuClockMem := a.gpuExtras()
+	a.mu.RLock()
+	tempSrc := a.cachedTempSource
+	tempLblRu := a.cachedTempLabelRu
+	tempLblEn := a.cachedTempLabelEn
+	a.mu.RUnlock()
 	hw := buildHardwareInfo(staticHW, cpuPct, perCore, gpuPct, vramUsed, vramShared, vramDedicated, vm, bat)
+	hw.GPU.TemperatureC = gpuTemp
+	hw.GPU.TempAvailable = gpuTempOK
+	hw.GPU.PowerW = gpuPower
+	hw.GPU.PowerAvailable = gpuPowerOK
+	hw.GPU.ClockCoreMHz = gpuClockCore
+	hw.GPU.ClockMemMHz = gpuClockMem
 
 	return SystemMetrics{
 		Timestamp:       now.Format(time.RFC3339),
@@ -385,17 +613,27 @@ func (a *App) buildSnapshot() SystemMetrics {
 		VRAMTotalMB:     vramTotal,
 		VRAMSharedMB:    vramShared,
 		VRAMDedicatedMB: vramDedicated,
-		RAMPercent:      vm.UsedPercent,
-		RAMUsedMB:       vm.Used / (1024 * 1024),
-		RAMTotalMB:      vm.Total / (1024 * 1024),
-		SwapPercent:     sm.UsedPercent,
-		SwapUsedMB:      sm.Used / (1024 * 1024),
-		SwapTotalMB:     sm.Total / (1024 * 1024),
+		RAMPercent:      ramPercentOf(vm),
+		RAMUsedMB:       ramUsedOf(vm),
+		RAMTotalMB:      ramTotalOf(vm),
+		SwapPercent:     swapPercentOf(sm),
+		SwapUsedMB:      swapUsedOf(sm),
+		SwapTotalMB:     swapTotalOf(sm),
 		Disks:           disks,
 		Battery:         bat,
-		Hardware:        hw,
-		TemperatureC:    temp,
-		PowerMode:       powerMode,
+		Hardware:                    hw,
+		TemperatureC:                temp,
+		TemperatureAvailable:        temp > 0,
+		TemperatureSource:           tempSrc,
+		TemperatureSourceLabelRu:    tempLblRu,
+		TemperatureSourceLabelEn:    tempLblEn,
+		GPUTemperatureC:             gpuTemp,
+		GPUTemperatureAvailable:     gpuTempOK,
+		GPUPowerW:                   gpuPower,
+		GPUPowerAvailable:           gpuPowerOK,
+		GPUClockCoreMHz:             gpuClockCore,
+		GPUClockMemMHz:              gpuClockMem,
+		PowerMode:                   powerMode,
 		PollIntervalMS:  pollMS,
 		MiniHUD:         mini,
 		Language:        lang,
@@ -420,12 +658,30 @@ func (a *App) GetMetrics() SystemMetrics {
 	return out
 }
 
+// GetSystemMetrics is the UI poll entry: it returns the cached snapshot and never blocks on WMI.
+func (a *App) GetSystemMetrics() SystemMetrics {
+	return a.GetMetrics()
+}
+
+// SetActiveTab tells the sampler which pane is visible so disks, vampires and WMI stay off the hot path.
+func (a *App) SetActiveTab(tab string) {
+	switch tab {
+	case "overview", "lag", "hardware", "settings", "modes":
+	case "gamelab", "gamepulse":
+		tab = "gamelab"
+	default:
+		tab = "overview"
+	}
+	a.mu.Lock()
+	a.activeTab = tab
+	a.mu.Unlock()
+}
+
 // SetPollInterval updates the background sampling cadence (ms).
 func (a *App) SetPollInterval(ms int) {
 	if ms < 500 {
 		ms = 500
 	}
-	defer a.persistConfig()
 	if ms > 5000 {
 		ms = 5000
 	}
@@ -445,7 +701,6 @@ func (a *App) SetLanguage(lang string) {
 	a.mu.Lock()
 	a.language = lang
 	a.mu.Unlock()
-	a.persistConfig()
 }
 
 // GetLanguage returns the active language code.
@@ -463,16 +718,19 @@ func (a *App) LagSpotterCheck(cores []float64, overall float64) []LagEvent {
 		return append([]LagEvent(nil), a.lagEvents...)
 	}
 
-	culpritName, culpritPID := findHottestProcess()
-	now := time.Now().Format("15:04:05")
+	a.mu.RLock()
+	prev := append([]float64(nil), a.prevCorePct...)
+	lastLag := make(map[int]time.Time, len(a.lastLagAt))
+	for k, v := range a.lastLagAt {
+		lastLag[k] = v
+	}
+	a.mu.RUnlock()
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
+	spikedIdx := make([]int, 0, 1)
 	for i, load := range cores {
 		spiked := load >= lagSpikeCore && overall < lagSpikeOverall
-		if !spiked && len(a.prevCorePct) == len(cores) {
-			delta := load - a.prevCorePct[i]
+		if !spiked && len(prev) == len(cores) {
+			delta := load - prev[i]
 			if delta >= 40 && load >= 90 && overall < 75 {
 				spiked = true
 			}
@@ -480,9 +738,23 @@ func (a *App) LagSpotterCheck(cores []float64, overall float64) []LagEvent {
 		if !spiked {
 			continue
 		}
-		if last, ok := a.lastLagAt[i]; ok && time.Since(last) < 3*time.Second {
+		if last, ok := lastLag[i]; ok && time.Since(last) < 3*time.Second {
 			continue
 		}
+		spikedIdx = append(spikedIdx, i)
+	}
+
+	culpritName, culpritPID := "", int32(0)
+	if len(spikedIdx) > 0 {
+		culpritName, culpritPID = findHottestProcess()
+	}
+	now := time.Now().Format("15:04:05")
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for _, i := range spikedIdx {
+		load := cores[i]
 		a.lastLagAt[i] = time.Now()
 		friendly := friendlyProcessName(culpritName)
 		ev := LagEvent{
@@ -512,26 +784,50 @@ func (a *App) GetLagEvents() []LagEvent {
 	return append([]LagEvent(nil), a.lagEvents...)
 }
 
-// GetVampireProcesses finds background CPU/disk hogs that are not foreground.
-// Identical executables are merged into one row with summed metrics.
-func (a *App) GetVampireProcesses() []VampireProcess {
+func (a *App) accrueSessionFromVampires(vamps []VampireProcess, intervalSec float64) {
+	if intervalSec <= 0 {
+		intervalSec = 2
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.sessionHits == nil {
+		a.sessionHits = make(map[string]*sessionHit)
+	}
+	now := time.Now()
+	for _, v := range vamps {
+		key := strings.ToLower(filepath.Base(v.Name))
+		if key == "" {
+			continue
+		}
+		s := a.sessionHits[key]
+		if s == nil {
+			s = &sessionHit{Name: v.Name, FriendlyName: v.FriendlyName}
+			a.sessionHits[key] = s
+		}
+		s.CPUSec += (clamp01to100(v.CPUPercent) / 100.0) * intervalSec
+		s.DiskMB += math.Max(0, v.DiskMBps) * intervalSec
+		s.LastSeen = now
+	}
+}
+
+func (a *App) accumulateSessionMetrics(intervalSec float64) {
+	if intervalSec <= 0 {
+		intervalSec = 2
+	}
 	fgPID := foregroundPID()
 	procs, err := process.Processes()
 	if err != nil {
-		return []VampireProcess{}
+		return
 	}
-
-	type agg struct {
-		name   string
-		pids   []int32
-		cpu    float64
-		disk   float64
-		ecoAll bool
+	alive := map[int32]bool{}
+	type hit struct {
+		name string
+		cpu  float64
+		disk float64
 	}
-	byName := map[string]*agg{}
-
+	byName := map[string]*hit{}
 	for _, p := range procs {
-		if int32(p.Pid) == fgPID || p.Pid == 0 {
+		if p.Pid == 0 || int32(p.Pid) == fgPID {
 			continue
 		}
 		name, err := p.Name()
@@ -542,73 +838,47 @@ func (a *App) GetVampireProcesses() []VampireProcess {
 		if isSelfOrWebView(lower) || lower == "system" || lower == "idle" {
 			continue
 		}
-
-		cpuPct, err := p.CPUPercent()
+		raw, err := p.CPUPercent()
 		if err != nil {
 			continue
 		}
+		cpu := normalizeProcessCPU(raw)
 		io, _ := p.IOCounters()
-		diskMBps := 0.0
-		if io != nil {
-			diskMBps = float64(io.ReadBytes+io.WriteBytes) / (1024 * 1024) / 60.0
-			if diskMBps > 500 {
-				diskMBps = 500
-			}
-		}
-		if cpuPct < vampireCPUPct && diskMBps < 2.0 {
+		disk := processDiskRateMBps(p.Pid, io)
+		alive[p.Pid] = true
+		if cpu < 0.5 && disk < 0.15 {
 			continue
 		}
-
-		a.mu.RLock()
-		ecoOn := a.ecoPIDs[p.Pid]
-		a.mu.RUnlock()
-
-		g := byName[lower]
-		if g == nil {
-			g = &agg{name: name, ecoAll: true}
-			byName[lower] = g
+		h := byName[lower]
+		if h == nil {
+			h = &hit{name: name}
+			byName[lower] = h
 		}
-		g.pids = append(g.pids, p.Pid)
-		g.cpu += cpuPct
-		g.disk += diskMBps
-		if !ecoOn {
-			g.ecoAll = false
-		}
+		h.cpu += cpu
+		h.disk += disk
 	}
-
-	list := make([]VampireProcess, 0, len(byName))
-	for _, g := range byName {
-		score := g.cpu*1.4 + g.disk*0.6
-		pid := int32(0)
-		if len(g.pids) > 0 {
-			pid = g.pids[0]
-		}
-		list = append(list, VampireProcess{
-			PID:          pid,
-			PIDs:         append([]int32(nil), g.pids...),
-			Count:        len(g.pids),
-			Name:         g.name,
-			FriendlyName: friendlyProcessName(g.name),
-			CPUPercent:   g.cpu,
-			DiskMBps:     g.disk,
-			Score:        score,
-			EcoMode:      g.ecoAll,
-			Frozen:       g.ecoAll,
-		})
-	}
-
-	sort.Slice(list, func(i, j int) bool { return list[i].Score > list[j].Score })
-	limit := 12
-	if len(list) < limit {
-		limit = len(list)
-	}
-	out := list[:limit]
+	pruneProcIOCache(alive)
 
 	a.mu.Lock()
-	a.vampires = append([]VampireProcess(nil), out...)
-	a.mu.Unlock()
-	return out
+	defer a.mu.Unlock()
+	if a.sessionHits == nil {
+		a.sessionHits = make(map[string]*sessionHit)
+	}
+	now := time.Now()
+	for key, h := range byName {
+		cpu := clamp01to100(h.cpu)
+		s := a.sessionHits[key]
+		if s == nil {
+			s = &sessionHit{Name: h.name, FriendlyName: friendlyProcessName(h.name)}
+			a.sessionHits[key] = s
+		}
+		s.CPUSec += (cpu / 100.0) * intervalSec
+		s.DiskMB += h.disk * intervalSec
+		s.LastSeen = now
+	}
 }
+
+// GetVampireProcesses is implemented in vampires.go (MA + hold-time anti-flicker).
 
 // SetPowerProfile switches Silent / Balanced / Full Throttle via PowrProf.dll.
 func (a *App) SetPowerProfile(mode string) error {
@@ -628,7 +898,12 @@ func (a *App) TriggerThermalCheck(temp float64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if temp > thermalLimitC {
+	if !a.prefs.TempAlerts {
+		a.hotSince = time.Time{}
+		a.thermalArmed = false
+		return
+	}
+	if temp > 85 {
 		if a.hotSince.IsZero() {
 			a.hotSince = now
 		}
@@ -645,7 +920,7 @@ func (a *App) TriggerThermalCheck(temp float64) {
 func (a *App) emitThermalAlarm(temp float64) {
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
 	title := "PulseCore Emergency Hardware Alarm"
-	body := fmt.Sprintf("CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.", temp, thermalLimitC, thermalHoldSec)
+	body := fmt.Sprintf("CPU temperature %.1f°C exceeded 85°C for %ds. Consider Silent mode.", temp, thermalHoldSec)
 	showWindowsToast(title, body)
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "thermal:alarm", map[string]interface{}{
@@ -669,18 +944,23 @@ func (a *App) ToggleMiniHUD(enable bool) {
 	}
 
 	if enable {
+		invalidateMainHWNDCache()
 		runtime.WindowUnmaximise(a.ctx)
 		runtime.WindowSetMinSize(a.ctx, miniHUDW, miniHUDH)
 		runtime.WindowSetMaxSize(a.ctx, miniHUDW, miniHUDH)
 		runtime.WindowSetSize(a.ctx, miniHUDW, miniHUDH)
 		runtime.WindowSetAlwaysOnTop(a.ctx, true)
-		a.positionMiniHUD()
+		// Do not steal focus from the foreground game.
 		runtime.WindowShow(a.ctx)
+		a.positionMiniHUD()
+		// Win10: clip our own window only (PID-verified HWND).
+		a.ApplyOverlayWindowRegion(miniHUDW, miniHUDH, miniHUDH/2)
 		runtime.EventsEmit(a.ctx, "ui:minihud", true)
 		runtime.EventsEmit(a.ctx, "ui:gameoverlay", false)
 		return
 	}
 
+	a.ClearOverlayWindowRegion()
 	a.restoreMainWindow()
 	runtime.EventsEmit(a.ctx, "ui:minihud", false)
 }
@@ -706,21 +986,24 @@ func (a *App) ToggleGameOverlay(enable bool) {
 		runtime.WindowSetAlwaysOnTop(a.ctx, true)
 		a.positionGameOverlay()
 		runtime.WindowShow(a.ctx)
+		a.ApplyOverlayWindowRegion(gameOverlayW, gameOverlayH, 12)
 		runtime.EventsEmit(a.ctx, "ui:gameoverlay", true)
 		runtime.EventsEmit(a.ctx, "ui:minihud", false)
 		return
 	}
 
+	a.ClearOverlayWindowRegion()
 	a.restoreMainWindow()
 	runtime.EventsEmit(a.ctx, "ui:gameoverlay", false)
 }
 
 func (a *App) restoreMainWindow() {
+	a.ClearOverlayWindowRegion()
 	runtime.WindowSetMaxSize(a.ctx, 0, 0)
 	runtime.WindowSetMinSize(a.ctx, mainMinW, mainMinH)
-	runtime.WindowSetSize(a.ctx, mainWindowW, mainWindowH)
 	runtime.WindowSetAlwaysOnTop(a.ctx, false)
-	a.centerMainWindow()
+	runtime.WindowSetSize(a.ctx, mainWindowW, mainWindowH)
+	runtime.WindowCenter(a.ctx)
 	runtime.WindowShow(a.ctx)
 }
 
@@ -747,13 +1030,21 @@ func (a *App) positionGameOverlay() {
 
 // peripheralsWatchdog polls PnP inventory every ~2.5s and emits changes.
 func (a *App) peripheralsWatchdog() {
-	ticker := time.NewTicker(2500 * time.Millisecond)
+	ticker := time.NewTicker(8 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-a.stopWorker:
 			return
+		case <-a.ctx.Done():
+			return
 		case <-ticker.C:
+			a.mu.RLock()
+			tab := a.activeTab
+			a.mu.RUnlock()
+			if tab != "hardware" {
+				continue
+			}
 			items := a.collectConnectedDevices()
 			fp := peripheralsFingerprint(items)
 			a.mu.Lock()
@@ -797,15 +1088,82 @@ func (a *App) positionMiniHUD() {
 	}
 	const margin = 18
 	const taskbar = 52
-	x := w - miniHUDW - margin
-	y := h - miniHUDH - margin - taskbar
-	if x < 0 {
-		x = margin
+	defX := w - miniHUDW - margin
+	defY := h - miniHUDH - margin - taskbar
+	if defX < 0 {
+		defX = margin
 	}
-	if y < 0 {
-		y = margin
+	if defY < 0 {
+		defY = margin
+	}
+	a.mu.RLock()
+	x, y := a.prefs.MiniHUDPosX, a.prefs.MiniHUDPosY
+	a.mu.RUnlock()
+	// Restore saved position only if it still lands on the current screen.
+	if x < 0 || y < 0 || x > w-40 || y > h-40 {
+		x, y = defX, defY
 	}
 	runtime.WindowSetPosition(a.ctx, x, y)
+}
+
+// SaveMiniHUDPosition persists the floating capsule location.
+func (a *App) SaveMiniHUDPosition(x, y int) {
+	a.mu.Lock()
+	a.prefs.MiniHUDPosX = x
+	a.prefs.MiniHUDPosY = y
+	p := a.prefs
+	a.mu.Unlock()
+	_ = a.savePrefs(p)
+}
+
+// SetMiniHUDOpacity stores 60/80/100 opacity preference for the capsule.
+func (a *App) SetMiniHUDOpacity(percent int) {
+	if percent != 60 && percent != 80 && percent != 100 {
+		percent = 80
+	}
+	a.mu.Lock()
+	a.prefs.MiniHUDOpacityPercent = percent
+	p := a.prefs
+	a.mu.Unlock()
+	_ = a.savePrefs(p)
+}
+
+// ResizeMiniHUD autosizes the frameless overlay via Wails runtime only
+// (never Win32 SetWindowPos/MoveWindow on an unverified HWND).
+func (a *App) ResizeMiniHUD(width, height int) {
+	if a.ctx == nil || !a.IsMiniHUD() {
+		return
+	}
+	if width < 160 {
+		width = 160
+	}
+	if width > 640 {
+		width = 640
+	}
+	if height < 40 {
+		height = 40
+	}
+	if height > 120 {
+		height = 120
+	}
+	// Strict Wails APIs bound to this app's window context.
+	runtime.WindowSetMinSize(a.ctx, width, height)
+	runtime.WindowSetMaxSize(a.ctx, width, height)
+	runtime.WindowSetSize(a.ctx, width, height)
+	// Region clip only on our own HWND (PID-checked).
+	a.ApplyOverlayWindowRegion(width, height, height/2)
+}
+
+// GetMiniHUDSettings returns opacity / acrylic prefs for the frontend capsule.
+func (a *App) GetMiniHUDSettings() map[string]interface{} {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return map[string]interface{}{
+		"opacityPercent": a.prefs.MiniHUDOpacityPercent,
+		"acrylic":        a.prefs.MiniHUDAcrylic,
+		"posX":           a.prefs.MiniHUDPosX,
+		"posY":           a.prefs.MiniHUDPosY,
+	}
 }
 
 func (a *App) centerMainWindow() {
@@ -877,33 +1235,6 @@ func (a *App) ShowWindow() {
 	runtime.WindowShow(a.ctx)
 }
 
-// HideToTray hides the window while keeping the process alive in the tray.
-func (a *App) HideToTray() {
-	if a.ctx == nil {
-		return
-	}
-	a.mu.Lock()
-	a.hidden = true
-	a.mu.Unlock()
-	runtime.WindowHide(a.ctx)
-}
-
-// QuitApp exits the application and tears down the tray icon.
-func (a *App) QuitApp() {
-	quitSystray()
-	if a.ctx != nil {
-		runtime.Quit(a.ctx)
-	}
-}
-
-// beforeClose routes the window close affordance into the tray.
-func (a *App) beforeClose(ctx context.Context) (prevent bool) {
-	a.mu.Lock()
-	a.hidden = true
-	a.mu.Unlock()
-	runtime.WindowHide(ctx)
-	return true
-}
 
 func (a *App) collectDisks(now time.Time) []DiskMetrics {
 	partitions, err := disk.Partitions(true)
@@ -968,55 +1299,134 @@ func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
 	a.mu.RLock()
 	total := float64(a.gpuTotalVRAM) / (1024 * 1024)
 	a.mu.RUnlock()
+	dedicatedMB = total
 
-	// Best-effort via nvidia-smi when present (no heavy SDK).
-	if out, err := runHiddenOutput("nvidia-smi",
-		"--query-gpu=utilization.gpu,memory.used,memory.total",
-		"--format=csv,noheader,nounits"); err == nil {
-		parts := strings.Split(strings.TrimSpace(string(out)), ",")
-		if len(parts) >= 3 {
-			fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
-			fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)
-			fmt.Sscanf(strings.TrimSpace(parts[2]), "%f", &total)
-			dedicatedMB = usedMB
-			if total > usedMB {
-				sharedMB = 0
+	// Prefer NVML (temp/power/clocks + util) - no admin required.
+	if s := readGPUViaNVML(); s.OK {
+		pct = s.Pct
+		usedMB = s.UsedMB
+		if s.TotalMB > 0 {
+			dedicatedMB = s.TotalMB
+			total = s.TotalMB
+		}
+		a.mu.Lock()
+		a.nvidiaMissing = false
+		a.cachedGPUTemp = s.TempC
+		a.cachedGPUTempOK = s.TempOK
+		a.cachedGPUPowerW = s.PowerW
+		a.cachedGPUPowerOK = s.PowerOK
+		a.cachedGPUClockCore = s.ClockCoreMHz
+		a.cachedGPUClockMem = s.ClockMemMHz
+		if total > 0 {
+			bytes := snapVRAMBytes(uint64(total * 1024 * 1024))
+			if bytes > a.gpuTotalVRAM {
+				a.gpuTotalVRAM = bytes
 			}
+			if bytes > a.staticHW.gpuVRAM {
+				a.staticHW.gpuVRAM = bytes
+			}
+		}
+		a.mu.Unlock()
+		return pct, usedMB, 0, dedicatedMB
+	}
+
+	out, err := runHiddenOutput("nvidia-smi",
+		"--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
+		"--format=csv,noheader,nounits")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
 			a.mu.Lock()
-			if total > 0 {
-				a.gpuTotalVRAM = uint64(total * 1024 * 1024)
-			}
+			a.nvidiaMissing = true
+			a.cachedGPUTempOK = false
+			a.cachedGPUPowerOK = false
 			a.mu.Unlock()
-			return pct, usedMB, sharedMB, dedicatedMB
+		}
+		return 0, 0, 0, dedicatedMB
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), ",")
+	if len(parts) < 3 {
+		return 0, 0, 0, dedicatedMB
+	}
+	fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
+	fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)
+	fmt.Sscanf(strings.TrimSpace(parts[2]), "%f", &total)
+	dedicatedMB = total
+	var smiTemp, smiPower float64
+	if len(parts) >= 4 {
+		fmt.Sscanf(strings.TrimSpace(parts[3]), "%f", &smiTemp)
+	}
+	if len(parts) >= 5 {
+		fmt.Sscanf(strings.TrimSpace(parts[4]), "%f", &smiPower)
+	}
+	a.mu.Lock()
+	a.nvidiaMissing = false
+	if smiTemp >= 10 && smiTemp <= 125 {
+		a.cachedGPUTemp = smiTemp
+		a.cachedGPUTempOK = true
+	} else {
+		a.cachedGPUTempOK = false
+	}
+	if smiPower > 0 && smiPower < 1000 {
+		a.cachedGPUPowerW = smiPower
+		a.cachedGPUPowerOK = true
+	} else {
+		a.cachedGPUPowerOK = false
+	}
+	a.cachedGPUClockCore = 0
+	a.cachedGPUClockMem = 0
+	if total > 0 {
+		bytes := snapVRAMBytes(uint64(total * 1024 * 1024))
+		if bytes > a.gpuTotalVRAM {
+			a.gpuTotalVRAM = bytes
+		}
+		if bytes > a.staticHW.gpuVRAM {
+			a.staticHW.gpuVRAM = bytes
 		}
 	}
+	a.mu.Unlock()
+	return pct, usedMB, 0, dedicatedMB
+}
 
-	// Fallback: derive light GPU pressure proxy from top 3D-ish processes.
-	procs, err := process.Processes()
-	if err == nil {
-		var sum float64
-		for _, p := range procs {
-			name, _ := p.Name()
-			ln := strings.ToLower(name)
-			if strings.Contains(ln, "dwm") || strings.Contains(ln, "chrome") ||
-				strings.Contains(ln, "game") || strings.Contains(ln, "steam") ||
-				strings.HasSuffix(ln, ".exe") && (strings.Contains(ln, "gfx") || strings.Contains(ln, "nvidia") || strings.Contains(ln, "amd")) {
-				c, _ := p.CPUPercent()
-				sum += c * 0.15
-			}
-		}
-		if sum > 100 {
-			sum = 100
-		}
-		pct = sum
+func ramPercentOf(vm *mem.VirtualMemoryStat) float64 {
+	if vm == nil {
+		return 0
 	}
+	return vm.UsedPercent
+}
 
-	dedicatedMB = total * (pct / 100.0)
-	usedMB = dedicatedMB
-	if vm, err := mem.VirtualMemory(); err == nil {
-		sharedMB = float64(vm.Used) / (1024 * 1024) * 0.02
+func ramUsedOf(vm *mem.VirtualMemoryStat) uint64 {
+	if vm == nil {
+		return 0
 	}
-	return pct, usedMB, sharedMB, dedicatedMB
+	return vm.Used / (1024 * 1024)
+}
+
+func ramTotalOf(vm *mem.VirtualMemoryStat) uint64 {
+	if vm == nil {
+		return 0
+	}
+	return vm.Total / (1024 * 1024)
+}
+
+func swapPercentOf(sm *mem.SwapMemoryStat) float64 {
+	if sm == nil {
+		return 0
+	}
+	return sm.UsedPercent
+}
+
+func swapUsedOf(sm *mem.SwapMemoryStat) uint64 {
+	if sm == nil {
+		return 0
+	}
+	return sm.Used / (1024 * 1024)
+}
+
+func swapTotalOf(sm *mem.SwapMemoryStat) uint64 {
+	if sm == nil {
+		return 0
+	}
+	return sm.Total / (1024 * 1024)
 }
 
 func readCPUName() string {
@@ -1102,8 +1512,9 @@ func readCPUTemperature() float64 {
 	return maxC
 }
 
+// estimateTempFromLoad is intentionally unused for UI - fake °C misleads users.
+// Kept only for rare internal heuristics that must never be shown as a sensor reading.
 func estimateTempFromLoad(cpuPct float64) float64 {
-	// Conservative soft estimate when ACPI sensors are unavailable.
 	return 45.0 + cpuPct*0.45
 }
 
@@ -1161,6 +1572,7 @@ func findHottestProcess() (string, int32) {
 		if err != nil {
 			continue
 		}
+		c = normalizeProcessCPU(c)
 		if c > bestCPU {
 			bestCPU = c
 			bestName = name
@@ -1208,31 +1620,30 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 	_ = runHiddenStart("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
 }
 
-func runHiddenCommand(name string, args ...string) error {
+// RunHiddenCommand builds an exec.Cmd that never flashes a console window.
+func RunHiddenCommand(name string, args ...string) *exec.Cmd {
 	cmd := exec.Command(name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
-		CreationFlags: createNoWindow,
+		CreationFlags: createNoWindow, // CREATE_NO_WINDOW
 	}
-	return cmd.Run()
+	return cmd
+}
+
+func runHiddenCommand(name string, args ...string) error {
+	return RunHiddenCommand(name, args...).Run()
 }
 
 func runHiddenOutput(name string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Output()
+	return RunHiddenCommand(name, args...).Output()
+}
+
+func runHiddenCombinedOutput(name string, args ...string) ([]byte, error) {
+	return RunHiddenCommand(name, args...).CombinedOutput()
 }
 
 func runHiddenStart(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Start()
+	return RunHiddenCommand(name, args...).Start()
 }
 
 func xmlEscape(s string) string {

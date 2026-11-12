@@ -8,5 +8,6 @@ export default defineConfig({
   },
   server: {
     strictPort: true,
+    allowedHosts: ['wails.localhost'],
   },
 })

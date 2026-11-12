@@ -39,7 +39,7 @@ var ecoDenylist = map[string]struct{}{
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
 }
 
-// Kernel / PPL protected security stack — EcoQoS cannot be applied.
+// Kernel / PPL protected security stack - EcoQoS cannot be applied.
 var ecoPPLProtected = map[string]struct{}{
 	"msmpeng.exe":               {},
 	"mssense.exe":               {},
@@ -147,7 +147,7 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	}
 	name := processNameByPID(pid)
 	if isEcoProtected(name) || isPPLProtected(name) {
-		return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+		return fmt.Errorf("protected process")
 	}
 
 	access := uint32(windows.PROCESS_SET_INFORMATION | windows.PROCESS_QUERY_LIMITED_INFORMATION)
@@ -155,9 +155,9 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	if err != nil {
 		// Access denied / PPL / exited between snapshot and open.
 		if errno, ok := err.(syscall.Errno); ok && (errno == windows.ERROR_ACCESS_DENIED || errno == 5) {
-			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+			return fmt.Errorf("access denied")
 		}
-		return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+		return fmt.Errorf("access denied")
 	}
 	defer windows.CloseHandle(h)
 
@@ -179,9 +179,9 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	)
 	if r1 == 0 {
 		if callErr != nil && callErr != windows.ERROR_SUCCESS {
-			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+			return fmt.Errorf("access denied")
 		}
-		return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+		return fmt.Errorf("access denied")
 	}
 
 	prio := uintptr(normalPriorityClass)
@@ -192,8 +192,6 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	if r2 == 0 {
 		// Priority failure after EcoQoS success is non-fatal for user outcome.
 	}
-
-	before := a.beginEcoDelta(pid, name, enable)
 
 	a.mu.Lock()
 	if a.ecoPIDs == nil {
@@ -211,11 +209,6 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 		}
 	}
 	a.mu.Unlock()
-
-	a.finishEcoDelta(pid, name, enable, before)
-	if sm := a.ensureStats(); sm != nil && enable {
-		sm.IncEcoToggle()
-	}
 	return nil
 }
 

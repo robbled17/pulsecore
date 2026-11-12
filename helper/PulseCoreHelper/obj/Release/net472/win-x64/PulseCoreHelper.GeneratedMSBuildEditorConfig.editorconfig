@@ -1,0 +1,5 @@
+is_global = true
+build_property.RootNamespace = PulseCoreHelper
+build_property.ProjectDir = C:\Projects\pulsecore\helper\PulseCoreHelper\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 

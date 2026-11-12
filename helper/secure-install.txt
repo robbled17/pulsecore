@@ -1,0 +1,3 @@
+PulseCoreHelper installed (task PulseCoreHelper).
+EXE=C:\Program Files\PulseCore\helper\PulseCoreHelper.exe
+SHA256=EBE6C8D2FED60BCAFA16C34398FA40B190180CB830275687B9B8C6CE321F8346
