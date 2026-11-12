@@ -22,6 +22,9 @@ type HomeState struct {
 	Deductions      []HealthDeduction `json:"deductions"`
 	PrepareActive   bool              `json:"prepareActive"`
 	PrepareRAMMB    float64           `json:"prepareRAMMB"`
+	// EcoLimitedCount is live Eco Mode process groups (real data only).
+	EcoLimitedCount int    `json:"ecoLimitedCount"`
+	PowerMode       string `json:"powerMode"`
 }
 
 // HomeActionResult reports outcome of a one-click fix.
@@ -180,6 +183,13 @@ func (a *App) GetHomeState() HomeState {
 	prepRAM := pg.freedMB
 	pg.mu.Unlock()
 
+	ecoCount := 0
+	for _, g := range a.GetEcoLimitedGroups() {
+		if g.Count > 0 || g.Name != "" {
+			ecoCount++
+		}
+	}
+
 	return HomeState{
 		Score: health.Score, ScoreIfAllFixed: ScoreIfAllFixed(health.Score, probs),
 		Status: status,
@@ -187,6 +197,7 @@ func (a *App) GetHomeState() HomeState {
 		Incomplete: health.Incomplete, MissingNote: health.MissingNote,
 		Deductions: health.Deductions,
 		PrepareActive: prepOn, PrepareRAMMB: prepRAM,
+		EcoLimitedCount: ecoCount, PowerMode: power,
 	}
 }
 

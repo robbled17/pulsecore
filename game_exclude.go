@@ -160,6 +160,7 @@ func isExcludedGameInfo(g GameInfo) bool {
 }
 
 // GetUserHiddenGames returns titles the user hid from GamePulse.
+// Includes poster/year so the modal can reuse the same cover path as the catalog.
 func (a *App) GetUserHiddenGames() []HiddenGamePref {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
@@ -169,7 +170,12 @@ func (a *App) GetUserHiddenGames() []HiddenGamePref {
 		if id == "" {
 			continue
 		}
-		out = append(out, HiddenGamePref{ID: id, Name: strings.TrimSpace(h.Name)})
+		out = append(out, HiddenGamePref{
+			ID:        id,
+			Name:      strings.TrimSpace(h.Name),
+			PosterURL: strings.TrimSpace(h.PosterURL),
+			Year:      h.Year,
+		})
 	}
 	return out
 }

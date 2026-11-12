@@ -196,6 +196,36 @@ func coverCacheKey(title string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// steamAppIDFromCoverURL extracts /steam/apps/<id>/ from CDN poster URLs.
+// Preferring Steam app id avoids title/slug mismatches that map the wrong cover.
+func steamAppIDFromCoverURL(remoteURL string) int {
+	low := strings.ToLower(remoteURL)
+	const marker = "/steam/apps/"
+	i := strings.Index(low, marker)
+	if i < 0 {
+		return 0
+	}
+	rest := remoteURL[i+len(marker):]
+	n := 0
+	for _, r := range rest {
+		if r < '0' || r > '9' {
+			break
+		}
+		n = n*10 + int(r-'0')
+		if n > 1_000_000_000 {
+			return 0
+		}
+	}
+	return n
+}
+
+func coverCacheKeyFor(title, remoteURL string) string {
+	if id := steamAppIDFromCoverURL(remoteURL); id > 0 {
+		return fmt.Sprintf("steam_%d", id)
+	}
+	return coverCacheKey(title)
+}
+
 func coverFileURL(absPath string) string {
 	absPath = filepath.Clean(absPath)
 	p := filepath.ToSlash(absPath)
@@ -227,7 +257,7 @@ func EnsureCoverCached(title, remoteURL string) string {
 	case strings.Contains(lower, ".webp"):
 		ext = ".webp"
 	}
-	name := coverCacheKey(title) + ext
+	name := coverCacheKeyFor(title, remoteURL) + ext
 	dest := filepath.Join(dir, name)
 	if st, err := os.Stat(dest); err == nil && st.Size() > 512 {
 		return coverFileURL(dest)

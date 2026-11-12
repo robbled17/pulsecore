@@ -1707,6 +1707,8 @@ export namespace main {
 	    deductions: HealthDeduction[];
 	    prepareActive: boolean;
 	    prepareRAMMB: number;
+	    ecoLimitedCount: number;
+	    powerMode: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HomeState(source);
@@ -1725,6 +1727,8 @@ export namespace main {
 	        this.deductions = this.convertValues(source["deductions"], HealthDeduction);
 	        this.prepareActive = source["prepareActive"];
 	        this.prepareRAMMB = source["prepareRAMMB"];
+	        this.ecoLimitedCount = source["ecoLimitedCount"];
+	        this.powerMode = source["powerMode"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

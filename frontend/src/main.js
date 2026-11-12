@@ -98,6 +98,7 @@ import {
   GetUserHiddenGames,
   HideUserGame,
   RestoreHiddenGame,
+  ResolveGameMeta,
   SetMiniHUDOpacity,
   SaveMiniHUDPosition,
   ResizeMiniHUD,
@@ -1006,17 +1007,52 @@ async function renderHome() {
     }
   }
   if (!probs.length) {
-    const prep = st.prepareActive
-      ? `<button type="button" class="btn soft" data-home-action="revert_prepare">${t('homeRevertPrepare')}</button>
-         <div class="meta">${t('homePrepareFreed', { mb: fmt(st.prepareRAMMB, 0) })}</div>`
-      : `<button type="button" class="btn primary home-prepare-btn" data-home-action="prepare_game">
-           <span class="home-prepare-bolt" aria-hidden="true">⚡</span>
-           <span class="home-prepare-label">${t('homePrepare')}</span>
-         </button>`
-    findings.innerHTML = `<div class="home-problem home-all-good">
-      <div class="problem-title">${t('homeAllGood')}</div>
-      <div class="problem-actions home-prepare-actions">${prep}</div>
-    </div>`
+    const ecoN = Number(st.ecoLimitedCount) || 0
+    const power = String(st.powerMode || '').toLowerCase()
+    const powerLabel = power === 'turbo' ? t('modeTurbo')
+      : power === 'silent' ? t('modeSilent')
+        : t('modeBalanced')
+    const ecoLine = ecoN > 0
+      ? t('homeEcoActive', { n: ecoN })
+      : t('homeEcoIdle')
+    const prepInFlight = !!findings.querySelector('[data-home-action="prepare_game"].is-loading, .home-prepare-progress')
+    if (!prepInFlight) {
+      let prep
+      if (st.prepareActive) {
+        prep = `
+          <div class="home-prepare-result ok" role="status">
+            <div class="home-prepare-result-title">${t('homePrepareReady')}</div>
+            <div class="meta">${t('homePrepareFreed', { mb: fmt(st.prepareRAMMB, 0) })}</div>
+            <div class="meta home-prepare-hint">${t('homeRevertPrepareHint')}</div>
+            <button type="button" class="btn soft home-prepare-revert" data-home-action="revert_prepare">${t('homeRevertPrepare')}</button>
+          </div>`
+      } else {
+        prep = `
+          <button type="button" class="btn primary home-prepare-btn" data-home-action="prepare_game">
+            <span class="home-prepare-bolt" aria-hidden="true">⚡</span>
+            <span class="home-prepare-label">${t('homePrepare')}</span>
+          </button>
+          <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>`
+      }
+      findings.innerHTML = `<div class="home-problem home-all-good st-good">
+        <div class="home-all-good-head">
+          <div class="problem-title">${t('homeAllGood')}</div>
+          <div class="home-all-good-sub meta">${escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))}</div>
+        </div>
+        <div class="home-eco-status" data-eco-count="${ecoN}">
+          <span class="home-eco-pill">${escapeHtml(ecoLine)}</span>
+          <span class="home-eco-pill soft">${escapeHtml(powerLabel)}</span>
+        </div>
+        <div class="problem-actions home-prepare-actions">${prep}</div>
+      </div>`
+    } else {
+      // Update Eco/power pills only — keep indeterminate prepare progress intact.
+      const ecoHost = findings.querySelector('.home-eco-status')
+      if (ecoHost) {
+        ecoHost.dataset.ecoCount = String(ecoN)
+        ecoHost.innerHTML = `<span class="home-eco-pill">${escapeHtml(ecoLine)}</span><span class="home-eco-pill soft">${escapeHtml(powerLabel)}</span>`
+      }
+    }
   } else {
     const head = showGains && scoreIfAll > score
       ? `<div class="home-score-if-all meta">${t('homeScoreIfAll', { n: scoreIfAll })}</div>`
@@ -2906,7 +2942,8 @@ function renderMiniHUD(m) {
   const set = (id, pct) => {
     const el = $(id)
     if (!el) return
-    el.textContent = `${fmt(pct, 0)}%`
+    // Fixed-width numeric text so updates never reflow the capsule.
+    el.textContent = `${String(fmt(pct, 0)).padStart(2, '0')}%`
     el.classList.remove('ok', 'warn', 'hot')
     el.classList.add(hudTone(pct))
   }
@@ -2917,41 +2954,44 @@ function renderMiniHUD(m) {
   const gpuT = Number(m.gpuTempC || m.tempGPU || 0)
   const cpuWrap = $('mh-cpu-temp-wrap')
   const gpuWrap = $('mh-gpu-temp-wrap')
+  // Keep temp slots in layout (visibility) so showing/hiding never shrinks width.
   if (cpuWrap) {
     const show = Number.isFinite(cpuT) && cpuT > 0
-    cpuWrap.classList.toggle('hidden', !show)
-    if (show) {
-      const el = $('mh-cpu-temp')
-      if (el) {
-        el.textContent = `${fmt(cpuT, 0)}°`
-        el.classList.remove('ok', 'warn', 'hot')
-        el.classList.add(cpuT >= 90 ? 'hot' : cpuT >= 80 ? 'warn' : 'ok')
-      }
+    cpuWrap.classList.toggle('is-empty', !show)
+    cpuWrap.classList.remove('hidden')
+    const el = $('mh-cpu-temp')
+    if (el) {
+      el.textContent = show ? `${fmt(cpuT, 0)}°` : '--°'
+      el.classList.remove('ok', 'warn', 'hot')
+      if (show) el.classList.add(cpuT >= 90 ? 'hot' : cpuT >= 80 ? 'warn' : 'ok')
     }
   }
   if (gpuWrap) {
     const show = Number.isFinite(gpuT) && gpuT > 0
-    gpuWrap.classList.toggle('hidden', !show)
-    if (show) {
-      const el = $('mh-gpu-temp')
-      if (el) {
-        el.textContent = `${fmt(gpuT, 0)}°`
-        el.classList.remove('ok', 'warn', 'hot')
-        el.classList.add(gpuT >= 90 ? 'hot' : gpuT >= 80 ? 'warn' : 'ok')
-      }
+    gpuWrap.classList.toggle('is-empty', !show)
+    gpuWrap.classList.remove('hidden')
+    const el = $('mh-gpu-temp')
+    if (el) {
+      el.textContent = show ? `${fmt(gpuT, 0)}°` : '--°'
+      el.classList.remove('ok', 'warn', 'hot')
+      if (show) el.classList.add(gpuT >= 90 ? 'hot' : gpuT >= 80 ? 'warn' : 'ok')
     }
   }
-  // Autosize overlay window to capsule content once per second max.
+  // Size once to the full capsule (temps reserved). Only grow — never shrink on tick.
   if (hudEnabled) {
     const box = $('minihud')
     if (box && !box.classList.contains('hidden')) {
       const w = Math.ceil(box.scrollWidth + 8)
       const h = Math.ceil(box.scrollHeight + 4)
       if (w > 40 && h > 20) {
-        const key = `${w}x${h}`
-        if (renderMiniHUD._size !== key) {
-          renderMiniHUD._size = key
-          try { ResizeMiniHUD(w, h) } catch (_) { /* ignore */ }
+        const prevW = renderMiniHUD._w || 0
+        const prevH = renderMiniHUD._h || 0
+        const nextW = Math.max(prevW, w)
+        const nextH = Math.max(prevH, h)
+        if (nextW !== prevW || nextH !== prevH) {
+          renderMiniHUD._w = nextW
+          renderMiniHUD._h = nextH
+          try { ResizeMiniHUD(nextW, nextH) } catch (_) { /* ignore */ }
         }
       }
     }
@@ -3334,6 +3374,11 @@ async function refreshAllDiskSmart(force = false) {
 function setHudMode(enabled) {
   hudEnabled = !!enabled
   if (enabled) setGameOverlayMode(false, true)
+  else {
+    // Allow a fresh measure next time HUD opens (still grow-only while open).
+    renderMiniHUD._w = 0
+    renderMiniHUD._h = 0
+  }
   document.body.classList.toggle('mini-hud-active', enabled)
   document.documentElement.classList.toggle('mini-hud-active', enabled)
   const hud = $('minihud')
@@ -3426,10 +3471,81 @@ function sampleFrametime(now) {
 let hiddenGames = new Set()
 let hiddenGamesMeta = []
 
+/** Shared human title path: metadata → catalog → careful slug → id. Never invent covers. */
+function humanizeGameSlug(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  // Prefer already-human titles.
+  if (/[ A-ZА-ЯЁ]/.test(s) && !/^[a-z0-9]+(?:[_-][a-z0-9]+)+$/i.test(s)) return s
+  return s
+    .replace(/^app[:_-]?/i, '')
+    .replace(/[_]+/g, ' ')
+    .replace(/[-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b([a-zа-яё])/gi, (ch) => ch.toUpperCase())
+}
+
+function looksLikeSlug(name, id) {
+  const n = String(name || '').trim()
+  const i = String(id || '').trim()
+  if (!n) return true
+  if (i && n.toLowerCase() === i.toLowerCase()) return true
+  if (/^[a-z0-9]+(?:[_-][a-z0-9]+)+$/i.test(n) && n === n.toLowerCase()) return true
+  return false
+}
+
+function gameDisplayName(g) {
+  if (!g) return ''
+  const id = String(g.id || g.ID || '').trim()
+  const meta = String(g.name || g.Name || g.title || g.Title || '').trim()
+  if (meta && !looksLikeSlug(meta, id)) return meta
+  const fromCatalog = lookupCatalogGame(id)
+  if (fromCatalog?.name && !looksLikeSlug(fromCatalog.name, id)) return fromCatalog.name
+  if (meta) return humanizeGameSlug(meta)
+  return humanizeGameSlug(id) || id
+}
+
+async function enrichHiddenGameTitles(list) {
+  const out = []
+  for (const h of list || []) {
+    const id = String(h?.id || '').trim()
+    if (!id) continue
+    let name = String(h?.name || '').trim()
+    let poster = String(h?.posterUrl || h?.PosterURL || '').trim()
+    let year = Number(h?.year || h?.Year) || 0
+    const catalog = lookupCatalogGame(id)
+    if (catalog) {
+      if (!name || looksLikeSlug(name, id)) name = catalog.name || name
+      if (!poster) poster = catalog.posterUrl || catalog.headerUrl || ''
+      if (!year) year = Number(catalog.year) || 0
+    }
+    if ((!name || looksLikeSlug(name, id) || !poster) && typeof ResolveGameMeta === 'function') {
+      try {
+        const meta = await ResolveGameMeta(name && !looksLikeSlug(name, id) ? name : id)
+        if (meta?.name && (!name || looksLikeSlug(name, id))) name = meta.name
+        if (!poster && (meta?.posterUrl || meta?.headerUrl)) {
+          // Only accept resolved cover when it belongs to this query — never a random hit without name match.
+          poster = meta.posterUrl || meta.headerUrl || ''
+        }
+        if (!year && meta?.year) year = Number(meta.year) || 0
+      } catch (_) { /* offline / fail closed to placeholder */ }
+    }
+    out.push({
+      id,
+      name: gameDisplayName({ id, name }),
+      posterUrl: poster,
+      headerUrl: '',
+      year,
+    })
+  }
+  return out
+}
+
 async function syncHiddenGamesFromBackend() {
   try {
     const list = await GetUserHiddenGames() || []
-    hiddenGamesMeta = Array.isArray(list) ? list : []
+    hiddenGamesMeta = await enrichHiddenGameTitles(Array.isArray(list) ? list : [])
     hiddenGames = new Set(hiddenGamesMeta.map((h) => String(h?.id || '').toLowerCase()).filter(Boolean))
     // One-shot migrate legacy localStorage list into prefs.
     try {
@@ -3438,11 +3554,16 @@ async function syncHiddenGamesFromBackend() {
         for (const id of legacy) {
           const sid = String(id || '').trim()
           if (!sid || hiddenGames.has(sid.toLowerCase())) continue
-          await HideUserGame(sid, sid)
+          const g = lookupCatalogGame(sid)
+          const title = gameDisplayName(g || { id: sid, name: sid })
+          const poster = g?.posterUrl || g?.headerUrl || ''
+          const year = Number(g?.year) || 0
+          if (typeof HideUserGameMeta === 'function') await HideUserGameMeta(sid, title, poster, year)
+          else await HideUserGame(sid, title)
         }
         localStorage.removeItem('zp_hidden_games')
         const refreshed = await GetUserHiddenGames() || []
-        hiddenGamesMeta = Array.isArray(refreshed) ? refreshed : []
+        hiddenGamesMeta = await enrichHiddenGameTitles(Array.isArray(refreshed) ? refreshed : [])
         hiddenGames = new Set(hiddenGamesMeta.map((h) => String(h?.id || '').toLowerCase()).filter(Boolean))
       }
     } catch (_) { /* ignore */ }
@@ -3733,9 +3854,25 @@ function renderGameGrid() {
     host.innerHTML = q || gameGenre !== 'all' || (gameReqFit && gameReqFit !== 'all')
       ? `<div class="game-empty-card" role="status">${t('gameSearchEmpty')}</div>`
       : `<div class="empty">${t('intelEmpty')}</div>`
+    host.dataset.gridSig = ''
     return
   }
-  host.innerHTML = list.filter((g) => g && (g.name || g.title)).map((g) => {
+  const ids = list.map((g) => g?.id).filter(Boolean)
+  const sig = `${ids.join('|')}::${gameSort}|${gameGenre}|${gameReqFit}|${q}`
+  // Same catalog membership: update selection classes only — never rebuild posters mid-scroll.
+  if (host.dataset.gridSig === sig && host.querySelector('.game-card')) {
+    const want = String(selectedGameId || '')
+    host.querySelectorAll('.game-card').forEach((card) => {
+      const on = card.dataset.game === want
+      card.classList.toggle('selected', on)
+      card.classList.toggle('active', on)
+    })
+    return
+  }
+  host.dataset.gridSig = sig
+  const frag = document.createDocumentFragment()
+  const tmp = document.createElement('div')
+  tmp.innerHTML = list.filter((g) => g && (g.name || g.title)).map((g) => {
     const safeName = String(g.name || g.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const titleAttr = String(g.name || g.title || '').replace(/"/g, '&quot;')
     const idAttr = String(g.id || '').replace(/"/g, '&quot;')
@@ -3748,6 +3885,8 @@ function renderGameGrid() {
       </div>
     </button>`
   }).join('')
+  while (tmp.firstChild) frag.appendChild(tmp.firstChild)
+  host.replaceChildren(frag)
 }
 
 let gamePanelLastFocus = null
@@ -3782,7 +3921,7 @@ async function hideSelectedGame() {
   if (!selectedGameId) return
   const id = String(selectedGameId)
   const g = lookupCatalogGame(id)
-  const name = g?.name || id
+  const name = gameDisplayName(g || { id, name: id })
   const poster = g?.posterUrl || g?.headerUrl || ''
   const year = Number(g?.year) || 0
   try {
@@ -3795,12 +3934,15 @@ async function hideSelectedGame() {
   }
   updateHiddenGamesButton()
   selectedGameId = null
+  predictToken += 1
   document.querySelectorAll('.game-card.selected, .game-card.active').forEach((card) => {
     card.classList.remove('selected', 'active')
   })
   hideFpsDetail()
   gameCatalog = normalizeGameList(gameCatalog)
   gameCatalogFull = normalizeGameList(gameCatalogFull)
+  const host = $('game-grid')
+  if (host) host.dataset.gridSig = ''
   renderGameGrid()
 }
 
@@ -3813,12 +3955,16 @@ function openHiddenGamesModal() {
     return
   }
   list.innerHTML = hiddenGamesMeta.map((h) => {
-    const title = String(h.name || h.id || '')
+    const title = gameDisplayName(h)
     const year = Number(h.year) > 0 ? String(h.year) : ''
-    const cover = h.posterUrl || h.headerUrl || ''
-    const coverHTML = cover
-      ? `<img class="hidden-game-cover" src="${escapeHtml(cover)}" alt="" loading="lazy" />`
-      : `<div class="hidden-game-cover fallback" aria-hidden="true"></div>`
+    // Same cover path as catalog: real poster for this id, else gradient placeholder — never wrong art.
+    const coverHTML = compactCoverHTML({
+      gameName: title,
+      name: title,
+      posterUrl: h.posterUrl || '',
+      headerUrl: h.headerUrl || '',
+      year: Number(h.year) || 0,
+    }, { hideTitle: true }).replace('class="game-cover"', 'class="game-cover hidden-game-cover"')
     return `
     <div class="hidden-game-row" data-hidden-id="${escapeHtml(h.id)}">
       ${coverHTML}
@@ -3853,6 +3999,7 @@ async function selectGame(gameId) {
   if (!id) return
   if (selectedGameId === id) {
     selectedGameId = null
+    predictToken += 1
     document.querySelectorAll('.game-card.selected, .game-card.active').forEach((card) => {
       card.classList.remove('selected', 'active')
     })
@@ -3861,12 +4008,41 @@ async function selectGame(gameId) {
   }
   gamePanelLastFocus = document.activeElement
   selectedGameId = id
+  // Selection is class-only — never rebuild the catalog grid.
   document.querySelectorAll('.game-card').forEach((card) => {
     const on = card.dataset.game === id
     card.classList.toggle('selected', on)
     card.classList.toggle('active', on)
   })
   showFpsDetail()
+  const box = $('fps-result')
+  if (box) {
+    const g = lookupCatalogGame(id)
+    const title = gameDisplayName(g || { id, name: id })
+    box.className = 'fps-result game-selected-panel open'
+    box.innerHTML = `
+      <div class="game-selected-panel-bar">
+        <div class="selected-game-banner game-compact">
+          ${g ? gamePosterHTML(g).replace('class="game-poster"', 'class="game-cover selected-game-poster-mini"') : posterFallbackHTML(title, 'game-cover selected-game-poster-mini', 0, '', { hideTitle: true })}
+          <div class="selected-game-info game-compact-body">
+            <div class="game-compact-title">${escapeHtml(title)}</div>
+            <div class="meta">${t('checking')}</div>
+          </div>
+        </div>
+        <div class="game-selected-actions">
+          <button type="button" class="btn compact btn-game-panel-close" id="btn-game-panel-close" aria-label="${t('gameClosePanel')}">✕</button>
+        </div>
+      </div>`
+    $('btn-game-panel-close')?.addEventListener('click', () => {
+      selectedGameId = null
+      predictToken += 1
+      document.querySelectorAll('.game-card.selected, .game-card.active').forEach((card) => {
+        card.classList.remove('selected', 'active')
+      })
+      hideFpsDetail()
+    })
+    syncGamePanelPadding(true)
+  }
   await predictSelectedGame()
   requestAnimationFrame(() => {
     $('btn-game-panel-close')?.focus()
@@ -3949,21 +4125,31 @@ function wireCustomDropdowns() {
   syncCustomDropdownLabels()
 }
 
+let warmCompatToken = 0
 async function warmCompatScores(list) {
   if (!gameReqFit || gameReqFit === 'all') return
+  const token = ++warmCompatToken
   const sample = (list || []).slice(0, 24)
-  await Promise.all(sample.map(async (g) => {
-    if (!g?.id || fpsCache[g.id]?.verdictLevel) return
+  let changed = false
+  // Yield between predictions so carousel scroll stays responsive.
+  for (const g of sample) {
+    if (token !== warmCompatToken) return
+    if (!g?.id || fpsCache[g.id]?.verdictLevel) continue
     try {
       const p = await PredictGameFPS(g.id)
+      if (token !== warmCompatToken) return
       fpsCache[g.id] = {
         medAvg: p.medAvg,
         highAvg: p.highAvg,
         verdictLevel: p.verdictLevel || 'warn',
       }
+      changed = true
     } catch (_) {}
-  }))
-  renderGameGrid()
+    await new Promise((r) => setTimeout(r, 0))
+  }
+  if (changed && token === warmCompatToken && gameReqFit && gameReqFit !== 'all') {
+    renderGameGrid()
+  }
 }
 
 function formatFitDownload(fit) {
@@ -4001,20 +4187,29 @@ function lookupCatalogGame(id) {
   return null
 }
 
+let predictToken = 0
 async function predictSelectedGame() {
   const box = $('fps-result')
   if (!box || !selectedGameId) return
+  const reqId = ++predictToken
+  const wantId = String(selectedGameId)
   showFpsDetail()
   try {
-    const p = await PredictGameFPS(selectedGameId)
-    const catalogGame = lookupCatalogGame(selectedGameId)
-    // Prefer live catalog cover (same art as grid); fall back to prediction / header.
+    const p = await PredictGameFPS(wantId)
+    if (reqId !== predictToken || selectedGameId !== wantId) return // stale race
+    const catalogGame = lookupCatalogGame(wantId)
+    // Prefer live catalog cover for THIS id only; never borrow another title's art.
     const coverSrc = catalogGame?.posterUrl || catalogGame?.headerUrl
-      || p.posterUrl || p.headerUrl || p.cover || p.imageURL || ''
-    const headerSrc = catalogGame?.headerUrl || p.headerUrl || ''
+      || (String(p.id || '') === wantId || String(p.gameId || '') === wantId
+        ? (p.posterUrl || p.headerUrl || p.cover || p.imageURL || '')
+        : '')
+      || ''
+    const headerSrc = catalogGame?.headerUrl
+      || (coverSrc && p.headerUrl && p.headerUrl !== coverSrc ? p.headerUrl : '')
+      || ''
     const fit = p.fit || {}
     const level = fit.level || 'unknown'
-    fpsCache[selectedGameId] = { medAvg: p.medAvg, highAvg: p.highAvg, verdictLevel: p.verdictLevel || fitLevelToFilterUI(level) }
+    fpsCache[wantId] = { medAvg: p.medAvg, highAvg: p.highAvg, verdictLevel: p.verdictLevel || fitLevelToFilterUI(level) }
     const useEn = lang === 'en'
     const label = (useEn ? fit.labelEn : fit.labelRu) || t(p.verdict || 'fitVerdictUnknown')
     const reason = (useEn ? fit.reasonEn : fit.reasonRu) || ''
@@ -4025,9 +4220,13 @@ async function predictSelectedGame() {
     const approx = fit.approximate !== false
       ? `<span class="fit-approx-badge">${t('fitApproximate')}</span>`
       : ''
+    const displayTitle = gameDisplayName({
+      id: wantId,
+      name: p.gameName || catalogGame?.name || '',
+      title: catalogGame?.title || '',
+    })
     const coverPayload = {
-      ...p,
-      gameName: p.gameName || catalogGame?.name || '',
+      gameName: displayTitle,
       posterUrl: coverSrc,
       headerUrl: headerSrc,
       category: p.category || catalogGame?.category || '',
@@ -4036,6 +4235,7 @@ async function predictSelectedGame() {
     }
     const cover = compactCoverHTML(coverPayload, { hideTitle: true })
       .replace('class="game-cover"', 'class="game-cover selected-game-poster-mini"')
+    if (reqId !== predictToken || selectedGameId !== wantId) return
     box.className = 'fps-result game-selected-panel open'
     box.setAttribute('role', 'dialog')
     box.setAttribute('aria-modal', 'false')
@@ -4046,7 +4246,7 @@ async function predictSelectedGame() {
         <div class="selected-game-banner game-compact">
           ${cover}
           <div class="selected-game-info game-compact-body">
-            <div class="game-compact-title" id="game-selected-title">${escapeHtml(p.gameName || '')}</div>
+            <div class="game-compact-title" id="game-selected-title">${escapeHtml(displayTitle)}</div>
             <div class="game-compact-meta">
               ${badge ? `<span class="game-badge era">${escapeHtml(badge)}</span>` : ''}
               ${p.engine ? `<span class="game-badge">${escapeHtml(p.engine)}</span>` : ''}
@@ -4070,6 +4270,7 @@ async function predictSelectedGame() {
     `
     $('btn-game-panel-close')?.addEventListener('click', () => {
       selectedGameId = null
+      predictToken += 1
       document.querySelectorAll('.game-card.selected, .game-card.active').forEach((card) => {
         card.classList.remove('selected', 'active')
       })
@@ -4078,8 +4279,15 @@ async function predictSelectedGame() {
     $('btn-game-hide')?.addEventListener('click', () => hideSelectedGame())
     requestAnimationFrame(() => syncGamePanelPadding(true))
   } catch (err) {
+    if (reqId !== predictToken || selectedGameId !== wantId) return
     box.className = 'fps-result game-selected-panel open empty'
-    box.textContent = String(err)
+    box.innerHTML = `<div class="game-selected-error" role="alert">${escapeHtml(String(err))}</div>
+      <button type="button" class="btn compact btn-game-panel-close" id="btn-game-panel-close" aria-label="${t('gameClosePanel')}">✕</button>`
+    $('btn-game-panel-close')?.addEventListener('click', () => {
+      selectedGameId = null
+      predictToken += 1
+      hideFpsDetail()
+    })
     syncGamePanelPadding(true)
   }
 }
@@ -5466,16 +5674,25 @@ function wireUI() {
       return
     }
     const btn = ev.target.closest('[data-home-action]')
-    if (!btn) return
+    if (!btn || btn.disabled) return
     const action = btn.getAttribute('data-home-action') || ''
     const arg = btn.getAttribute('data-home-arg') || ''
+    const actionsHost = btn.closest('.home-prepare-actions') || btn.parentElement
     btn.disabled = true
     const labelEl = btn.querySelector('.home-prepare-label')
-    const prevLabel = labelEl?.textContent || btn.textContent
-    if (action === 'prepare_game') {
-      btn.classList.add('is-loading')
-      if (labelEl) labelEl.textContent = t('homePrepareLoading')
-      else btn.textContent = t('homePrepareLoading')
+    if (action === 'prepare_game' || action === 'revert_prepare') {
+      // Immediate honest UI: indeterminate progress, no fake %.
+      if (actionsHost) {
+        const label = action === 'prepare_game' ? t('homePrepareLoading') : t('homeRevertLoading')
+        actionsHost.innerHTML = `
+          <div class="home-prepare-progress" role="status" aria-live="polite" aria-busy="true">
+            <div class="home-prepare-progress-label">${escapeHtml(label)}</div>
+            <div class="home-prepare-track" aria-hidden="true"><div class="home-prepare-fill"></div></div>
+          </div>`
+      } else {
+        btn.classList.add('is-loading')
+        if (labelEl) labelEl.textContent = t('homePrepareLoading')
+      }
     }
     let res
     try { res = await RunHomeAction(action, arg) } catch (err) {
@@ -5492,10 +5709,24 @@ function wireUI() {
       return
     }
     if (action === 'set_refresh_rate' || res?.openTab === 'monitors') {
-      const arg = btn.getAttribute('data-home-arg') || ''
-      const [dev, hzStr] = String(arg).split('|')
+      const a = btn.getAttribute('data-home-arg') || ''
+      const [dev, hzStr] = String(a).split('|')
       openMonitorsModal(dev || '', Number(hzStr) || 0).catch(() => {})
       btn.disabled = false
+      return
+    }
+    if ((action === 'prepare_game' || action === 'revert_prepare') && res && res.ok === false && actionsHost) {
+      const errText = resultMsg(res) || t('homePrepareFail')
+      actionsHost.innerHTML = `
+        <div class="home-prepare-result err" role="alert">
+          <div class="home-prepare-result-title">${escapeHtml(errText)}</div>
+          <button type="button" class="btn primary home-prepare-btn" data-home-action="prepare_game">
+            <span class="home-prepare-bolt" aria-hidden="true">⚡</span>
+            <span class="home-prepare-label">${t('homePrepare')}</span>
+          </button>
+          <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>
+        </div>`
+      showToast(errText, false, { holdMs: 6000 })
       return
     }
     const msg = resultMsg(res)
@@ -5504,10 +5735,11 @@ function wireUI() {
     if (action === 'open_disk') {
       revealDiskSpecs(arg || 'C')
     }
-    renderHome().catch(() => {})
+    // Clear in-flight marker so renderHome can rebuild result/restore UI.
+    actionsHost?.querySelector('.home-prepare-progress')?.remove()
     btn.classList.remove('is-loading')
-    if (labelEl) labelEl.textContent = prevLabel
     btn.disabled = false
+    renderHome().catch(() => {})
   })
   $('mh-expand').addEventListener('click', disableHud)
   $('btn-toggle-overlay')?.addEventListener('click', toggleGameOverlayPill)
@@ -5766,20 +5998,26 @@ function wireUI() {
 
   const carousel = $('games-carousel-wrapper') || document.querySelector('.games-carousel-wrapper')
   if (carousel) {
+    let wheelLock = false
     carousel.addEventListener('wheel', (e) => {
       e.preventDefault()
+      if (wheelLock) return
+      wheelLock = true
       const step = 206
+      // Instant scroll avoids smooth-scroll + paint jank stacking during rapid wheel.
       carousel.scrollBy({
         top: e.deltaY > 0 ? step : -step,
-        behavior: 'smooth',
+        behavior: 'auto',
       })
+      requestAnimationFrame(() => { wheelLock = false })
     }, { passive: false })
   }
 
-  $('game-grid')?.addEventListener('click', async (ev) => {
+  $('game-grid')?.addEventListener('click', (ev) => {
     const card = ev.target.closest('[data-game]')
     if (!card) return
-    await selectGame(card.dataset.game)
+    // Fire-and-forget: selection UI is sync; prediction is raced via predictToken.
+    selectGame(card.dataset.game).catch(() => {})
   })
 
   $('lag-log')?.addEventListener('click', async (ev) => {

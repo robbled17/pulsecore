@@ -23,11 +23,11 @@
 
   <div id="minihud" class="minihud mini-hud-capsule hidden" data-opacity="80" title="">
     <div class="minihud-metrics">
-      <span class="mh-label">CPU <b id="mh-cpu">--</b></span>
-      <span class="mh-label">RAM <b id="mh-ram">--</b></span>
-      <span class="mh-label">GPU <b id="mh-gpu">--</b></span>
-      <span class="mh-label mh-temp hidden" id="mh-cpu-temp-wrap">CPU° <b id="mh-cpu-temp">--</b></span>
-      <span class="mh-label mh-temp hidden" id="mh-gpu-temp-wrap">GPU° <b id="mh-gpu-temp">--</b></span>
+      <span class="mh-label">CPU <b id="mh-cpu">--%</b></span>
+      <span class="mh-label">RAM <b id="mh-ram">--%</b></span>
+      <span class="mh-label">GPU <b id="mh-gpu">--%</b></span>
+      <span class="mh-label mh-temp is-empty" id="mh-cpu-temp-wrap">CPU° <b id="mh-cpu-temp">--°</b></span>
+      <span class="mh-label mh-temp is-empty" id="mh-gpu-temp-wrap">GPU° <b id="mh-gpu-temp">--°</b></span>
     </div>
     <button type="button" id="mh-expand" class="btn ghost compact mh-expand hud-nodrag" data-i18n-title="hudExpand" title="Expand">↗</button>
     <div id="mh-menu" class="mh-menu hidden hud-nodrag" role="menu">
@@ -629,8 +629,9 @@
           <li>PawnIO (namazso) - GPL-2.0 (+ exception for IOCTL clients)</li>
           <li>Wails, gopsutil и др. - см. зависимости проекта</li>
         </ul>
-                <div class="about-report-block">
-          <div class="settings-section-title" data-i18n="reportTitle">Диагностический отчёт</div>
+        <div class="about-report-block">
+          <div class="settings-section-title about-report-title" data-i18n="reportTitle">Диагностический отчёт</div>
+          <p class="settings-hint about-report-lead" data-i18n="reportSub">Локальный снимок состояния для поддержки — без паролей и токенов.</p>
           <button type="button" class="settings-debug-toggle glass-control" id="btn-about-report-toggle" aria-expanded="false">
             <span data-i18n="reportPreview">Что войдёт в отчёт</span> <span class="settings-debug-chevron" aria-hidden="true">▾</span>
           </button>
