@@ -20,6 +20,53 @@ func normalizeGameKey(name string) string {
 	return re.ReplaceAllString(n, "")
 }
 
+// folderTitleAliases maps install-folder / slug ids to the real store title.
+// Keys are normalizeGameKey output (letters and digits only).
+var folderTitleAliases = map[string]string{
+	"cities2":                          "Cities: Skylines II",
+	"citiesskylines2":                  "Cities: Skylines II",
+	"citiesskylinesii":                 "Cities: Skylines II",
+	"oblivionremaster":                 "The Elder Scrolls IV: Oblivion Remastered",
+	"oblivionremastered":               "The Elder Scrolls IV: Oblivion Remastered",
+	"elderscrollsivoblivionremastered": "The Elder Scrolls IV: Oblivion Remastered",
+	"skyrimspecialedition":             "The Elder Scrolls V: Skyrim Special Edition",
+	"skyrimse":                         "The Elder Scrolls V: Skyrim Special Edition",
+	"fallout4":                         "Fallout 4",
+	"witcher3":                         "The Witcher 3: Wild Hunt",
+	"thewitcher3":                      "The Witcher 3: Wild Hunt",
+	"baldursgate3":                     "Baldur's Gate 3",
+	"bg3":                              "Baldur's Gate 3",
+	"cyberpunk2077":                    "Cyberpunk 2077",
+	"rdr2":                             "Red Dead Redemption 2",
+	"reddeadredemption2":               "Red Dead Redemption 2",
+	"buckshotroulette":                 "Buckshot Roulette",
+}
+
+// canonicalFolderTitle resolves a folder slug before any fuzzy catalog search.
+func canonicalFolderTitle(query string) (string, bool) {
+	key := normalizeGameKey(query)
+	key = strings.TrimPrefix(key, "steam")
+	if key == "" {
+		return "", false
+	}
+	if title, ok := folderTitleAliases[key]; ok && strings.TrimSpace(title) != "" {
+		return title, true
+	}
+	return "", false
+}
+
+// namesMatchStrict is equality after case and punctuation folding.
+// A query must not match a longer DLC or puzzle title that merely contains the words.
+func namesMatchStrict(a, b string) bool {
+	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
+		return false
+	}
+	if normGameKey(a) == normGameKey(b) {
+		return true
+	}
+	return normalizeGameKey(a) != "" && normalizeGameKey(a) == normalizeGameKey(b)
+}
+
 // normalizeGameInfo fills safe defaults so missing covers/fields never panic callers.
 func normalizeGameInfo(g GameInfo) GameInfo {
 	g.ID = strings.TrimSpace(g.ID)
@@ -155,10 +202,10 @@ func parseLibraryFolders(vdf string) []string {
 	return out
 }
 
-func parseAppManifest(path string) (appID int, name string) {
+func parseAppManifest(path string) (appID int, name, installDir string, sizeBytes int64) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return 0, ""
+		return 0, "", "", 0
 	}
 	text := string(raw)
 	if m := regexp.MustCompile(`(?i)"appid"\s+"(\d+)"`).FindStringSubmatch(text); len(m) == 2 {
@@ -167,7 +214,13 @@ func parseAppManifest(path string) (appID int, name string) {
 	if m := regexp.MustCompile(`(?i)"name"\s+"([^"]+)"`).FindStringSubmatch(text); len(m) == 2 {
 		name = m[1]
 	}
-	return appID, name
+	if m := regexp.MustCompile(`(?i)"installdir"\s+"([^"]+)"`).FindStringSubmatch(text); len(m) == 2 {
+		installDir = m[1]
+	}
+	if m := regexp.MustCompile(`(?i)"SizeOnDisk"\s+"(\d+)"`).FindStringSubmatch(text); len(m) == 2 {
+		sizeBytes, _ = strconv.ParseInt(m[1], 10, 64)
+	}
+	return appID, name, installDir, sizeBytes
 }
 
 func localSteamPoster(steamRoot string, appID int) string {
@@ -197,30 +250,41 @@ func collectInstalledSteamGames() []GameInfo {
 		apps := filepath.Join(folder, "steamapps")
 		matches, _ := filepath.Glob(filepath.Join(apps, "appmanifest_*.acf"))
 		for _, mf := range matches {
-			appID, name := parseAppManifest(mf)
+			appID, name, manifestDir, sizeBytes := parseAppManifest(mf)
 			if appID <= 0 || name == "" || seen[appID] {
 				continue
 			}
 			installDir := filepath.Join(apps, "common")
+			if manifestDir != "" {
+				installDir = filepath.Join(apps, "common", manifestDir)
+			}
+			var sizeGB float64
+			if sizeBytes > 0 {
+				sizeGB = float64(sizeBytes) / (1024 * 1024 * 1024)
+			}
 			g := normalizeGameInfo(GameInfo{
-				ID:          fmt.Sprintf("steam:%d", appID),
-				Name:        name,
-				SteamAppID:  appID,
-				InstallPath: installDir,
-				FromSteam:   true,
+				ID:            fmt.Sprintf("steam:%d", appID),
+				Name:          name,
+				SteamAppID:    appID,
+				InstallPath:   installDir,
+				InstallSizeGB: sizeGB,
+				FromSteam:     true,
 			})
 			if !keepInstalledGame(g, nonGameExcludeInput{Name: name, ID: g.ID, InstallPath: installDir}) {
 				continue
 			}
 			seen[appID] = true
-			cat, year, _, genre, weight := classifyTitle(name, 0)
+			cat, year, badge, genre, weight := classifyTitle(name, 0)
 			g.Genre = genre
 			g.Weight = weight + 0.05
 			g.PosterURL = localSteamPoster(root, appID)
 			g.HeaderURL = steamHeaderPoster(appID)
 			g.Category = cat
 			g.Year = year
-			g.Badge = "Steam"
+			g.Badge = finalizeGameBadge(g, requirementsFor(g))
+			if g.Badge == "" {
+				g.Badge = badge
+			}
 			out = append(out, normalizeGameInfo(g))
 		}
 	}
@@ -228,17 +292,17 @@ func collectInstalledSteamGames() []GameInfo {
 }
 
 type epicManifest struct {
-	DisplayName          string `json:"DisplayName"`
-	InstallLocation      string `json:"InstallLocation"`
-	LaunchExecutable     string `json:"LaunchExecutable"`
-	AppName              string `json:"AppName"`
-	CatalogNamespace     string `json:"CatalogNamespace"`
-	CatalogItemId        string `json:"CatalogItemId"`
+	DisplayName          string   `json:"DisplayName"`
+	InstallLocation      string   `json:"InstallLocation"`
+	LaunchExecutable     string   `json:"LaunchExecutable"`
+	AppName              string   `json:"AppName"`
+	CatalogNamespace     string   `json:"CatalogNamespace"`
+	CatalogItemId        string   `json:"CatalogItemId"`
 	AppCategories        []string `json:"AppCategories"`
-	Category             string `json:"Category"`
-	bIsIncomplete        bool   `json:"bIsIncomplete"`
-	bIsApplication       *bool  `json:"bIsApplication"`
-	bIsIncompleteInstall bool   `json:"bIsIncompleteInstall"`
+	Category             string   `json:"Category"`
+	bIsIncomplete        bool     `json:"bIsIncomplete"`
+	bIsApplication       *bool    `json:"bIsApplication"`
+	bIsIncompleteInstall bool     `json:"bIsIncompleteInstall"`
 }
 
 func collectInstalledEpicGames() []GameInfo {

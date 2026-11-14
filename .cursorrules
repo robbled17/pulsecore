@@ -1,0 +1,34 @@
+# PulseCore Development Rules for AI Agents
+
+## 1. Branch Strategy
+- Всегда работать строго в ветке `pulseee/roadmap`.
+- Запрещено переключаться на `main` или создавать посторонние ветки без явного запроса пользователя.
+
+## 2. Commit Conventions
+- Все сообщения коммитов пишутся на русском языке.
+- Обязателен семантический префикс в начале сообщения:
+  - `feat:` — добавление новой функциональности
+  - `fix:` — исправление ошибок и багов
+  - `refactor:` — рефакторинг кода без изменения логики
+  - `style:` — правки верстки, стилей CSS и UI компонентов
+  - `test:` — добавление или правка тестов
+  - `ci:` — изменения в GitHub Actions и пайплайнах
+  - `chore:` — рутинные задачи, обновление зависимостей или конфигураций
+
+## 3. Verification & Build
+В конце каждой задачи или итерации перед коммитом и пушем обязательно выполнять:
+1. Тесты фронтенда: `npm test --prefix frontend` (проверка i18n, контрактов сообщений, дисков).
+2. Тесты бэкенда: `go test ./...`.
+3. Сборку Wails: `wails build -clean -s` (убедиться в отсутствии ошибок компиляции и линковки).
+
+## 4. Git Push & CI/CD Release
+- После успешного прохождения проверок выполнить `git push -u origin pulseee/roadmap`.
+- После пуша обязательно выводить в ответе пользователю прямые ссылки на:
+  - GitHub Actions Workflow: `https://github.com/robbled17/pulsecore/actions`
+  - GitHub Releases: `https://github.com/robbled17/pulsecore/releases/tag/latest-dev`
+
+## 5. Architectural Principles
+- Windows-first: использовать Win32 Shell API, Restart Manager (`rstrtmgr.dll`), COM UI Automation, WMI.
+- Сохранять кроссплатформенную компилируемость за счет stub-файлов (`*_stub.go`) для не-Windows ОС (`//go:build !windows`).
+- 100% покрытие локализации: все текстовые строки интерфейса должны поддерживать 7 языков (ru, en, de, ja, kk, tt, zh) через `frontend/src/i18n/locales/*.json`.
+- UI/UX: минималистичный стеклянный дизайн (Fluent / Mica / Glassmorphism), высокая производительность без лагов, отзывчивые анимации.

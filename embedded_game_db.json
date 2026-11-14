@@ -134,7 +134,7 @@
   {
     "id": "cs2",
     "title": "Counter-Strike 2",
-    "aliases": ["CS2", "КС 2", "Counter-Strike"],
+    "aliases": ["CS2", "КС 2", "Counter-Strike 2"],
     "min_vram": 2,
     "rec_vram": 4,
     "min_ram": 8,
@@ -142,6 +142,54 @@
     "year": 2023,
     "category": "shooter",
     "cover": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/730/library_600x900.jpg"
+  },
+  {
+    "id": "cs16",
+    "title": "Counter-Strike 1.6",
+    "aliases": ["CS 1.6", "КС 1.6", "Counter-Strike", "Counter-Strike 1.6"],
+    "min_vram": 0.128,
+    "rec_vram": 0.256,
+    "min_ram": 0.5,
+    "rec_ram": 1,
+    "year": 2003,
+    "category": "classic",
+    "cover": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/10/library_600x900.jpg"
+  },
+  {
+    "id": "doom1",
+    "title": "DOOM (1993)",
+    "aliases": ["DOOM 1993", "DOOM 1", "DOOM I", "DOOM (1993)"],
+    "min_vram": 0.032,
+    "rec_vram": 0.064,
+    "min_ram": 0.016,
+    "rec_ram": 0.032,
+    "year": 1993,
+    "category": "classic",
+    "cover": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2280/library_600x900.jpg"
+  },
+  {
+    "id": "quake",
+    "title": "Quake",
+    "aliases": ["Quake 1", "Quake (1996)"],
+    "min_vram": 0.032,
+    "rec_vram": 0.064,
+    "min_ram": 0.032,
+    "rec_ram": 0.064,
+    "year": 1996,
+    "category": "classic",
+    "cover": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2310/library_600x900.jpg"
+  },
+  {
+    "id": "buckshotroulette",
+    "title": "Buckshot Roulette",
+    "aliases": ["Buckshot", "Buckshot Roulette"],
+    "min_vram": 0.512,
+    "rec_vram": 1.0,
+    "min_ram": 2,
+    "rec_ram": 4,
+    "year": 2024,
+    "category": "indie",
+    "cover": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2835570/library_600x900.jpg"
   },
   {
     "id": "fortnite",

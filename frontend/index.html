@@ -23,11 +23,11 @@
 
   <div id="minihud" class="minihud mini-hud-capsule hidden" data-opacity="80" title="">
     <div class="minihud-metrics">
-      <span class="mh-label">CPU <b id="mh-cpu">--%</b></span>
+      <span class="mh-label">CPU <b id="mh-cpu">--%</b><b id="mh-cpu-temp" class="mh-temp-inline hidden"></b></span>
+      <span class="mh-sep" aria-hidden="true">|</span>
       <span class="mh-label">RAM <b id="mh-ram">--%</b></span>
-      <span class="mh-label">GPU <b id="mh-gpu">--%</b></span>
-      <span class="mh-label mh-temp is-empty" id="mh-cpu-temp-wrap">CPU° <b id="mh-cpu-temp">--°</b></span>
-      <span class="mh-label mh-temp is-empty" id="mh-gpu-temp-wrap">GPU° <b id="mh-gpu-temp">--°</b></span>
+      <span class="mh-sep" aria-hidden="true">|</span>
+      <span class="mh-label">GPU <b id="mh-gpu">--%</b><b id="mh-gpu-temp" class="mh-temp-inline hidden"></b></span>
     </div>
     <button type="button" id="mh-expand" class="btn ghost compact mh-expand hud-nodrag" data-i18n-title="hudExpand" title="Expand">↗</button>
     <div id="mh-menu" class="mh-menu hidden hud-nodrag" role="menu">
@@ -484,6 +484,8 @@
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-start-min" /> <span data-i18n="optStartMin">Запуск свёрнутым на панели задач</span></label>
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-close-tray" /> <span data-i18n="optCloseTray">Сворачивать в трей при закрытии</span></label>
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-tray-temp" /> <span data-i18n="optTrayTemp">Температура CPU на иконке трея</span></label>
+          <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-conflict-watcher" /> <span data-i18n="optConflictWatcher">Умный перехват заблокированных файлов</span></label>
+          <p class="settings-hint" data-i18n="optConflictWatcherHint" style="margin-top: 2px; margin-bottom: 8px;">Автоматически показывать плавающее окно разблокировки при ошибках Explorer «Файл используется»</p>
           <div class="settings-section-title settings-section-title-sub" data-i18n="ecoExitTitle">Eco Mode при выходе</div>
           <select id="opt-eco-exit" class="lang-select lang-select-block settings-select" aria-label="Eco exit policy">
             <option value="ask" data-i18n="ecoExitAsk">Спрашивать, снять ли ограничения</option>
@@ -551,6 +553,7 @@
         <h2 id="diskclean-title" data-i18n="diskCleanTitle">Мастер очистки диска C</h2>
         <button type="button" class="win-btn" id="diskclean-close">✕</button>
       </div>
+      <div id="diskclean-drives" class="diskclean-drives"></div>
       <div id="diskclean-tabs" class="diskclean-tabs" role="tablist"></div>
       <div id="diskclean-body" class="modal-body"></div>
     </div>

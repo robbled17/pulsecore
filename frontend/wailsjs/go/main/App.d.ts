@@ -47,6 +47,8 @@ export function ConfirmQuitAfterEco(arg1:boolean):Promise<void>;
 
 export function ConfirmRefreshRate(arg1:string,arg2:number):Promise<Record<string, any>>;
 
+export function CreateRestorePoint():Promise<main.DeepCleanupResult>;
+
 export function DiagnoseLagOrigin():Promise<main.LagDiagnosis>;
 
 export function DisableAdvancedMode():Promise<main.AdvancedModeActionResult>;
@@ -58,6 +60,8 @@ export function DiskWatchPrior(arg1:string,arg2:number):Promise<number>;
 export function DismissHomeProblem(arg1:string):Promise<boolean>;
 
 export function EcoModeByProcessName(arg1:string,arg2:boolean):Promise<void>;
+
+export function EmptyRecycleBin():Promise<main.DeepCleanupResult>;
 
 export function EnableAdvancedMode(arg1:boolean):Promise<main.AdvancedModeActionResult>;
 
@@ -107,6 +111,8 @@ export function GetLanguage():Promise<string>;
 
 export function GetLastRevertibleSmartFix():Promise<main.SmartFixJournalSession>;
 
+export function GetLocalDrives():Promise<Array<main.LocalDriveInfo>>;
+
 export function GetMemoryWatchCards():Promise<Array<main.MemoryWatchCard>>;
 
 export function GetMetrics():Promise<main.SystemMetrics>;
@@ -118,6 +124,8 @@ export function GetMonthlyAppReport():Promise<main.MonthlyAppReport>;
 export function GetNetworkMonitor():Promise<main.NetworkMonitorSnapshot>;
 
 export function GetProcessAnomalies():Promise<Array<main.ProcessAnomaly>>;
+
+export function GetRecycleBinInfo():Promise<main.RecycleBinStatus>;
 
 export function GetSmartFixPlan():Promise<main.SmartFixPlan>;
 
@@ -146,6 +154,8 @@ export function HideToTray():Promise<void>;
 export function HideUserGame(arg1:string,arg2:string):Promise<boolean>;
 
 export function HideUserGameMeta(arg1:string,arg2:string,arg3:string,arg4:number):Promise<boolean>;
+
+export function IsConflictWatcherEnabled():Promise<boolean>;
 
 export function IsDiskWatching(arg1:string):Promise<boolean>;
 
@@ -182,6 +192,8 @@ export function OpenDiskCleanup():Promise<void>;
 export function OpenFolderInExplorer(arg1:string):Promise<void>;
 
 export function OpenPnPDeviceAction(arg1:string,arg2:string):Promise<Record<string, any>>;
+
+export function OpenRecycleBin():Promise<void>;
 
 export function OpenStorageSense():Promise<void>;
 
@@ -229,6 +241,8 @@ export function RestartPnPDevice(arg1:string):Promise<Record<string, any>>;
 
 export function RestoreHiddenGame(arg1:string):Promise<boolean>;
 
+export function RestoreLastTrashedItem():Promise<Record<string, any>>;
+
 export function ResumeProcess(arg1:number):Promise<void>;
 
 export function RevertAllEco():Promise<main.EcoApplyResult>;
@@ -259,6 +273,8 @@ export function SetActiveTab(arg1:string):Promise<void>;
 
 export function SetBehaviorSettings(arg1:main.appPrefs):Promise<void>;
 
+export function SetConflictWatcherEnabled(arg1:boolean):Promise<void>;
+
 export function SetDiskWatching(arg1:string,arg2:boolean):Promise<boolean>;
 
 export function SetDisplayRefreshRate(arg1:string,arg2:number):Promise<Record<string, any>>;
@@ -278,6 +294,8 @@ export function SetStartupItemEnabled(arg1:string,arg2:boolean):Promise<main.Sta
 export function ShowWindow():Promise<void>;
 
 export function SmoothnessStatus():Promise<Record<string, any>>;
+
+export function StartConflictWatcher():Promise<void>;
 
 export function StartRemoveOrphanLeftover(arg1:string):Promise<Record<string, any>>;
 

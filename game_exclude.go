@@ -170,12 +170,29 @@ func (a *App) GetUserHiddenGames() []HiddenGamePref {
 		if id == "" {
 			continue
 		}
-		out = append(out, HiddenGamePref{
+		item := repairHiddenGamePref(HiddenGamePref{
 			ID:        id,
 			Name:      strings.TrimSpace(h.Name),
 			PosterURL: strings.TrimSpace(h.PosterURL),
 			Year:      h.Year,
 		})
+		if item.PosterURL == "" {
+			resolved := resolveGame(item.ID)
+			if resolved.PosterURL != "" {
+				item.PosterURL = resolved.PosterURL
+			} else if resolved.HeaderURL != "" {
+				item.PosterURL = resolved.HeaderURL
+			}
+			if item.Year <= 0 && resolved.Year > 0 {
+				item.Year = resolved.Year
+			}
+			if item.Name == "" || looksLikeSlug(item.Name, item.ID) {
+				if resolved.Name != "" {
+					item.Name = resolved.Name
+				}
+			}
+		}
+		out = append(out, item)
 	}
 	return out
 }
@@ -239,6 +256,32 @@ func (a *App) RestoreHiddenGame(id string) bool {
 	a.prefs.HiddenGames = append([]HiddenGamePref(nil), next...)
 	_ = a.savePrefs(a.prefs)
 	return true
+}
+
+func looksLikeSlug(name, id string) bool {
+	n := strings.TrimSpace(name)
+	if n == "" || strings.EqualFold(n, id) {
+		return true
+	}
+	return !strings.Contains(n, " ") && (strings.Contains(n, "_") || strings.Contains(n, "-") || strings.ToLower(n) == strings.ToLower(id))
+}
+
+// repairHiddenGamePref replaces a fuzzy false title (cities2 → a puzzle, oblivion_remaster → Turok)
+// with the folder alias. A mismatched poster is dropped so GetUserHiddenGames can load the real cover.
+func repairHiddenGamePref(h HiddenGamePref) HiddenGamePref {
+	title, ok := canonicalFolderTitle(h.ID)
+	if !ok {
+		title, ok = canonicalFolderTitle(h.Name)
+	}
+	if !ok {
+		return h
+	}
+	if namesMatchStrict(h.Name, title) {
+		return h
+	}
+	h.Name = title
+	h.PosterURL = ""
+	return h
 }
 
 func (a *App) isUserHiddenGameID(id string) bool {

@@ -90,6 +90,10 @@ export function ConfirmRefreshRate(arg1, arg2) {
   return window['go']['main']['App']['ConfirmRefreshRate'](arg1, arg2);
 }
 
+export function CreateRestorePoint() {
+  return window['go']['main']['App']['CreateRestorePoint']();
+}
+
 export function DiagnoseLagOrigin() {
   return window['go']['main']['App']['DiagnoseLagOrigin']();
 }
@@ -112,6 +116,10 @@ export function DismissHomeProblem(arg1) {
 
 export function EcoModeByProcessName(arg1, arg2) {
   return window['go']['main']['App']['EcoModeByProcessName'](arg1, arg2);
+}
+
+export function EmptyRecycleBin() {
+  return window['go']['main']['App']['EmptyRecycleBin']();
 }
 
 export function EnableAdvancedMode(arg1) {
@@ -210,6 +218,10 @@ export function GetLastRevertibleSmartFix() {
   return window['go']['main']['App']['GetLastRevertibleSmartFix']();
 }
 
+export function GetLocalDrives() {
+  return window['go']['main']['App']['GetLocalDrives']();
+}
+
 export function GetMemoryWatchCards() {
   return window['go']['main']['App']['GetMemoryWatchCards']();
 }
@@ -232,6 +244,10 @@ export function GetNetworkMonitor() {
 
 export function GetProcessAnomalies() {
   return window['go']['main']['App']['GetProcessAnomalies']();
+}
+
+export function GetRecycleBinInfo() {
+  return window['go']['main']['App']['GetRecycleBinInfo']();
 }
 
 export function GetSmartFixPlan() {
@@ -288,6 +304,10 @@ export function HideUserGame(arg1, arg2) {
 
 export function HideUserGameMeta(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['HideUserGameMeta'](arg1, arg2, arg3, arg4);
+}
+
+export function IsConflictWatcherEnabled() {
+  return window['go']['main']['App']['IsConflictWatcherEnabled']();
 }
 
 export function IsDiskWatching(arg1) {
@@ -360,6 +380,10 @@ export function OpenFolderInExplorer(arg1) {
 
 export function OpenPnPDeviceAction(arg1, arg2) {
   return window['go']['main']['App']['OpenPnPDeviceAction'](arg1, arg2);
+}
+
+export function OpenRecycleBin() {
+  return window['go']['main']['App']['OpenRecycleBin']();
 }
 
 export function OpenStorageSense() {
@@ -454,6 +478,10 @@ export function RestoreHiddenGame(arg1) {
   return window['go']['main']['App']['RestoreHiddenGame'](arg1);
 }
 
+export function RestoreLastTrashedItem() {
+  return window['go']['main']['App']['RestoreLastTrashedItem']();
+}
+
 export function ResumeProcess(arg1) {
   return window['go']['main']['App']['ResumeProcess'](arg1);
 }
@@ -514,6 +542,10 @@ export function SetBehaviorSettings(arg1) {
   return window['go']['main']['App']['SetBehaviorSettings'](arg1);
 }
 
+export function SetConflictWatcherEnabled(arg1) {
+  return window['go']['main']['App']['SetConflictWatcherEnabled'](arg1);
+}
+
 export function SetDiskWatching(arg1, arg2) {
   return window['go']['main']['App']['SetDiskWatching'](arg1, arg2);
 }
@@ -552,6 +584,10 @@ export function ShowWindow() {
 
 export function SmoothnessStatus() {
   return window['go']['main']['App']['SmoothnessStatus']();
+}
+
+export function StartConflictWatcher() {
+  return window['go']['main']['App']['StartConflictWatcher']();
 }
 
 export function StartRemoveOrphanLeftover(arg1) {

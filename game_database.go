@@ -56,58 +56,24 @@ func normGameKey(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func scoreGameNameMatch(q, cand string) int {
-	if q == "" || cand == "" {
-		return 0
-	}
-	if cand == q {
-		return 100
-	}
-	// Whole-word / token match only — avoids "eft" inside "theft" (GTA V).
-	padded := " " + q + " "
-	token := " " + cand + " "
-	if strings.Contains(padded, token) {
-		return 90
-	}
-	if len(cand) >= 6 && (strings.HasPrefix(q, cand+" ") || strings.HasSuffix(q, " "+cand)) {
-		return 85
-	}
-	if len(cand) >= 8 && len(q) >= 8 {
-		if strings.Contains(q, cand) {
-			return 75
-		}
-		if strings.Contains(cand, q) {
-			return 72
-		}
-	}
-	return 0
-}
-
 func findLocalGameEntry(query string) *GameDBEntry {
 	q := normGameKey(query)
 	if q == "" {
 		return nil
 	}
 	db := loadGameDB()
-	bestIdx := -1
-	bestScore := 0
 	for i := range db {
 		e := &db[i]
 		cands := make([]string, 0, 2+len(e.Aliases))
 		cands = append(cands, e.Title, e.ID)
 		cands = append(cands, e.Aliases...)
 		for _, c := range cands {
-			score := scoreGameNameMatch(q, normGameKey(c))
-			if score > bestScore {
-				bestScore = score
-				bestIdx = i
+			if namesMatchStrict(q, c) {
+				return e
 			}
 		}
 	}
-	if bestScore < 72 || bestIdx < 0 {
-		return nil
-	}
-	return &db[bestIdx]
+	return nil
 }
 
 func findLocalGameEntryForInfo(game GameInfo) *GameDBEntry {
@@ -152,20 +118,38 @@ func (a *App) ResolveGameMeta(query string) GameInfo {
 	if q == "" {
 		return GameInfo{}
 	}
+	// Folder/id aliases win before any catalog or store search.
+	if title, ok := canonicalFolderTitle(q); ok {
+		q = title
+	}
 	if e := findLocalGameEntry(q); e != nil {
 		return gameInfoFromDBEntry(e)
 	}
 	hits := searchSteamStore(q)
-	if len(hits) == 0 {
-		hits = searchSteamApps(q)
+	if g, ok := firstStrictGameHit(q, hits); ok {
+		return cacheResolvedCover(g)
 	}
-	if len(hits) == 0 {
-		hits = searchRAWGGames(q)
+	hits = searchSteamApps(q)
+	if g, ok := firstStrictGameHit(q, hits); ok {
+		return cacheResolvedCover(g)
 	}
-	if len(hits) == 0 {
-		return GameInfo{}
+	hits = searchRAWGGames(q)
+	if g, ok := firstStrictGameHit(q, hits); ok {
+		return cacheResolvedCover(g)
 	}
-	g := hits[0]
+	return GameInfo{}
+}
+
+func firstStrictGameHit(query string, hits []GameInfo) (GameInfo, bool) {
+	for _, h := range hits {
+		if namesMatchStrict(query, h.Name) {
+			return h, true
+		}
+	}
+	return GameInfo{}, false
+}
+
+func cacheResolvedCover(g GameInfo) GameInfo {
 	if g.PosterURL != "" {
 		g.PosterURL = EnsureCoverCached(g.Name, g.PosterURL)
 	}
@@ -296,11 +280,11 @@ func EnsureCoverCached(title, remoteURL string) string {
 
 type rawgSearchResp struct {
 	Results []struct {
-		ID        int     `json:"id"`
-		Name      string  `json:"name"`
-		Released  string  `json:"released"`
-		BGImage   string  `json:"background_image"`
-		Rating    float64 `json:"rating"`
+		ID       int     `json:"id"`
+		Name     string  `json:"name"`
+		Released string  `json:"released"`
+		BGImage  string  `json:"background_image"`
+		Rating   float64 `json:"rating"`
 	} `json:"results"`
 }
 
@@ -399,6 +383,11 @@ func applyLocalDBRequirements(game GameInfo, req gameReqSet) gameReqSet {
 		if req.Ultra.ReqVRAMGB < req.High.ReqVRAMGB {
 			req.Ultra.ReqVRAMGB = req.High.ReqVRAMGB
 		}
+	}
+	if e.RecRAM > 0 {
+		req.ReqRAMGB = e.RecRAM
+	} else if e.MinRAM > 0 {
+		req.ReqRAMGB = e.MinRAM
 	}
 	return req
 }

@@ -3,21 +3,44 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const orphanLeftoverMinBytes = 100 * 1024 * 1024 // 100 MB
 
 // OrphanLeftover is a large AppData/ProgramData folder not matching any installed app.
 type OrphanLeftover struct {
-	Path      string `json:"path"`
-	Name      string `json:"name"`
-	SizeBytes int64  `json:"sizeBytes"`
-	SizeLabel string `json:"sizeLabel"`
-	RootKind  string `json:"rootKind"` // local|roaming|programdata
+	Path        string    `json:"path"`
+	Name        string    `json:"name"`
+	SizeBytes   int64     `json:"sizeBytes"`
+	SizeLabel   string    `json:"sizeLabel"`
+	RootKind    string    `json:"rootKind"` // local|roaming|programdata
+	LastModTime time.Time `json:"lastModTime"`
+	DaysAgo     int       `json:"daysAgo"`
+	AgeBadgeRu  string    `json:"ageBadgeRu"`
+	AgeBadgeEn  string    `json:"ageBadgeEn"`
+	AgeStatus   string    `json:"ageStatus"` // recent|safe|neutral
 }
+
+// TrashedLeftover stores information about folders safely moved to Recycle Bin.
+type TrashedLeftover struct {
+	Path       string    `json:"path"`
+	Name       string    `json:"name"`
+	SizeBytes  int64     `json:"sizeBytes"`
+	DeleteTime time.Time `json:"deleteTime"`
+}
+
+var (
+	trashedMu        sync.Mutex
+	trashedLeftovers []TrashedLeftover
+)
 
 var leftoverProtectedNames = map[string]bool{
 	"microsoft": true, "packages": true, "temp": true, "tmp": true,
@@ -34,7 +57,42 @@ var leftoverProtectedNames = map[string]bool{
 	"ceflog": true, "virtualstore": true, "assembly": true,
 }
 
-// ListOrphanLeftovers finds large leftover folders from uninstalled software (no registry writes).
+// latestDirModTime scans directory entries to find the newest file modification time.
+func latestDirModTime(dir string, budget time.Time, maxDepth int) time.Time {
+	var newest time.Time
+	if info, err := os.Stat(dir); err == nil {
+		newest = info.ModTime()
+	}
+	var walk func(p string, depth int)
+	walk = func(p string, depth int) {
+		if depth > maxDepth || time.Now().After(budget) {
+			return
+		}
+		entries, err := os.ReadDir(p)
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			if time.Now().After(budget) {
+				return
+			}
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(newest) {
+				newest = info.ModTime()
+			}
+			if e.IsDir() {
+				walk(filepath.Join(p, e.Name()), depth+1)
+			}
+		}
+	}
+	walk(dir, 1)
+	return newest
+}
+
+// ListOrphanLeftovers finds large leftover folders from uninstalled software with recency analysis.
 func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 	installed := a.ListInstalledApps()
 	names := installedNameSet(installed)
@@ -67,9 +125,48 @@ func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 			if sz < orphanLeftoverMinBytes {
 				continue
 			}
+
+			// Check freshness of files inside
+			modTime := latestDirModTime(p, time.Now().Add(120*time.Millisecond), 2)
+			daysAgo := int(time.Since(modTime).Hours() / 24)
+			if daysAgo < 0 {
+				daysAgo = 0
+			}
+
+			ageStatus := "neutral"
+			ageBadgeRu := ""
+			ageBadgeEn := ""
+
+			if daysAgo <= 14 {
+				ageStatus = "recent"
+				if daysAgo == 0 {
+					ageBadgeRu = "⚠️ Использовалось сегодня — проверьте перед удалением"
+					ageBadgeEn = "⚠️ Used today — check before deleting"
+				} else if daysAgo == 1 {
+					ageBadgeRu = "⚠️ Использовалось вчера — проверьте перед удалением"
+					ageBadgeEn = "⚠️ Used yesterday — check before deleting"
+				} else {
+					ageBadgeRu = fmt.Sprintf("⚠️ Использовалось недавно (%d дн. назад) — проверьте перед удалением", daysAgo)
+					ageBadgeEn = fmt.Sprintf("⚠️ Used recently (%d days ago) — check before deleting", daysAgo)
+				}
+			} else if daysAgo > 30 {
+				ageStatus = "safe"
+				ageBadgeRu = fmt.Sprintf("✓ Не использовалось %d дн. — можно безопасно очистить", daysAgo)
+				ageBadgeEn = fmt.Sprintf("✓ Not used for %d days — safe to clean", daysAgo)
+			} else {
+				ageBadgeRu = fmt.Sprintf("Не использовалось %d дн.", daysAgo)
+				ageBadgeEn = fmt.Sprintf("Not used for %d days", daysAgo)
+			}
+
 			out = append(out, OrphanLeftover{
 				Path: p, Name: name, SizeBytes: sz,
-				SizeLabel: formatSizeLabel(sz), RootKind: kind,
+				SizeLabel:   formatSizeLabel(sz),
+				RootKind:    kind,
+				LastModTime: modTime,
+				DaysAgo:     daysAgo,
+				AgeBadgeRu:  ageBadgeRu,
+				AgeBadgeEn:  ageBadgeEn,
+				AgeStatus:   ageStatus,
 			})
 		}
 	}
@@ -77,14 +174,19 @@ func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 	scan(os.Getenv("APPDATA"), "roaming")
 	scan(os.Getenv("PROGRAMDATA"), "programdata")
 
-	// Heaviest first.
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if out[j].SizeBytes > out[i].SizeBytes {
-				out[i], out[j] = out[j], out[i]
-			}
+	// Sort: non-recent first, recent last; inside group - by daysAgo descending then size descending
+	sort.Slice(out, func(i, j int) bool {
+		iRecent := out[i].AgeStatus == "recent"
+		jRecent := out[j].AgeStatus == "recent"
+		if iRecent != jRecent {
+			return !iRecent
 		}
-	}
+		if out[i].DaysAgo != out[j].DaysAgo {
+			return out[i].DaysAgo > out[j].DaysAgo
+		}
+		return out[i].SizeBytes > out[j].SizeBytes
+	})
+
 	if len(out) > 40 {
 		out = out[:40]
 	}
@@ -99,7 +201,6 @@ func installedNameSet(apps []InstalledApp) map[string]bool {
 		}
 		if pub := strings.ToLower(strings.TrimSpace(a.Publisher)); len(pub) >= 3 {
 			out[pub] = true
-			// first token of publisher
 			if i := strings.IndexAny(pub, " ,."); i > 2 {
 				out[pub[:i]] = true
 			}
@@ -123,7 +224,6 @@ func matchesInstalledApp(folderKey string, names map[string]bool) bool {
 			continue
 		}
 		if strings.Contains(folderKey, n) || strings.Contains(n, folderKey) {
-			// Avoid ultra-short false positives.
 			if len(n) >= 4 && len(folderKey) >= 4 {
 				return true
 			}
@@ -132,7 +232,7 @@ func matchesInstalledApp(folderKey string, names map[string]bool) bool {
 	return false
 }
 
-// StartRemoveOrphanLeftover deletes one orphan folder asynchronously with history.
+// StartRemoveOrphanLeftover safely moves one orphan folder to Windows Recycle Bin.
 func (a *App) StartRemoveOrphanLeftover(path string) map[string]interface{} {
 	path = filepath.Clean(strings.TrimSpace(path))
 	if path == "" || !isSafeAppLeftoverPath(path) {
@@ -150,18 +250,82 @@ func (a *App) StartRemoveOrphanLeftover(path string) map[string]interface{} {
 			if err == nil && info.IsDir() {
 				reported = dirSizeBudget(path, time.Now().Add(800*time.Millisecond), 5)
 			}
-			_ = ForceDeleteAll(path)
+			// Safe delete to Windows Recycle Bin with undo capability
+			_ = recycleFileOrDir(path)
 			return reported
 		})
+
+		// Track in trashed slice for in-app restoration
+		trashedMu.Lock()
+		trashedLeftovers = append(trashedLeftovers, TrashedLeftover{
+			Path:       path,
+			Name:       label,
+			SizeBytes:  reported,
+			DeleteTime: time.Now(),
+		})
+		trashedMu.Unlock()
+
 		a.RefreshDiskMetricsEx()
 		freed := int64(rec.BytesFreed)
 		if freed <= 0 {
 			freed = reported
 		}
+
+		// Re-query recycle bin size immediately
+		binBytes := queryRecycleBinBytes()
+		runtime.EventsEmit(a.ctx, "recycle-bin-updated", map[string]interface{}{
+			"bytes":       binBytes,
+			"lastTrashed": label,
+			"path":        path,
+		})
+
 		a.emitDeleteProgress(deleteProgress{
 			JobID: jobID, Phase: "done", Percent: 100, Label: label, Path: path,
-			FreedBytes: freed, OK: true, Message: "ok",
+			FreedBytes: freed, OK: true, Message: "trashed",
 		})
 	}()
 	return map[string]interface{}{"started": true, "jobId": jobID, "name": label}
+}
+
+// RestoreLastTrashedItem restores the most recently trashed folder from Windows Recycle Bin.
+func (a *App) RestoreLastTrashedItem() (map[string]interface{}, error) {
+	trashedMu.Lock()
+	if len(trashedLeftovers) == 0 {
+		trashedMu.Unlock()
+		return map[string]interface{}{"success": false, "message": "no trashed items"}, fmt.Errorf("no trashed items to restore")
+	}
+	last := trashedLeftovers[len(trashedLeftovers)-1]
+	trashedLeftovers = trashedLeftovers[:len(trashedLeftovers)-1]
+	trashedMu.Unlock()
+
+	err := restoreFromRecycleBin(last.Name, last.Path)
+	binBytes := queryRecycleBinBytes()
+	if err != nil {
+		return map[string]interface{}{
+			"success":  false,
+			"name":     last.Name,
+			"path":     last.Path,
+			"binBytes": binBytes,
+			"message":  err.Error(),
+		}, err
+	}
+
+	a.RefreshDiskMetricsEx()
+	runtime.EventsEmit(a.ctx, "recycle-bin-updated", map[string]interface{}{
+		"bytes":    binBytes,
+		"restored": last.Name,
+	})
+
+	return map[string]interface{}{
+		"success":  true,
+		"name":     last.Name,
+		"path":     last.Path,
+		"binBytes": binBytes,
+		"message":  "restored",
+	}, nil
+}
+
+// OpenRecycleBin opens Windows Recycle Bin in Explorer.
+func (a *App) OpenRecycleBin() error {
+	return exec.Command("explorer.exe", "shell:RecycleBinFolder").Start()
 }

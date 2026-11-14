@@ -1,4 +1,4 @@
-import {
+﻿import {
   GetMetrics,
   GetSystemMetrics,
   SetActiveTab,
@@ -71,6 +71,9 @@ import {
   StartRemoveOrphanLeftover,
   ListOrphanLeftovers,
   GetCleanStats,
+  GetRecycleBinInfo,
+  EmptyRecycleBin,
+  CreateRestorePoint,
   OpenFolderInExplorer,
   PreviewDeepCleanup,
   DisableHibernation,
@@ -104,6 +107,9 @@ import {
   ResizeMiniHUD,
   CheckNetworkDetailed,
   CancelNetworkCheck,
+  GetLocalDrives,
+  IsConflictWatcherEnabled,
+  SetConflictWatcherEnabled,
 } from '../wailsjs/go/main/App.js'
 import { EventsOn, WindowMinimise, BrowserOpenURL, WindowIsMaximised } from '../wailsjs/runtime/runtime.js'
 
@@ -180,7 +186,7 @@ function updateDeleteProgress(ev) {
   const pct = Math.max(0, Math.min(100, Number(ev?.percent) || 0))
   if (bar) bar.style.width = `${pct}%`
   if (ev?.phase === 'done') {
-    const gb = formatBytesGB(ev?.freedBytes || 0)
+    const gb = formatBytesSmart(ev?.freedBytes || 0)
     if (text) text.textContent = t('deleteProgressDone', { gb })
     done?.classList.remove('hidden')
     setTimeout(() => {
@@ -281,6 +287,8 @@ let gameOverlayOn = false
 let latestDisks = []
 let lastMetrics = null
 let gameCatalog = []
+let currentSearchQuery = ''
+let gameSearchToken = 0
 let gameCatalogFull = []
 let selectedGameId = null
 let gameSearchFocused = false
@@ -885,6 +893,7 @@ function readBehavior() {
     showTempOnTray: !!$('opt-tray-temp')?.checked,
     tempAlerts: !!$('opt-temp-alert')?.checked,
     ecoExitPolicy: $('opt-eco-exit')?.value || 'ask',
+    conflictWatcherEnabled: $('opt-conflict-watcher') ? !!$('opt-conflict-watcher').checked : true,
   }
 }
 
@@ -902,6 +911,7 @@ async function loadBehavior() {
     if ($('opt-tray-temp')) $('opt-tray-temp').checked = p.showTempOnTray !== false
     if ($('opt-temp-alert')) $('opt-temp-alert').checked = p.tempAlerts !== false
     if ($('opt-eco-exit')) $('opt-eco-exit').value = p.ecoExitPolicy || 'ask'
+    if ($('opt-conflict-watcher')) $('opt-conflict-watcher').checked = p.conflictWatcherEnabled !== false
   } catch (_) {}
 }
 
@@ -2942,56 +2952,44 @@ function renderMiniHUD(m) {
   const set = (id, pct) => {
     const el = $(id)
     if (!el) return
-    // Fixed-width numeric text so updates never reflow the capsule.
-    el.textContent = `${String(fmt(pct, 0)).padStart(2, '0')}%`
+    el.textContent = `${fmt(pct, 0)}%`
     el.classList.remove('ok', 'warn', 'hot')
     el.classList.add(hudTone(pct))
   }
   set('mh-cpu', m.cpuPercent)
   set('mh-ram', m.ramPercent)
   set('mh-gpu', m.gpuPercent)
-  const cpuT = Number(m.cpuTempC || m.tempCPU || 0)
-  const gpuT = Number(m.gpuTempC || m.tempGPU || 0)
-  const cpuWrap = $('mh-cpu-temp-wrap')
-  const gpuWrap = $('mh-gpu-temp-wrap')
-  // Keep temp slots in layout (visibility) so showing/hiding never shrinks width.
-  if (cpuWrap) {
-    const show = Number.isFinite(cpuT) && cpuT > 0
-    cpuWrap.classList.toggle('is-empty', !show)
-    cpuWrap.classList.remove('hidden')
-    const el = $('mh-cpu-temp')
-    if (el) {
-      el.textContent = show ? `${fmt(cpuT, 0)}°` : '--°'
-      el.classList.remove('ok', 'warn', 'hot')
-      if (show) el.classList.add(cpuT >= 90 ? 'hot' : cpuT >= 80 ? 'warn' : 'ok')
+  const cpuT = Number(m.temperatureC || m.cpuTempC || m.tempCPU || m.hardware?.cpu?.temperatureC || 0)
+  const gpuT = Number(m.gpuTemperatureC || m.gpuTempC || m.tempGPU || m.hardware?.gpu?.temperatureC || 0)
+  const cpuKnown = !!(m.temperatureAvailable || (Number.isFinite(cpuT) && cpuT > 0))
+  const gpuKnown = !!(m.gpuTemperatureAvailable || m.hardware?.gpu?.tempAvailable || (Number.isFinite(gpuT) && gpuT > 0))
+  const paintTemp = (id, show, value) => {
+    const el = $(id)
+    if (!el) return
+    if (!show || !(value > 0)) {
+      el.textContent = ''
+      el.classList.add('hidden')
+      return
     }
+    el.classList.remove('hidden')
+    el.textContent = ` · ${fmt(value, 0)}°C`
+    el.classList.remove('ok', 'warn', 'hot')
+    el.classList.add(value >= 90 ? 'hot' : value >= 80 ? 'warn' : 'ok')
   }
-  if (gpuWrap) {
-    const show = Number.isFinite(gpuT) && gpuT > 0
-    gpuWrap.classList.toggle('is-empty', !show)
-    gpuWrap.classList.remove('hidden')
-    const el = $('mh-gpu-temp')
-    if (el) {
-      el.textContent = show ? `${fmt(gpuT, 0)}°` : '--°'
-      el.classList.remove('ok', 'warn', 'hot')
-      if (show) el.classList.add(gpuT >= 90 ? 'hot' : gpuT >= 80 ? 'warn' : 'ok')
-    }
-  }
-  // Size once to the full capsule (temps reserved). Only grow — never shrink on tick.
+  paintTemp('mh-cpu-temp', cpuKnown, cpuT)
+  paintTemp('mh-gpu-temp', gpuKnown, gpuT)
   if (hudEnabled) {
     const box = $('minihud')
     if (box && !box.classList.contains('hidden')) {
-      const w = Math.ceil(box.scrollWidth + 8)
-      const h = Math.ceil(box.scrollHeight + 4)
+      const w = Math.ceil(box.scrollWidth + 24)
+      const h = Math.ceil(box.scrollHeight + 8)
       if (w > 40 && h > 20) {
         const prevW = renderMiniHUD._w || 0
         const prevH = renderMiniHUD._h || 0
-        const nextW = Math.max(prevW, w)
-        const nextH = Math.max(prevH, h)
-        if (nextW !== prevW || nextH !== prevH) {
-          renderMiniHUD._w = nextW
-          renderMiniHUD._h = nextH
-          try { ResizeMiniHUD(nextW, nextH) } catch (_) { /* ignore */ }
+        if (Math.abs(w - prevW) > 2 || Math.abs(h - prevH) > 2) {
+          renderMiniHUD._w = w
+          renderMiniHUD._h = h
+          try { ResizeMiniHUD(w, h) } catch (_) { /* ignore */ }
         }
       }
     }
@@ -3385,7 +3383,7 @@ function setHudMode(enabled) {
   hud?.classList.toggle('hidden', !enabled)
   // HUD stays visually dark; do not flip capsule to light theme tokens.
   if (hud) {
-    hud.title = t('hudExclusiveTip')
+    hud.removeAttribute('title')
     const op = hud.dataset.opacity || '80'
     hud.dataset.opacity = op
   }
@@ -3486,6 +3484,16 @@ function humanizeGameSlug(raw) {
     .replace(/\b([a-zа-яё])/gi, (ch) => ch.toUpperCase())
 }
 
+function foldGameName(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '')
+}
+
+function strictTitleMatch(a, b) {
+  const x = foldGameName(a)
+  const y = foldGameName(b)
+  return !!x && x === y
+}
+
 function looksLikeSlug(name, id) {
   const n = String(name || '').trim()
   const i = String(id || '').trim()
@@ -3524,8 +3532,7 @@ async function enrichHiddenGameTitles(list) {
       try {
         const meta = await ResolveGameMeta(name && !looksLikeSlug(name, id) ? name : id)
         if (meta?.name && (!name || looksLikeSlug(name, id))) name = meta.name
-        if (!poster && (meta?.posterUrl || meta?.headerUrl)) {
-          // Only accept resolved cover when it belongs to this query — never a random hit without name match.
+        if (!poster && meta?.name && strictTitleMatch(meta.name, name) && (meta.posterUrl || meta.headerUrl)) {
           poster = meta.posterUrl || meta.headerUrl || ''
         }
         if (!year && meta?.year) year = Number(meta.year) || 0
@@ -3632,14 +3639,33 @@ function gameMatchesQuery(g, qRaw) {
   return blob.includes(q)
 }
 
+function applyGameFilters() {
+  const q = String($('game-search')?.value ?? currentSearchQuery ?? '').trim()
+  currentSearchQuery = q
+  const base = normalizeGameList(gameCatalogFull || [])
+  if (!q) {
+    gameCatalog = base
+    return
+  }
+  const narrowed = base.filter((g) => gameMatchesQuery(g, q))
+  const extra = (gameCatalog || []).filter((g) => gameMatchesQuery(g, q) && !narrowed.some((x) => x.id === g.id))
+  gameCatalog = narrowed.concat(extra)
+}
+
 async function loadGames() {
   await syncHiddenGamesFromBackend()
+  const token = gameSearchToken
   try {
     gameCatalogFull = normalizeGameList(await ListGames() || [])
   } catch (_) {
-    gameCatalogFull = []
+    gameCatalogFull = gameCatalogFull || []
   }
-  gameCatalog = gameCatalogFull
+  if (token !== gameSearchToken && currentSearchQuery) {
+    applyGameFilters()
+    renderGameGrid()
+    return
+  }
+  applyGameFilters()
   renderGameGrid()
 }
 
@@ -3662,35 +3688,39 @@ function mergeGameLists(localList, onlineList) {
   return out
 }
 
-async function searchGamesLocal(q) {
+async function searchGamesLocal(q, token) {
   try {
     if (!q) {
       gameCatalogFull = normalizeGameList(await ListGames() || [])
+      if (token != null && token !== gameSearchToken) return
       gameCatalog = gameCatalogFull
     } else {
       const remote = normalizeGameList(await SearchGames(q) || [])
-      // Client-side null-safe / Cyrillic-aware filter as defense in depth.
+      if (token != null && token !== gameSearchToken) return
       gameCatalog = remote.filter((g) => gameMatchesQuery(g, q))
     }
   } catch (_) {
-    gameCatalog = normalizeGameList(gameCatalog || [])
+    if (token != null && token !== gameSearchToken) return
+    applyGameFilters()
   }
   renderGameGrid()
   if (gameReqFit && gameReqFit !== 'all') warmCompatScores(gameCatalog)
 }
 
-async function searchGamesOnlineMerge(q) {
+async function searchGamesOnlineMerge(q, token) {
   if (!q) return
   setSearchSpinner(true)
   try {
     const online = await SearchGamesOnline(q) || []
     const local = await SearchGames(q) || []
+    if (token != null && token !== gameSearchToken) return
     gameCatalog = mergeGameLists(local, online).filter((g) => gameMatchesQuery(g, q))
   } catch (_) {
     // keep current local results
   } finally {
-    setSearchSpinner(false)
+    if (token == null || token === gameSearchToken) setSearchSpinner(false)
   }
+  if (token != null && token !== gameSearchToken) return
   renderGameGrid()
   if (gameCatalog.length === 1) {
     const onlyId = gameCatalog[0]?.id
@@ -3706,20 +3736,28 @@ async function searchGamesOnlineMerge(q) {
 
 async function searchGamesLive(opts = {}) {
   const online = !!opts.online
+  const token = ++gameSearchToken
   const q = String($('game-search')?.value || '').trim()
+  currentSearchQuery = q
   if (!q) {
     setSearchSpinner(false)
     try {
-      gameCatalog = normalizeGameList(await ListGames() || [])
+      gameCatalogFull = normalizeGameList(await ListGames() || [])
+      if (token !== gameSearchToken) return
+      gameCatalog = gameCatalogFull
     } catch (_) {
+      if (token !== gameSearchToken) return
       gameCatalog = []
     }
     renderGameGrid()
     return
   }
-  await searchGamesLocal(q)
+  applyGameFilters()
+  renderGameGrid()
+  await searchGamesLocal(q, token)
+  if (token !== gameSearchToken) return
   if (online || gameCatalog.length === 0) {
-    await searchGamesOnlineMerge(q)
+    await searchGamesOnlineMerge(q, token)
   }
 }
 
@@ -3833,23 +3871,26 @@ function filteredGameList() {
 function syncGamePanelPadding(open) {
   const wrap = $('games-carousel-wrapper')
   const grid = $('game-grid')
-  const box = $('fps-result')
   if (!wrap) return
   wrap.classList.toggle('has-selection', !!open)
   grid?.classList.toggle('has-selection', !!open)
   if (open) {
-    const h = Math.max(130, Math.ceil(box?.getBoundingClientRect().height || 110))
-    wrap.style.setProperty('--game-panel-h', `${h}px`)
+    wrap.style.setProperty('--game-panel-h', '165px')
+    wrap.style.paddingBottom = '165px'
   } else {
     wrap.style.removeProperty('--game-panel-h')
+    wrap.style.removeProperty('padding-bottom')
   }
 }
 
 function renderGameGrid() {
   const host = $('game-grid')
   if (!host) return
-  const list = filteredGameList()
-  const q = String($('game-search')?.value || '').trim()
+  const typed = String($('game-search')?.value ?? currentSearchQuery ?? '').trim()
+  currentSearchQuery = typed
+  let list = filteredGameList()
+  if (typed) list = list.filter((g) => gameMatchesQuery(g, typed))
+  const q = typed
   if (!list.length) {
     host.innerHTML = q || gameGenre !== 'all' || (gameReqFit && gameReqFit !== 'all')
       ? `<div class="game-empty-card" role="status">${t('gameSearchEmpty')}</div>`
@@ -3946,6 +3987,26 @@ async function hideSelectedGame() {
   renderGameGrid()
 }
 
+function getGameInitials(rawTitle) {
+  const clean = String(rawTitle || '')
+    .replace(/\(.*?\)/g, '')
+    .replace(/\[.*?\]/g, '')
+    .replace(/[:\-–—_]/g, ' ')
+    .trim()
+  const stopWords = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'for', 'to', 'on', 'at'])
+  const words = clean.split(/\s+/).filter((w) => w && !stopWords.has(w.toLowerCase()))
+  if (!words.length) return 'PC'
+  if (words.length === 1) {
+    const w = words[0]
+    if (w.length <= 4) return w.toUpperCase()
+    return w.slice(0, 3).toUpperCase()
+  }
+  if (words.length === 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return (words[0][0] + words[1][0] + words[2][0]).toUpperCase()
+}
+
 function openHiddenGamesModal() {
   const modal = $('hidden-games-modal')
   const list = $('hidden-games-list')
@@ -3957,17 +4018,14 @@ function openHiddenGamesModal() {
   list.innerHTML = hiddenGamesMeta.map((h) => {
     const title = gameDisplayName(h)
     const year = Number(h.year) > 0 ? String(h.year) : ''
-    // Same cover path as catalog: real poster for this id, else gradient placeholder — never wrong art.
-    const coverHTML = compactCoverHTML({
-      gameName: title,
-      name: title,
-      posterUrl: h.posterUrl || '',
-      headerUrl: h.headerUrl || '',
-      year: Number(h.year) || 0,
-    }, { hideTitle: true }).replace('class="game-cover"', 'class="game-cover hidden-game-cover"')
+    const poster = h.posterUrl || h.headerUrl || ''
+    const initials = getGameInitials(title)
+    const thumbHTML = poster
+      ? `<div class="hidden-game-thumb"><img src="${escapeHtml(poster)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'hidden-game-initials\\'>${escapeHtml(initials)}</span>'" /></div>`
+      : `<div class="hidden-game-thumb"><span class="hidden-game-initials">${escapeHtml(initials)}</span></div>`
     return `
     <div class="hidden-game-row" data-hidden-id="${escapeHtml(h.id)}">
-      ${coverHTML}
+      ${thumbHTML}
       <div class="hidden-game-info">
         <h4>${escapeHtml(title)}</h4>
         ${year ? `<span>${escapeHtml(year)}</span>` : ''}
@@ -4152,6 +4210,38 @@ async function warmCompatScores(list) {
   }
 }
 
+function formatCompactFitDetails(p, fit) {
+  const need = Number(p?.reqVRAMGB) || 0
+  const have = Number(p?.vramGB) || 0
+  const size = Number(fit?.storageNeedGB) || 0
+  const disks = Array.isArray(fit?.disks) ? fit.disks : []
+  const best = disks.reduce((acc, d) => ((Number(d?.freeGB) || 0) > (Number(acc?.freeGB) || 0) ? d : acc), null)
+  const formatVram = (gb) => {
+    if (gb <= 0) return '?'
+    if (gb < 1) return t('unitsMB', { n: fmt(gb * 1024, 0) })
+    return t('unitsGB', { n: String(Math.round(gb)) })
+  }
+  const vram = t('fitVramYou', {
+    need: formatVram(need),
+    have: formatVram(have),
+  })
+  let sizeBit = ''
+  if (size > 0) {
+    sizeBit = size < 1 ? t('fitSizeMB', { n: fmt(size * 1024, 0) }) : t('fitSizeApprox', { n: String(Math.round(size)) })
+  }
+  let diskBit = ''
+  if (best) {
+    const letter = String(best.mount || '').replace(/:\\?$/, '').replace(':', '')
+    diskBit = t('fitDiskFree', { disk: letter, free: String(Math.round(Number(best.freeGB) || 0)) })
+  }
+  return [vram, sizeBit, diskBit].filter(Boolean).join(' · ')
+}
+
+function formatCompactFitLine(label, p, fit) {
+  const details = formatCompactFitDetails(p, fit)
+  return [label, details].filter(Boolean).join(' · ')
+}
+
 function formatFitDownload(fit) {
   const need = Number(fit.storageNeedGB) || 0
   const disks = Array.isArray(fit.disks) ? fit.disks : []
@@ -4212,14 +4302,9 @@ async function predictSelectedGame() {
     fpsCache[wantId] = { medAvg: p.medAvg, highAvg: p.highAvg, verdictLevel: p.verdictLevel || fitLevelToFilterUI(level) }
     const useEn = lang === 'en'
     const label = (useEn ? fit.labelEn : fit.labelRu) || t(p.verdict || 'fitVerdictUnknown')
-    const reason = (useEn ? fit.reasonEn : fit.reasonRu) || ''
-    const download = formatFitDownload(fit)
     const verdictCls = level === 'excellent' || level === 'ok' ? 'ok'
       : (level === 'tight' ? 'warn' : (level === 'wont' ? 'bad' : 'warn'))
     const badge = p.badge || p.genre || p.category || ''
-    const approx = fit.approximate !== false
-      ? `<span class="fit-approx-badge">${t('fitApproximate')}</span>`
-      : ''
     const displayTitle = gameDisplayName({
       id: wantId,
       name: p.gameName || catalogGame?.name || '',
@@ -4241,6 +4326,8 @@ async function predictSelectedGame() {
     box.setAttribute('aria-modal', 'false')
     box.setAttribute('aria-label', t('gameSelectedPanel'))
     box.setAttribute('aria-hidden', 'false')
+    const genreBadge = p.genre || catalogGame?.genre || badge
+    const line = formatCompactFitLine(label, p, fit)
     box.innerHTML = `
       <div class="game-selected-panel-bar">
         <div class="selected-game-banner game-compact">
@@ -4248,9 +4335,13 @@ async function predictSelectedGame() {
           <div class="selected-game-info game-compact-body">
             <div class="game-compact-title" id="game-selected-title">${escapeHtml(displayTitle)}</div>
             <div class="game-compact-meta">
-              ${badge ? `<span class="game-badge era">${escapeHtml(badge)}</span>` : ''}
+              ${genreBadge ? `<span class="game-badge era">${escapeHtml(genreBadge)}</span>` : ''}
               ${p.engine ? `<span class="game-badge">${escapeHtml(p.engine)}</span>` : ''}
               ${p.year ? `<span class="game-badge">${p.year}</span>` : ''}
+            </div>
+            <div class="game-compact-line ${verdictCls}">
+              <span class="game-verdict-badge ${verdictCls}">${escapeHtml(label)}</span>
+              <span class="game-verdict-details">${escapeHtml(formatCompactFitDetails(p, fit))}</span>
             </div>
           </div>
         </div>
@@ -4259,14 +4350,6 @@ async function predictSelectedGame() {
           <button type="button" class="btn compact btn-game-panel-close" id="btn-game-panel-close" aria-label="${t('gameClosePanel')}">✕</button>
         </div>
       </div>
-      <div class="fit-verdict ${verdictCls}">
-        <div class="fit-verdict-head">
-          <div class="fit-label">${escapeHtml(label)}</div>
-          ${approx}
-        </div>
-        ${reason ? `<div class="fit-reason">${escapeHtml(reason)}</div>` : ''}
-      </div>
-      ${download ? `<div class="fit-download">${escapeHtml(download).replace(/\n/g, '<br>')}</div>` : ''}
     `
     $('btn-game-panel-close')?.addEventListener('click', () => {
       selectedGameId = null
@@ -4400,28 +4483,132 @@ function closeDiskCleanModal() {
   renderHome().catch(() => {})
 }
 
+let selectedCleanDrive = 'C'
+let diskCleanFilterCandidates = false
+let localDrivesCache = []
+
+async function renderDiskCleanDrives() {
+  const container = $('diskclean-drives')
+  if (!container) return
+  try {
+    localDrivesCache = await GetLocalDrives()
+  } catch (err) {
+    console.warn('Failed to get local drives:', err)
+    localDrivesCache = []
+  }
+  if (!Array.isArray(localDrivesCache) || localDrivesCache.length === 0) {
+    container.innerHTML = ''
+    return
+  }
+
+  const driveLetters = localDrivesCache.map((d) => (d.letter || '').replace(/[:\\/]/g, '').toUpperCase())
+  if (!driveLetters.includes(selectedCleanDrive.toUpperCase()) && driveLetters.length > 0) {
+    selectedCleanDrive = driveLetters[0]
+  }
+
+  updateDiskCleanTitle()
+
+  container.innerHTML = localDrivesCache.map((d) => {
+    const letter = (d.letter || '').replace(/[:\\/]/g, '').toUpperCase()
+    const isActive = letter === selectedCleanDrive.toUpperCase()
+    const freeGb = bytesToGB(d.freeBytes)
+    const totalGb = bytesToGB(d.totalBytes)
+    const usedPercent = Math.min(100, Math.max(0, Math.round(d.usedPercent || 0)))
+    const nameStr = d.volumeName ? ` (${escapeHtml(d.volumeName)})` : ''
+    const freeText = t('diskCleanDriveFree', {
+      free: escapeHtml(t('unitsGB', { n: freeGb })),
+      total: escapeHtml(t('unitsGB', { n: totalGb })),
+    })
+    return `
+      <div class="dc-drive-card ${isActive ? 'active' : ''}" data-drive="${letter}" role="button" tabindex="0">
+        <div class="dc-drive-head">
+          <span class="dc-drive-letter">💽 ${t('diskCleanDrive', { letter: `${letter}:` })}${nameStr}</span>
+          <span class="dc-drive-percent">${usedPercent}%</span>
+        </div>
+        <div class="dc-drive-bar-wrap">
+          <div class="dc-drive-bar ${usedPercent > 90 ? 'critical' : usedPercent > 75 ? 'warn' : ''}" style="width: ${usedPercent}%;"></div>
+        </div>
+        <div class="dc-drive-sub">${freeText}</div>
+      </div>
+    `
+  }).join('')
+
+  container.querySelectorAll('.dc-drive-card').forEach((card) => {
+    card.addEventListener('click', async () => {
+      const drv = card.getAttribute('data-drive')
+      if (drv && drv !== selectedCleanDrive) {
+        selectedCleanDrive = drv
+        await renderDiskCleanDrives()
+        await renderDiskCleanBody()
+      }
+    })
+  })
+}
+
+function updateDiskCleanTitle() {
+  const title = $('diskclean-title')
+  if (title) {
+    title.textContent = t('diskCleanTitle') + (selectedCleanDrive ? ` (${selectedCleanDrive}:)` : '')
+  }
+}
+
 async function openDiskCleanupWizard(tab = 'apps') {
   diskCleanTab = tab || 'apps'
-  const title = $('diskclean-title')
-  if (title) title.textContent = t('diskCleanTitle')
+  diskCleanFilterCandidates = false
   openDiskCleanModal()
+  await renderDiskCleanDrives()
   renderDiskCleanTabs()
   await renderDiskCleanBody()
+}
+
+function formatBytesSmart(bytes, withSign = false) {
+  const n = Math.max(0, Number(bytes) || 0)
+  const sign = withSign ? '+' : ''
+  const isEn = lang === 'en'
+  // units handled via t()
+  // units handled via t()
+  // units handled via t()
+
+  if (n === 0) {
+    return `${sign}0 ` + t('unitsMB', { n: '' }).trim()
+  }
+  if (n < 1024 * 1024) {
+    const kb = Math.round(n / 1024)
+    return `${sign}` + t('unitsKB', { n: String(kb) })
+  }
+  if (n < 1024 * 1024 * 1024) {
+    const mb = n / (1024 * 1024)
+    const val = mb >= 10 ? fmt(mb, 0) : fmt(mb, 1)
+    return `${sign}` + t('unitsMB', { n: String(val) })
+  }
+  const gb = n / (1024 * 1024 * 1024)
+  const val = fmt(gb, 1)
+    return `${sign}` + t('unitsGB', { n: String(val) })
 }
 
 function bytesToGB(n) {
   return fmt((Number(n) || 0) / (1024 * 1024 * 1024), 1)
 }
 
+function cleanStatBytes(stats, name) {
+  if (!stats) return 0
+  const snake = String(name).replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
+  return Number(stats[name] ?? stats[snake] ?? 0) || 0
+}
+
+function formatCleanStat(bytes) {
+  return formatBytesSmart(bytes)
+}
+
 function cleanCompareCardHTML(usedBefore, usedAfter, freed) {
   const ub = bytesToGB(usedBefore)
   const ua = bytesToGB(usedAfter)
-  const fr = bytesToGB(freed)
+  const fr = formatBytesSmart(freed, true)
   if (!(Number(usedBefore) > 0 || Number(freed) > 0)) return ''
   return `<div class="clean-compare-card">
     <div class="clean-compare-row"><span>${t('cleanWasUsed')}</span><b>${escapeHtml(t('unitsGB', { n: ub }))}</b></div>
     <div class="clean-compare-row"><span>${t('cleanNowUsed')}</span><b>${escapeHtml(t('unitsGB', { n: ua }))}</b></div>
-    <div class="clean-compare-freed">${t('cleanFreedNow', { gb: fr })}</div>
+    <div class="clean-compare-freed">${t('cleanFreedNow', { val: fr, gb: fr, size: fr })}</div>
   </div>`
 }
 
@@ -4429,15 +4616,15 @@ async function renderCleanStatsBanner(host) {
   if (!host) return
   let stats
   try { stats = await GetCleanStats() } catch (_) { stats = null }
-  const today = bytesToGB(stats?.todayFreed)
-  const month = bytesToGB(stats?.monthFreed)
-  const all = bytesToGB(stats?.allTimeFreed)
+  const today = formatBytesSmart(cleanStatBytes(stats, 'todayFreed'))
+  const month = formatBytesSmart(cleanStatBytes(stats, 'monthFreed'))
+  const all = formatBytesSmart(cleanStatBytes(stats, 'allTimeFreed'))
   host.innerHTML = `<div class="clean-stats-banner" id="clean-stats-banner">
     <div class="clean-stats-title">${t('cleanStatsTitle')}</div>
     <div class="clean-stats-grid">
-      <div class="clean-stat-pill"><span>${t('cleanStatsToday')}</span><b data-anim="today">${escapeHtml(t('unitsGB', { n: today }))}</b></div>
-      <div class="clean-stat-pill"><span>${t('cleanStatsMonth')}</span><b data-anim="month">${escapeHtml(t('unitsGB', { n: month }))}</b></div>
-      <div class="clean-stat-pill"><span>${t('cleanStatsAll')}</span><b data-anim="all">${escapeHtml(t('unitsGB', { n: all }))}</b></div>
+      <div class="clean-stat-pill"><span>${t('cleanStatsToday')}</span><b data-anim="today">${escapeHtml(today)}</b></div>
+      <div class="clean-stat-pill"><span>${t('cleanStatsMonth')}</span><b data-anim="month">${escapeHtml(month)}</b></div>
+      <div class="clean-stat-pill"><span>${t('cleanStatsAll')}</span><b data-anim="all">${escapeHtml(all)}</b></div>
     </div>
   </div>`
   host.querySelectorAll('.clean-stat-pill b').forEach((el) => {
@@ -4497,23 +4684,44 @@ async function renderDiskCleanApps(body) {
     return
   }
   diskCleanAppsCache = Array.isArray(apps) ? apps : []
+
+  const targetDrive = (selectedCleanDrive || 'C').toUpperCase()
+  const driveFiltered = diskCleanAppsCache.filter((a) => {
+    const appDrive = (a.driveLetter || '').toUpperCase()
+    if (!appDrive) {
+      return targetDrive === 'C'
+    }
+    return appDrive === targetDrive
+  })
+
+  const candidatesCount = driveFiltered.filter((a) => a.candidateCleanup).length
+
+  const candidateFiltered = diskCleanFilterCandidates
+    ? driveFiltered.filter((a) => a.candidateCleanup)
+    : driveFiltered
+
   const q = (body.querySelector('#dc-app-search')?.value || '').trim().toLowerCase()
-  const filtered = diskCleanAppsCache.filter((a) => {
+  const finalFiltered = candidateFiltered.filter((a) => {
     if (!q) return true
     const hay = `${a.displayName || ''} ${a.publisher || ''}`.toLowerCase()
     return hay.includes(q)
   })
-  const rows = filtered.slice(0, 80).map((a) => {
+
+  const rows = finalFiltered.slice(0, 100).map((a) => {
     const size = formatAppSize(a.sizeBytes, a.sizeLabel)
     const disabled = a.canUninstall ? '' : 'disabled'
     const loc = String(a.installLocation || '').trim()
     const openBtn = loc
       ? `<button type="button" class="btn soft compact dc-open-folder" data-path="${escapeHtml(loc)}" title="${escapeHtml(t('diskCleanOpenFolder'))}">📁</button>`
       : ''
+    const candidateBadge = (a.candidateCleanup || a.candidateBadgeRu || a.candidateBadgeEn)
+      ? `<div class="dc-candidate-badge">${escapeHtml(lang === 'en' ? (a.candidateBadgeEn || a.candidateBadgeRu) : (a.candidateBadgeRu || a.candidateBadgeEn))}</div>`
+      : ''
     return `<div class="dc-app-row" data-app-id="${escapeHtml(a.id)}">
       <div class="dc-app-main">
         <div class="dc-app-name">${escapeHtml(a.displayName || '')}</div>
         <div class="dc-app-meta">${escapeHtml(a.publisher || '')}${a.displayVersion ? ' · ' + escapeHtml(a.displayVersion) : ''}</div>
+        ${candidateBadge}
       </div>
       <div class="dc-app-size">${escapeHtml(size)}</div>
       <div class="dc-app-actions">
@@ -4523,21 +4731,55 @@ async function renderDiskCleanApps(body) {
       <div class="dc-row-loader hidden" aria-hidden="true"></div>
     </div>`
   }).join('')
-  body.innerHTML = `
+
+  if (!body.querySelector('#dc-app-search')) {
+    body.innerHTML = `
     <div class="dc-pane">
       <div id="dc-stats-slot"></div>
-      <input type="search" id="dc-app-search" class="dc-search" placeholder="${escapeHtml(t('diskCleanSearch'))}" />
-      <div class="dc-app-list">${rows || `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`}</div>
+      <div class="dc-filter-toolbar">
+        <div class="dc-filter-pills">
+          <button type="button" class="btn compact dc-filter-btn ${!diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-all">${t('diskCleanAllApps')}</button>
+          <button type="button" class="btn compact dc-filter-btn ${diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-candidates">${t('diskCleanCandidates')} (${candidatesCount})</button>
+        </div>
+        <input type="search" id="dc-app-search" class="dc-search" placeholder="${escapeHtml(t('diskCleanSearch'))}" autocomplete="off" />
+      </div>
+      <div id="cleaner-list-body" class="dc-app-list"></div>
       <div id="dc-app-status" class="dc-status hidden"></div>
     </div>`
+
+    const search = body.querySelector('#dc-app-search')
+    let searchTimer = null
+    search?.addEventListener('input', () => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(() => renderDiskCleanApps(body).catch(() => {}), 160)
+    })
+
+    body.querySelector('#dc-filter-all')?.addEventListener('click', () => {
+      if (diskCleanFilterCandidates) {
+        diskCleanFilterCandidates = false
+        renderDiskCleanApps(body).catch(() => {})
+      }
+    })
+
+    body.querySelector('#dc-filter-candidates')?.addEventListener('click', () => {
+      if (!diskCleanFilterCandidates) {
+        diskCleanFilterCandidates = true
+        renderDiskCleanApps(body).catch(() => {})
+      }
+    })
+  } else {
+    const btnAll = body.querySelector('#dc-filter-all')
+    const btnCand = body.querySelector('#dc-filter-candidates')
+    if (btnAll) btnAll.classList.toggle('active', !diskCleanFilterCandidates)
+    if (btnCand) {
+      btnCand.classList.toggle('active', diskCleanFilterCandidates)
+      btnCand.textContent = `${t('diskCleanCandidates')} (${candidatesCount})`
+    }
+  }
+
+  const listHost = body.querySelector('#cleaner-list-body')
+  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`
   await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
-  const search = body.querySelector('#dc-app-search')
-  if (search && q) search.value = q
-  let searchTimer = null
-  search?.addEventListener('input', () => {
-    clearTimeout(searchTimer)
-    searchTimer = setTimeout(() => renderDiskCleanApps(body).catch(() => {}), 180)
-  })
   body.querySelectorAll('.dc-open-folder').forEach((btn) => {
     btn.addEventListener('click', async (ev) => {
       ev.preventDefault()
@@ -4594,31 +4836,144 @@ async function renderDiskCleanApps(body) {
   })
 }
 
+let lastTrashedLeftover = null
+
 async function renderDiskCleanLeftovers(body) {
   let items = []
   try { items = await ListOrphanLeftovers() } catch (err) {
     body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
     return
   }
-  const rows = (Array.isArray(items) ? items : []).map((it) => `
+  let binBytes = 0
+  try {
+    const bin = await GetRecycleBinInfo()
+    binBytes = Number(bin?.bytes) || 0
+  } catch (_) { binBytes = 0 }
+  const q = (body.querySelector('#dc-left-search')?.value || '').trim().toLowerCase()
+  const filtered = (Array.isArray(items) ? items : []).filter((it) => {
+    if (!q) return true
+    return `${it.name || ''} ${it.path || ''}`.toLowerCase().includes(q)
+  })
+  const rows = filtered.map((it) => {
+    const ageBadge = (it.ageBadgeRu || it.ageBadgeEn)
+      ? `<div class="dc-age-badge ${it.ageStatus || 'neutral'}">${escapeHtml(lang === 'en' ? (it.ageBadgeEn || it.ageBadgeRu) : (it.ageBadgeRu || it.ageBadgeEn))}</div>`
+      : ''
+    return `
     <div class="dc-app-row" data-orphan-path="${escapeHtml(it.path)}">
       <div class="dc-app-main">
         <div class="dc-app-name">${escapeHtml(it.name || '')}</div>
         <div class="dc-app-meta">${escapeHtml(it.path || '')}</div>
+        ${ageBadge}
       </div>
-      <div class="dc-app-size">${escapeHtml(it.sizeLabel || formatCleanupSize(it.sizeBytes))}</div>
+      <div class="dc-app-size">${escapeHtml(formatBytesSmart(it.sizeBytes))}</div>
       <button type="button" class="btn soft compact dc-orphan-del" data-path="${escapeHtml(it.path)}" data-name="${escapeHtml(it.name || '')}">${t('diskCleanDeleteLeftover')}</button>
-    </div>`).join('')
-  body.innerHTML = `
+    </div>`
+  }).join('')
+
+  if (!body.querySelector('#dc-left-search')) {
+    body.innerHTML = `
     <div class="dc-pane">
       <div id="dc-stats-slot"></div>
+      <div class="dc-app-row" id="dc-recycle-row">
+        <div class="dc-app-main">
+          <div class="dc-app-name">${t('diskCleanRecycleTitle')}</div>
+        </div>
+        <div class="dc-app-size" id="dc-recycle-size">${escapeHtml(formatBytesSmart(binBytes))}</div>
+        <button type="button" class="btn soft compact" id="dc-empty-recycle">${t('diskCleanRecycleAction')}</button>
+      </div>
+
+      <div id="dc-leftover-undo-banner" class="dc-undo-banner ${lastTrashedLeftover ? '' : 'hidden'}">
+        <div class="dc-undo-header">
+          ${t('dcUndoHeader', { name: escapeHtml(lastTrashedLeftover?.name || '') })}
+        </div>
+        <div class="dc-undo-actions">
+          <button type="button" class="btn primary compact" id="dc-btn-restore-last">${t('dcUndoRestoreBtn')}</button>
+          <button type="button" class="btn soft compact" id="dc-btn-open-recycle">${t('dcUndoOpenRecycle')}</button>
+        </div>
+      </div>
+
+      <input type="search" id="dc-left-search" class="dc-search" placeholder="${escapeHtml(t('diskCleanSearchLeftovers'))}" autocomplete="off" />
       <div class="sf-glass-block">
         <div class="sf-block-title">${t('diskCleanLeftoversTitle')}</div>
         <div class="dc-app-meta" style="margin-bottom:10px">${t('diskCleanLeftoversHint')}</div>
-        <div class="dc-app-list">${rows || `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`}</div>
+        <div id="cleaner-list-body" class="dc-app-list"></div>
       </div>
     </div>`
+
+    const search = body.querySelector('#dc-left-search')
+    let searchTimer = null
+    search?.addEventListener('input', () => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(() => renderDiskCleanLeftovers(body).catch(() => {}), 160)
+    })
+    body.querySelector('#dc-empty-recycle')?.addEventListener('click', async () => {
+      const btn = body.querySelector('#dc-empty-recycle')
+      if (btn) btn.disabled = true
+      try {
+        await EmptyRecycleBin()
+      } catch (err) {
+        showToast(String(err), false)
+      }
+      await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
+      await renderDiskCleanLeftovers(body)
+    })
+  }
+
+  // Bind Undo & Open Recycle Bin actions
+  const undoBanner = body.querySelector('#dc-leftover-undo-banner')
+  if (undoBanner) {
+    if (lastTrashedLeftover) {
+      undoBanner.querySelector('.dc-undo-header').textContent = t('dcUndoHeader', { name: lastTrashedLeftover.name || '' })
+      undoBanner.classList.remove('hidden')
+    } else {
+      undoBanner.classList.add('hidden')
+    }
+
+    body.querySelector('#dc-btn-restore-last')?.addEventListener('click', async () => {
+      const btn = body.querySelector('#dc-btn-restore-last')
+      if (btn) {
+        btn.disabled = true
+        btn.textContent = t('dcUndoRestoring')
+      }
+      try {
+        const res = await window.go.main.App.RestoreLastTrashedItem()
+        if (res?.success) {
+          showToast(t('dcUndoSuccess', { name: res.name }), true)
+          lastTrashedLeftover = null
+          await renderDiskCleanLeftovers(body)
+        } else {
+          showToast(res?.message || t('dcUndoFailed'), false)
+          if (btn) {
+            btn.disabled = false
+          btn.textContent = t('dcUndoRestoreBtn')
+          }
+        }
+      } catch (err) {
+        showToast(String(err), false)
+        if (btn) {
+          btn.disabled = false
+          btn.textContent = t('dcUndoRestoreBtn')
+        }
+      }
+    })
+
+    body.querySelector('#dc-btn-open-recycle')?.addEventListener('click', async () => {
+      try {
+        if (window.go?.main?.App?.OpenRecycleBin) {
+          await window.go.main.App.OpenRecycleBin()
+        }
+      } catch (_) {}
+    })
+  }
+
+  const sizeEl = body.querySelector('#dc-recycle-size')
+  if (sizeEl) sizeEl.textContent = formatBytesSmart(binBytes)
+  const emptyBtn = body.querySelector('#dc-empty-recycle')
+  if (emptyBtn) emptyBtn.disabled = binBytes <= 0
+  const listHost = body.querySelector('#cleaner-list-body')
+  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`
   await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
+
   body.querySelectorAll('.dc-orphan-del').forEach((btn) => {
     btn.addEventListener('click', async (ev) => {
       ev.preventDefault()
@@ -4626,16 +4981,14 @@ async function renderDiskCleanLeftovers(body) {
       const path = btn.getAttribute('data-path') || ''
       const name = btn.getAttribute('data-name') || path
       if (!path) return
-      const ok = await glassConfirm({
-        title: t('diskCleanDeleteTitle', { name }),
-        body: t('diskCleanDeleteBody', { size: btn.closest('.dc-app-row')?.querySelector('.dc-app-size')?.textContent || '', path }),
-        confirmLabel: t('confirmDeleteForever'),
-        danger: true,
-      })
-      if (!ok) return
       openDeleteProgress(name)
-      window.__dcRefreshAfterDelete = () => renderDiskCleanLeftovers(body)
-      try { await StartRemoveOrphanLeftover(path) } catch (err) {
+      window.__dcRefreshAfterDelete = async () => {
+        lastTrashedLeftover = { name, path }
+        await renderDiskCleanLeftovers(body)
+      }
+      try {
+        await StartRemoveOrphanLeftover(path)
+      } catch (err) {
         updateDeleteProgress({ phase: 'error', message: String(err) })
       }
     })
@@ -4695,7 +5048,7 @@ async function renderDiskCleanCache(body) {
         window.__lastCleanCompare.usedBefore,
         window.__lastCleanCompare.usedAfter,
         window.__lastCleanCompare.freed,
-      ) || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesGB(window.__lastCleanCompare.freed) })}</div>`
+      ) || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesSmart(window.__lastCleanCompare.freed, true) })}</div>`
     }
     renderHome().catch(() => {})
     await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
@@ -4727,7 +5080,10 @@ async function renderDiskCleanSystem(body) {
           <div class="sf-cat-name">${t('diskCleanVSS')}</div>
           <div class="dc-app-meta">${t('diskCleanVSSHint', { size: formatCleanupSize(shadow) })}</div>
         </div>
-        <button type="button" class="btn soft compact" id="dc-vss" ${shadow > 0 ? '' : 'disabled'}>${t('diskCleanVSSAction')}</button>
+        <div class="dc-sys-actions">
+          <button type="button" class="btn soft compact" id="dc-vss" ${shadow > 0 ? '' : 'disabled'} title="${shadow > 0 ? '' : escapeHtml(t('diskCleanVSSNoPoints'))}">${t('diskCleanVSSAction')}</button>
+          <button type="button" class="btn soft compact" id="dc-create-rp">${t('diskCleanCreateRP')}</button>
+        </div>
       </div>
       <div class="sf-glass-block dc-sys-row">
         <div>
@@ -4735,9 +5091,6 @@ async function renderDiskCleanSystem(body) {
           <div class="dc-app-meta">${formatCleanupSize(delivery)}</div>
         </div>
         <button type="button" class="btn soft compact" id="dc-delivery" ${delivery > 0 ? '' : 'disabled'}>${t('diskCleanDeliveryAction')}</button>
-      </div>
-      <div class="btn-row sf-actions">
-        <button type="button" class="btn soft" id="dc-storage-sense">${t('largeFoldersTitle')}</button>
       </div>
       <div id="dc-sys-status" class="dc-status hidden"></div>
     </div>`
@@ -4761,7 +5114,7 @@ async function renderDiskCleanSystem(body) {
     }
     try {
       const st = await GetCleanStats()
-      setStatus(cleanCompareCardHTML(st?.lastUsedBefore, st?.lastUsedAfter, st?.lastCleanFreed || res?.freedBytes || 0)
+      setStatus(cleanCompareCardHTML(cleanStatBytes(st, 'lastUsedBefore'), cleanStatBytes(st, 'lastUsedAfter'), cleanStatBytes(st, 'lastCleanFreed') || res?.freedBytes || 0)
         || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesGB(res?.actualCleanedBytes || res?.freedBytes || 0) })}</div>`)
     } catch (_) {
       setStatus(`<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesGB(res?.actualCleanedBytes || res?.freedBytes || 0) })}</div>`)
@@ -4790,12 +5143,34 @@ async function renderDiskCleanSystem(body) {
     try { res = await CleanDeliveryOptimization() } catch (err) { setStatus(escapeHtml(String(err))); return }
     setStatus(`<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesGB(res?.actualCleanedBytes || res?.freedBytes || 0) })}</div>`)
     renderHome().catch(() => {})
+    await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
     await renderDiskCleanSystem(body)
   })
-  body.querySelector('#dc-storage-sense')?.addEventListener('click', async () => {
-    diskCleanTab = 'apps'
-    renderDiskCleanTabs()
-    await renderDiskCleanBody()
+  body.querySelector('#dc-create-rp')?.addEventListener('click', async () => {
+    const btn = body.querySelector('#dc-create-rp')
+    if (btn) {
+      btn.disabled = true
+      btn.textContent = t('diskCleanCreateRPWorking')
+    }
+    setStatus(t('diskCleanCreateRPWorking'))
+    let res
+    try { res = await CreateRestorePoint() } catch (err) {
+      setStatus(escapeHtml(String(err)))
+      if (btn) {
+        btn.disabled = false
+        btn.textContent = t('diskCleanCreateRP')
+      }
+      return
+    }
+    if (btn) {
+      btn.disabled = false
+      btn.textContent = t('diskCleanCreateRP')
+    }
+    const code = String(res?.message || '')
+    if (res?.ok) setStatus(`<div class="dc-status-ok">${t('diskCleanCreateRPOK')}</div>`)
+    else if (code === 'restore_point_24h') setStatus(`<div class="dc-status-warn">${t('diskCleanCreateRP24h')}</div>`)
+    else if (code === 'restore_point_admin') setStatus(`<div class="dc-status-warn">${t('diskCleanCreateRPAdmin')}</div>`)
+    else setStatus(`<div class="dc-status-warn">${escapeHtml(code || t('diskCleanCreateRPAdmin'))}</div>`)
   })
 }
 
@@ -5100,7 +5475,7 @@ async function applySmartFixFromUI() {
         applied: [{
           ok: true, scenarioId: 'disk_full',
           title: { code: 'smartFixCleanupVerdict' },
-          detail: { code: 'smartFixCleanupDone', params: { gb: formatBytesGB(cleanRes?.actualCleanedBytes || cleanRes?.freedBytes || 0) } },
+          detail: { code: 'smartFixCleanupDone', params: { gb: formatBytesSmart(cleanRes?.actualCleanedBytes || cleanRes?.freedBytes || 0, true) } },
         }],
         message: { code: 'smartFixCleanupVerdict' },
       }
@@ -5110,7 +5485,7 @@ async function applySmartFixFromUI() {
           {
             ok: true, scenarioId: 'disk_full',
             title: { code: 'smartFixCleanupVerdict' },
-            detail: { code: 'smartFixCleanupDone', params: { gb: formatBytesGB(cleanRes.actualCleanedBytes || cleanRes.freedBytes || 0) } },
+            detail: { code: 'smartFixCleanupDone', params: { gb: formatBytesSmart(cleanRes.actualCleanedBytes || cleanRes.freedBytes || 0, true) } },
           },
           ...(Array.isArray(res.applied) ? res.applied.filter((a) => a.scenarioId !== 'disk_full') : []),
         ]
@@ -5149,7 +5524,7 @@ function summarizeSmartFixApplied(applied, freedBytes) {
     lines.push({ kind: 'refresh', text: t('smartFixResultRefreshLine', { hz: hz || msgText(refresh.detail) }) })
   }
   if (cleaned || Number(freedBytes) > 0) {
-    lines.push({ kind: 'cleanup', text: t('smartFixResultFreedLine', { gb: formatBytesGB(freedBytes) }) })
+    lines.push({ kind: 'cleanup', text: t('smartFixResultFreedLine', { gb: formatBytesSmart(freedBytes, true) }) })
   }
   if (startupN > 0) {
     lines.push({ kind: 'startup', text: t('smartFixResultStartupLine', { n: startupN }) })
@@ -5177,7 +5552,7 @@ function renderSmartFixResult(res) {
   const before = Number(res?.scoreBefore) || 0
   const after = Number(res?.scoreAfter) || before
   const delta = after - before
-  const freedGB = formatBytesGB(res?.freedBytes)
+  const freedGB = formatBytesSmart(res?.freedBytes, true)
   const lines = summarizeSmartFixApplied(res?.applied, res?.freedBytes)
   const listHtml = lines.map((l) => {
     if (l.kind === 'device') {
@@ -5446,7 +5821,7 @@ function wireUI() {
     btn.addEventListener('click', () => applyTheme(btn.dataset.theme))
   })
   wireCustomDropdowns()
-  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
+  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
     $(id)?.addEventListener('change', saveBehavior)
   })
   $('btn-adv-diag-toggle')?.addEventListener('click', () => {
@@ -5827,7 +6202,7 @@ function wireUI() {
       const id = ev?.appId || window.__dcPendingDeleteId || ''
       showToast(t('diskCleanExternalDeleted', {
         name,
-        size: formatBytesGB(freed),
+        size: formatBytesSmart(freed, true),
       }), true, { holdMs: 7000 })
       window.__lastCleanCompare = {
         usedBefore: 0,
@@ -5852,6 +6227,22 @@ function wireUI() {
       if (typeof window.__dcRefreshAfterDelete === 'function') {
         window.__dcRefreshAfterDelete().catch?.(() => {})
         window.__dcRefreshAfterDelete = null
+      }
+    })
+    EventsOn('recycle-bin-updated', (ev) => {
+      const b = Number(ev?.bytes) || 0
+      const sizeEl = document.querySelector('#dc-recycle-size')
+      if (sizeEl) sizeEl.textContent = formatBytesSmart(b)
+      const emptyBtn = document.querySelector('#dc-empty-recycle')
+      if (emptyBtn) emptyBtn.disabled = b <= 0
+      if (ev?.lastTrashed) {
+        lastTrashedLeftover = { name: ev.lastTrashed, path: ev.path }
+        const banner = document.querySelector('#dc-leftover-undo-banner')
+        if (banner) {
+          const header = banner.querySelector('.dc-undo-header')
+          if (header) header.innerHTML = '🗑️ Папка <b>«' + escapeHtml(ev.lastTrashed) + '»</b> перемещена в Корзину Windows. Если удалили что-то нужное — можно вернуть обратно.'
+          banner.classList.remove('hidden')
+        }
       }
     })
   } catch (_) {}

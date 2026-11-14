@@ -19,20 +19,31 @@ var embeddedGamesJSON []byte
 
 // GameInfo describes a title in the FPS Predictor catalog.
 type GameInfo struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Genre       string  `json:"genre"`
-	Weight      float64 `json:"weight"`
-	SteamAppID  int     `json:"steamAppId"`
-	PosterURL   string  `json:"posterUrl"`
-	HeaderURL   string  `json:"headerUrl,omitempty"`
-	Category    string  `json:"category"`
-	Year        int     `json:"year,omitempty"`
-	Badge       string  `json:"badge,omitempty"`
-	Engine      string  `json:"engine,omitempty"`
-	Synthetic   bool    `json:"synthetic,omitempty"`
-	FromSteam   bool    `json:"fromSteam,omitempty"`
-	InstallPath string  `json:"installPath,omitempty"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Genre         string  `json:"genre"`
+	Weight        float64 `json:"weight"`
+	SteamAppID    int     `json:"steamAppId"`
+	PosterURL     string  `json:"posterUrl"`
+	HeaderURL     string  `json:"headerUrl,omitempty"`
+	Category      string  `json:"category"`
+	Year          int     `json:"year,omitempty"`
+	Badge         string  `json:"badge,omitempty"`
+	Engine        string  `json:"engine,omitempty"`
+	Synthetic     bool    `json:"synthetic,omitempty"`
+	FromSteam     bool    `json:"fromSteam,omitempty"`
+	InstallPath   string  `json:"installPath,omitempty"`
+	InstallSizeGB float64 `json:"installSizeGB,omitempty"`
+	MinVRAMGB     float64 `json:"minVramGB,omitempty"`
+	RecVRAMGB     float64 `json:"recVramGB,omitempty"`
+	MinRAMGB      float64 `json:"minRAMGB,omitempty"`
+	RecRAMGB      float64 `json:"recRAMGB,omitempty"`
+	FitVerdict    string  `json:"fitVerdict,omitempty"`
+	FitVerdictCls string  `json:"fitVerdictCls,omitempty"`
+	FitLabelRu    string  `json:"fitLabelRu,omitempty"`
+	FitLabelEn    string  `json:"fitLabelEn,omitempty"`
+	FitReasonRu   string  `json:"fitReasonRu,omitempty"`
+	FitReasonEn   string  `json:"fitReasonEn,omitempty"`
 }
 
 // FPSPrediction is estimated average FPS across quality presets.
@@ -70,7 +81,12 @@ type FPSPrediction struct {
 	ArchConfirm  string   `json:"archConfirm"`
 	UpscaleHint  string   `json:"upscaleHint,omitempty"`
 	// Phase 4 - fit for this PC (primary UI; FPS numbers are not shown).
-	Fit GameFitVerdict `json:"fit"`
+	Fit          GameFitVerdict `json:"fit"`
+	FitVerdict   string         `json:"fitVerdict,omitempty"`
+	FitReasonRu  string         `json:"fitReasonRu,omitempty"`
+	FitReasonEn  string         `json:"fitReasonEn,omitempty"`
+	ReqVRAMGB    float64        `json:"reqVRAMGB"`
+	ReqRAMGB     float64        `json:"reqRAMGB"`
 }
 
 // SystemPowerProfile is the live hardware scorecard used by GamePulse.
@@ -109,6 +125,7 @@ type gameReqSet struct {
 	Low, Med, High, Ultra gameReq
 	CapFPS                float64 // 0 = no cap; e.g. 60 for lightweight titles
 	Heavy                 bool
+	ReqRAMGB              float64
 }
 
 var gameCatalog []GameInfo
@@ -301,6 +318,20 @@ func (a *App) ListGames() []GameInfo {
 			continue
 		}
 		filtered = append(filtered, g)
+	}
+	sys := a.buildSystemPowerProfile()
+	for i := range filtered {
+		req := requirementsFor(filtered[i])
+		verdict, cls, lRu, lEn, rRu, rEn := EvaluateGameFitUnified(sys, filtered[i], req)
+		filtered[i].MinVRAMGB = req.Low.ReqVRAMGB
+		filtered[i].RecVRAMGB = req.High.ReqVRAMGB
+		filtered[i].MinRAMGB = req.ReqRAMGB
+		filtered[i].FitVerdict = verdict
+		filtered[i].FitVerdictCls = cls
+		filtered[i].FitLabelRu = lRu
+		filtered[i].FitLabelEn = lEn
+		filtered[i].FitReasonRu = rRu
+		filtered[i].FitReasonEn = rEn
 	}
 	return filtered
 }
@@ -585,54 +616,13 @@ type steamAppDetails struct {
 
 func fetchSteamAppDetails(appID int) steamAppDetails {
 	out := steamAppDetails{}
-	client := &http.Client{Timeout: 4 * time.Second}
-	u := fmt.Sprintf("https://store.steampowered.com/api/appdetails?appids=%d&l=russian", appID)
-	req, err := http.NewRequest(http.MethodGet, u, nil)
-	if err != nil {
+	if appID <= 0 {
 		return out
 	}
-	req.Header.Set("User-Agent", "PulseCore/1.0")
-	req.Header.Set("Accept", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		return out
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 3<<20))
-	if err != nil {
-		return out
-	}
-	text := string(body)
-	lower := strings.ToLower(text)
-
-	// Name
-	if m := regexp.MustCompile(`"name"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"`).FindStringSubmatch(text); len(m) == 2 {
-		out.Name = strings.ReplaceAll(m[1], `\"`, `"`)
-	}
-	// Release year: "date":"16 Nov, 2009" / "16 ноября 2009"
-	if m := regexp.MustCompile(`"date"\s*:\s*"[^"]*?((?:19|20)\d{2})`).FindStringSubmatch(text); len(m) == 2 {
-		out.Year, _ = strconv.Atoi(m[1])
-	}
-	// Min VRAM from pc_requirements HTML
-	re := regexp.MustCompile(`(?i)(\d+)\s*(mb|gb).{0,24}(video|vram|graphics|видео|видеопамя)`)
-	if m := re.FindStringSubmatch(lower); len(m) >= 3 {
-		n, _ := strconv.Atoi(m[1])
-		if strings.EqualFold(m[2], "mb") {
-			out.MinVRAMGB = float64(n) / 1024.0
-		} else {
-			out.MinVRAMGB = float64(n)
-		}
-	} else {
-		re2 := regexp.MustCompile(`(?i)(video|graphics|vram|видео|видеопамя).{0,32}(\d+)\s*(mb|gb)`)
-		if m := re2.FindStringSubmatch(lower); len(m) >= 4 {
-			n, _ := strconv.Atoi(m[2])
-			if strings.EqualFold(m[3], "mb") {
-				out.MinVRAMGB = float64(n) / 1024.0
-			} else {
-				out.MinVRAMGB = float64(n)
-			}
-		}
-	}
+	data := GetCachedOrFetchGameReqs(appID, "", 0, "")
+	out.Name = data.Name
+	out.Year = data.Year
+	out.MinVRAMGB = data.MinVRAMGB
 	return out
 }
 
@@ -686,10 +676,11 @@ func classifyTitle(name string, yearHint int) (cat string, year int, badge, genr
 	case containsAny(q, mobaHints):
 		cat, weight, genre, badge = "moba", 0.58, "MOBA", "eSports"
 	default:
-		// Unknown modern titles - mid AAA, not automatic "heavy unplayable".
-		cat, weight, genre, badge = "aaa", 0.95, "Action", "AAA"
-		if year >= 2020 {
-			badge = "AAA Next-Gen"
+		// Unknown titles are modest until real VRAM/size data says otherwise.
+		// Buckshot Roulette and similar small games must not inherit an AAA template.
+		cat, weight, genre, badge = "indie", 0.42, "Indie", "Indie"
+		if strings.Contains(q, "casual") {
+			genre = "Casual"
 		}
 	}
 	return
@@ -830,15 +821,21 @@ func requirementsFor(game GameInfo) gameReqSet {
 		}
 		switch cat {
 		case "classic":
+			minV := 0.128
+			recV := 0.256
+			if game.Year > 0 && game.Year <= 2000 {
+				minV = 0.032
+				recV = 0.064
+			}
 			req = gameReqSet{
-				Low: gameReq{120, 5, 5, 0.5}, Med: gameReq{110, 8, 8, 1},
-				High: gameReq{100, 14, 12, 2}, Ultra: gameReq{90, 22, 18, 3},
+				Low: gameReq{120, 5, 5, minV}, Med: gameReq{110, 8, 8, (minV + recV) / 2},
+				High: gameReq{100, 14, 12, recV}, Ultra: gameReq{90, 22, 18, recV * 1.5},
 				CapFPS: 240, Heavy: false,
 			}
-		case "indie":
+		case "indie", "casual":
 			req = gameReqSet{
-				Low: gameReq{100, 14, 22, 0.5}, Med: gameReq{90, 20, 28, 1},
-				High: gameReq{80, 28, 34, 1.5}, Ultra: gameReq{70, 36, 40, 2},
+				Low: gameReq{100, 14, 22, 0.256}, Med: gameReq{90, 20, 28, 0.512},
+				High: gameReq{80, 28, 34, 1}, Ultra: gameReq{70, 36, 40, 1.5},
 			}
 		case "shooter", "moba":
 			req = gameReqSet{
@@ -850,17 +847,92 @@ func requirementsFor(game GameInfo) gameReqSet {
 				Low: gameReq{70, 30, 32, 1}, Med: gameReq{65, 42, 40, 2},
 				High: gameReq{60, 55, 48, 4}, Ultra: gameReq{55, 68, 55, 6},
 			}
-		default:
-			// Modern AAA baseline - still capped by year below.
+		case "aaa":
+			// Named heavy titles live in gameRequirements. Unknown "aaa" stays modest
+			// until local DB / Steam supplies a real recommended VRAM.
 			req = gameReqSet{
-				Low: gameReq{50, 48, 40, 3}, Med: gameReq{50, 62, 50, 5},
-				High: gameReq{55, 74, 58, 8}, Ultra: gameReq{50, 88, 68, 10},
-				Heavy: true,
+				Low: gameReq{60, 36, 32, 2}, Med: gameReq{55, 48, 40, 3},
+				High: gameReq{50, 58, 48, 4}, Ultra: gameReq{48, 68, 55, 6},
+			}
+		default:
+			req = gameReqSet{
+				Low: gameReq{100, 14, 22, 0.5}, Med: gameReq{90, 20, 28, 1},
+				High: gameReq{80, 28, 34, 2}, Ultra: gameReq{70, 36, 40, 2},
 			}
 		}
 	}
 	req = applyLocalDBRequirements(game, req)
-	return scaleReqVRAMByYear(req, game.Year)
+
+	// Apply precise cached or fetched Steam Store requirements
+	steamReq := GetCachedOrFetchGameReqs(game.SteamAppID, game.Name, game.Year, game.Category)
+	if steamReq.MinVRAMGB > 0 {
+		req.Low.ReqVRAMGB = steamReq.MinVRAMGB
+		if steamReq.RecVRAMGB > 0 {
+			req.High.ReqVRAMGB = steamReq.RecVRAMGB
+			req.Med.ReqVRAMGB = (steamReq.MinVRAMGB + steamReq.RecVRAMGB) / 2
+		} else {
+			req.High.ReqVRAMGB = steamReq.MinVRAMGB
+			req.Med.ReqVRAMGB = steamReq.MinVRAMGB
+		}
+	}
+
+	req = scaleReqVRAMByYear(req, game.Year)
+	if req.ReqRAMGB <= 0 {
+		switch {
+		case found && req.High.ReqVRAMGB >= 6:
+			req.ReqRAMGB = 16
+		case !found && (isModestGame(game) || req.High.ReqVRAMGB <= 2):
+			req.ReqRAMGB = 4
+		case req.High.ReqVRAMGB >= 6:
+			req.ReqRAMGB = 16
+		default:
+			req.ReqRAMGB = 8
+		}
+	}
+	return req
+}
+
+// isModestGame is true for Indie / Casual / 2D and anything released before 2016.
+func isModestGame(game GameInfo) bool {
+	blob := strings.ToLower(strings.Join([]string{game.Category, game.Genre, game.Badge, game.Name}, " "))
+	if strings.Contains(blob, "indie") || strings.Contains(blob, "casual") || strings.Contains(blob, "2d") ||
+		strings.Contains(blob, "classic") || strings.Contains(blob, "retro") {
+		return true
+	}
+	switch strings.ToLower(game.Category) {
+	case "indie", "casual", "classic":
+		return true
+	}
+	return game.Year > 0 && game.Year < 2016
+}
+
+// finalizeGameBadge keeps AAA only when recommended VRAM or install size is actually high.
+func finalizeGameBadge(game GameInfo, req gameReqSet) string {
+	size, _ := storageNeedFor(game)
+	heavy := req.High.ReqVRAMGB >= 6 || size > 35
+	badge := strings.TrimSpace(game.Badge)
+	if badge == "" {
+		badge = badgeForCategory(game.Category, game.Year)
+	}
+	claimsAAA := strings.Contains(strings.ToLower(badge), "aaa") || strings.EqualFold(game.Category, "aaa")
+	if !heavy {
+		if claimsAAA || isModestGame(game) {
+			if strings.EqualFold(game.Category, "classic") || (game.Year > 0 && game.Year < 2010) {
+				return badgeForCategory("classic", game.Year)
+			}
+			if isModestGame(game) || claimsAAA {
+				return "Indie"
+			}
+		}
+		return badge
+	}
+	if strings.EqualFold(game.Category, "aaa") || strings.Contains(strings.ToLower(badge), "aaa") {
+		if game.Year >= 2020 {
+			return "AAA Next-Gen"
+		}
+		return "AAA"
+	}
+	return badge
 }
 
 // scaleReqVRAMByYear caps VRAM demand so old titles never look "tight" on mid-range cards.
@@ -871,13 +943,22 @@ func scaleReqVRAMByYear(req gameReqSet, year int) gameReqSet {
 	}
 	var capGB float64
 	switch {
+	case year <= 2000:
+		capGB = 0.064
+		req.Heavy = false
+	case year <= 2008:
+		capGB = 0.256
+		req.Heavy = false
+	case year <= 2014:
+		capGB = 1.0
+		req.Heavy = false
 	case year <= 2016:
-		capGB = 3
+		capGB = 3.0
 		req.Heavy = false
 	case year <= 2020:
-		capGB = 6
+		capGB = 6.0
 	default:
-		capGB = 8
+		capGB = 8.0
 	}
 	clamp := func(r gameReq) gameReq {
 		if r.ReqVRAMGB > capGB {
@@ -1030,10 +1111,7 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 	a.mu.RUnlock()
 	fit := EvaluateGameFit(sys, game, reqSet, diskSnaps)
 
-	badge := game.Badge
-	if badge == "" {
-		badge = badgeForCategory(game.Category, game.Year)
-	}
+	badge := finalizeGameBadge(game, reqSet)
 	poster := game.PosterURL
 	if poster == "" {
 		poster = game.HeaderURL
@@ -1048,9 +1126,10 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 		verdictKey = "fitVerdictOk"
 	case "tight":
 		verdictKey = "fitVerdictTight"
-	case "wont":
-		verdictKey = "fitVerdictWont"
+	case "wont", "deficit":
+		verdictKey = "fitVerdictDeficit"
 	}
+	verdictUnified, _, _, _, rRu, rEn := EvaluateGameFitUnified(sys, game, reqSet)
 
 	return FPSPrediction{
 		GameID:       game.ID,
@@ -1086,6 +1165,11 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 		ArchConfirm:  "",
 		UpscaleHint:  "",
 		Fit:          fit,
+		FitVerdict:   verdictUnified,
+		FitReasonRu:  rRu,
+		FitReasonEn:  rEn,
+		ReqVRAMGB:    reqSet.High.ReqVRAMGB,
+		ReqRAMGB:     reqSet.ReqRAMGB,
 	}
 }
 

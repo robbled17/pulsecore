@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,13 +11,14 @@ import (
 
 // CleanRecord is one successful cleanup / uninstall measurement.
 type CleanRecord struct {
-	Timestamp   time.Time `json:"timestamp"`
-	BytesBefore uint64    `json:"bytes_before"` // free bytes before
-	BytesAfter  uint64    `json:"bytes_after"`  // free bytes after
-	BytesFreed  uint64    `json:"bytes_freed"`
-	TotalBytes  uint64    `json:"total_bytes"`
-	TargetDrive string    `json:"target_drive"` // "C:"
-	Category    string    `json:"category"`     // Cache|AppUninstall|Shaders|...
+	Timestamp    time.Time `json:"timestamp"`
+	BytesBefore  uint64    `json:"bytes_before"` // free bytes before
+	BytesAfter   uint64    `json:"bytes_after"`  // free bytes after
+	BytesFreed   uint64    `json:"bytes_freed"`
+	DeletedBytes uint64    `json:"deletedBytes"`
+	TotalBytes   uint64    `json:"total_bytes"`
+	TargetDrive  string    `json:"target_drive"` // "C:"
+	Category     string    `json:"category"`     // Cache|AppUninstall|Shaders|...
 }
 
 // CleanStats is aggregated savings for the UI.
@@ -110,8 +112,24 @@ func (a *App) saveCleanHistoryLocked(e *cleanHistoryEngine) {
 	_ = os.Rename(tmp, path)
 }
 
+// chooseFreedBytes prefers bytes actually deleted over an NTFS free-space delta.
+// A zero delta from filesystem caching must not wipe a real file-size measurement.
+func chooseFreedBytes(freeBefore, freeAfter, deleted uint64) uint64 {
+	if deleted > 0 {
+		return deleted
+	}
+	if freeAfter > freeBefore {
+		return freeAfter - freeBefore
+	}
+	return 0
+}
+
 // RecordCleanEvent measures and persists a cleanup delta (free-space based).
 func (a *App) RecordCleanEvent(drive, category string, freeBefore, freeAfter, total uint64) CleanRecord {
+	return a.recordCleanEvent(drive, category, freeBefore, freeAfter, total, 0)
+}
+
+func (a *App) recordCleanEvent(drive, category string, freeBefore, freeAfter, total, deleted uint64) CleanRecord {
 	a.loadCleanHistory()
 	e := a.ensureCleanHistory()
 	e.mu.Lock()
@@ -119,21 +137,16 @@ func (a *App) RecordCleanEvent(drive, category string, freeBefore, freeAfter, to
 
 	drive = normalizeDriveLetter(drive) + ":"
 	category = trimCategory(category)
-	var freed uint64
-	if freeAfter > freeBefore {
-		freed = freeAfter - freeBefore
-	}
+	freed := chooseFreedBytes(freeBefore, freeAfter, deleted)
 	rec := CleanRecord{
-		Timestamp:   time.Now(),
-		BytesBefore: freeBefore,
-		BytesAfter:  freeAfter,
-		BytesFreed:  freed,
-		TotalBytes:  total,
-		TargetDrive: drive,
-		Category:    category,
-	}
-	if freed == 0 && freeAfter == freeBefore {
-		// Still record if caller insists via separate ActualCleanedBytes path.
+		Timestamp:    time.Now(),
+		BytesBefore:  freeBefore,
+		BytesAfter:   freeAfter,
+		BytesFreed:   freed,
+		DeletedBytes: freed,
+		TotalBytes:   total,
+		TargetDrive:  drive,
+		Category:     category,
 	}
 	e.store.Records = append(e.store.Records, rec)
 	if len(e.store.Records) > cleanHistoryMaxRecords {
@@ -149,7 +162,12 @@ func (a *App) MeasureAndRecordClean(drive, category string, fn func() int64) (fr
 	beforeFree, total, ok := getDiskFreeSpaceEx(root)
 	if !ok {
 		freedReported = fn()
-		return freedReported, CleanRecord{}
+		var deleted uint64
+		if freedReported > 0 {
+			deleted = uint64(freedReported)
+		}
+		rec = a.recordCleanEvent(drive, category, 0, 0, 0, deleted)
+		return freedReported, rec
 	}
 	freedReported = fn()
 	time.Sleep(150 * time.Millisecond)
@@ -157,21 +175,11 @@ func (a *App) MeasureAndRecordClean(drive, category string, fn func() int64) (fr
 	if ok2 && total2 > 0 {
 		total = total2
 	}
-	rec = a.RecordCleanEvent(drive, category, beforeFree, afterFree, total)
-	// Prefer measured free-space delta when positive; keep reported as fallback for stats UI.
-	if rec.BytesFreed == 0 && freedReported > 0 {
-		rec.BytesFreed = uint64(freedReported)
-		// Amend last record.
-		a.loadCleanHistory()
-		e := a.ensureCleanHistory()
-		e.mu.Lock()
-		if n := len(e.store.Records); n > 0 {
-			e.store.Records[n-1].BytesFreed = uint64(freedReported)
-			rec = e.store.Records[n-1]
-			a.saveCleanHistoryLocked(e)
-		}
-		e.mu.Unlock()
+	var deleted uint64
+	if freedReported > 0 {
+		deleted = uint64(freedReported)
 	}
+	rec = a.recordCleanEvent(drive, category, beforeFree, afterFree, total, deleted)
 	return freedReported, rec
 }
 
@@ -189,12 +197,16 @@ func (a *App) GetCleanStats() CleanStats {
 	monthStart := time.Date(y, m, 1, 0, 0, 0, 0, now.Location())
 
 	for _, r := range e.store.Records {
-		out.AllTimeFreed += r.BytesFreed
+		freed := r.DeletedBytes
+		if r.BytesFreed > freed {
+			freed = r.BytesFreed
+		}
+		out.AllTimeFreed += freed
 		if !r.Timestamp.Before(todayStart) {
-			out.TodayFreed += r.BytesFreed
+			out.TodayFreed += freed
 		}
 		if !r.Timestamp.Before(monthStart) {
-			out.MonthFreed += r.BytesFreed
+			out.MonthFreed += freed
 		}
 	}
 	if n := len(e.store.Records); n > 0 {
@@ -225,4 +237,28 @@ func trimCategory(c string) string {
 		return "Cache"
 	}
 	return c
+}
+
+// FormatBytesSmart formats bytes into KB, MB, or GB with exact thresholds.
+func FormatBytesSmart(bytes uint64, withSign bool) string {
+	sign := ""
+	if withSign {
+		sign = "+"
+	}
+	if bytes == 0 {
+		return sign + "0 МБ"
+	}
+	if bytes < 1024*1024 {
+		kb := (bytes + 512) / 1024
+		return fmt.Sprintf("%s%d КБ", sign, kb)
+	}
+	if bytes < 1024*1024*1024 {
+		mb := float64(bytes) / (1024 * 1024)
+		if mb >= 10 {
+			return fmt.Sprintf("%s%.0f МБ", sign, mb)
+		}
+		return fmt.Sprintf("%s%.1f МБ", sign, mb)
+	}
+	gb := float64(bytes) / (1024 * 1024 * 1024)
+	return fmt.Sprintf("%s%.1f ГБ", sign, gb)
 }

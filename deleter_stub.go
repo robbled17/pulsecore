@@ -24,3 +24,11 @@ func isDeletableInstallPath(p string) bool { return isSafeAppLeftoverPath(p) }
 func openPathInExplorer(folderPath string) error {
 	return fmt.Errorf("unsupported")
 }
+
+func recycleFileOrDir(dirPath string) error {
+	return os.RemoveAll(dirPath)
+}
+
+func restoreFromRecycleBin(name string, originalPath string) error {
+	return fmt.Errorf("unsupported")
+}

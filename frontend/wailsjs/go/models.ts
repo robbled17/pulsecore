@@ -255,6 +255,7 @@ export namespace main {
 	    bytes_before: number;
 	    bytes_after: number;
 	    bytes_freed: number;
+	    deletedBytes: number;
 	    total_bytes: number;
 	    target_drive: string;
 	    category: string;
@@ -269,6 +270,7 @@ export namespace main {
 	        this.bytes_before = source["bytes_before"];
 	        this.bytes_after = source["bytes_after"];
 	        this.bytes_freed = source["bytes_freed"];
+	        this.deletedBytes = source["deletedBytes"];
 	        this.total_bytes = source["total_bytes"];
 	        this.target_drive = source["target_drive"];
 	        this.category = source["category"];
@@ -1188,6 +1190,11 @@ export namespace main {
 	    archConfirm: string;
 	    upscaleHint?: string;
 	    fit: GameFitVerdict;
+	    fitVerdict?: string;
+	    fitReasonRu?: string;
+	    fitReasonEn?: string;
+	    reqVRAMGB: number;
+	    reqRAMGB: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new FPSPrediction(source);
@@ -1228,6 +1235,11 @@ export namespace main {
 	        this.archConfirm = source["archConfirm"];
 	        this.upscaleHint = source["upscaleHint"];
 	        this.fit = this.convertValues(source["fit"], GameFitVerdict);
+	        this.fitVerdict = source["fitVerdict"];
+	        this.fitReasonRu = source["fitReasonRu"];
+	        this.fitReasonEn = source["fitReasonEn"];
+	        this.reqVRAMGB = source["reqVRAMGB"];
+	        this.reqRAMGB = source["reqRAMGB"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1302,6 +1314,17 @@ export namespace main {
 	    synthetic?: boolean;
 	    fromSteam?: boolean;
 	    installPath?: string;
+	    installSizeGB?: number;
+	    minVramGB?: number;
+	    recVramGB?: number;
+	    minRAMGB?: number;
+	    recRAMGB?: number;
+	    fitVerdict?: string;
+	    fitVerdictCls?: string;
+	    fitLabelRu?: string;
+	    fitLabelEn?: string;
+	    fitReasonRu?: string;
+	    fitReasonEn?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new GameInfo(source);
@@ -1323,6 +1346,17 @@ export namespace main {
 	        this.synthetic = source["synthetic"];
 	        this.fromSteam = source["fromSteam"];
 	        this.installPath = source["installPath"];
+	        this.installSizeGB = source["installSizeGB"];
+	        this.minVramGB = source["minVramGB"];
+	        this.recVramGB = source["recVramGB"];
+	        this.minRAMGB = source["minRAMGB"];
+	        this.recRAMGB = source["recRAMGB"];
+	        this.fitVerdict = source["fitVerdict"];
+	        this.fitVerdictCls = source["fitVerdictCls"];
+	        this.fitLabelRu = source["fitLabelRu"];
+	        this.fitLabelEn = source["fitLabelEn"];
+	        this.fitReasonRu = source["fitReasonRu"];
+	        this.fitReasonEn = source["fitReasonEn"];
 	    }
 	}
 	export class GameSession {
@@ -1763,6 +1797,11 @@ export namespace main {
 	    canUninstall: boolean;
 	    registryRoot: string;
 	    registryPath: string;
+	    driveLetter: string;
+	    lastUsedDays: number;
+	    candidateCleanup: boolean;
+	    candidateBadgeRu?: string;
+	    candidateBadgeEn?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new InstalledApp(source);
@@ -1782,6 +1821,11 @@ export namespace main {
 	        this.canUninstall = source["canUninstall"];
 	        this.registryRoot = source["registryRoot"];
 	        this.registryPath = source["registryPath"];
+	        this.driveLetter = source["driveLetter"];
+	        this.lastUsedDays = source["lastUsedDays"];
+	        this.candidateCleanup = source["candidateCleanup"];
+	        this.candidateBadgeRu = source["candidateBadgeRu"];
+	        this.candidateBadgeEn = source["candidateBadgeEn"];
 	    }
 	}
 	export class IntelBaseline {
@@ -1962,6 +2006,38 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.sizeBytes = source["sizeBytes"];
+	    }
+	}
+	export class LocalDriveInfo {
+	    letter: string;
+	    mount: string;
+	    label: string;
+	    driveType: string;
+	    totalBytes: number;
+	    freeBytes: number;
+	    usedBytes: number;
+	    totalGB: number;
+	    freeGB: number;
+	    usedGB: number;
+	    usedPercent: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalDriveInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.letter = source["letter"];
+	        this.mount = source["mount"];
+	        this.label = source["label"];
+	        this.driveType = source["driveType"];
+	        this.totalBytes = source["totalBytes"];
+	        this.freeBytes = source["freeBytes"];
+	        this.usedBytes = source["usedBytes"];
+	        this.totalGB = source["totalGB"];
+	        this.freeGB = source["freeGB"];
+	        this.usedGB = source["usedGB"];
+	        this.usedPercent = source["usedPercent"];
 	    }
 	}
 	export class MemoryWatchCard {
@@ -2176,6 +2252,11 @@ export namespace main {
 	    sizeBytes: number;
 	    sizeLabel: string;
 	    rootKind: string;
+	    lastModTime: time.Time;
+	    daysAgo: number;
+	    ageBadgeRu: string;
+	    ageBadgeEn: string;
+	    ageStatus: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new OrphanLeftover(source);
@@ -2188,7 +2269,30 @@ export namespace main {
 	        this.sizeBytes = source["sizeBytes"];
 	        this.sizeLabel = source["sizeLabel"];
 	        this.rootKind = source["rootKind"];
+	        this.lastModTime = this.convertValues(source["lastModTime"], time.Time);
+	        this.daysAgo = source["daysAgo"];
+	        this.ageBadgeRu = source["ageBadgeRu"];
+	        this.ageBadgeEn = source["ageBadgeEn"];
+	        this.ageStatus = source["ageStatus"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PeripheralItem {
 	    name: string;
@@ -2308,6 +2412,20 @@ export namespace main {
 	
 	
 	
+	export class RecycleBinStatus {
+	    bytes: number;
+	    items: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RecycleBinStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.bytes = source["bytes"];
+	        this.items = source["items"];
+	    }
+	}
 	export class SleepReport {
 	    ok: boolean;
 	    sleepOK: boolean;
@@ -3056,6 +3174,7 @@ export namespace main {
 	    miniHudPosY: number;
 	    miniHudOpacityPercent: number;
 	    miniHudAcrylic: boolean;
+	    conflictWatcherEnabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new appPrefs(source);
@@ -3075,6 +3194,7 @@ export namespace main {
 	        this.miniHudPosY = source["miniHudPosY"];
 	        this.miniHudOpacityPercent = source["miniHudOpacityPercent"];
 	        this.miniHudAcrylic = source["miniHudAcrylic"];
+	        this.conflictWatcherEnabled = source["conflictWatcherEnabled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

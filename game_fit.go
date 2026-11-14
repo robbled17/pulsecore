@@ -14,20 +14,20 @@ type DiskFreeSnap struct {
 
 // GameFitVerdict is the Phase-4 GamePulse result: fit for THIS PC, not an FPS number.
 type GameFitVerdict struct {
-	Level        string `json:"level"` // excellent|ok|tight|wont|unknown
-	LabelRu      string `json:"labelRu"`
-	LabelEn      string `json:"labelEn"`
-	ReasonRu     string `json:"reasonRu"`
-	ReasonEn     string `json:"reasonEn"`
-	Approximate  bool   `json:"approximate"`  // always true for class-based estimates
-	Confident    bool   `json:"confident"`
+	Level       string `json:"level"` // excellent|ok|tight|wont|unknown
+	LabelRu     string `json:"labelRu"`
+	LabelEn     string `json:"labelEn"`
+	ReasonRu    string `json:"reasonRu"`
+	ReasonEn    string `json:"reasonEn"`
+	Approximate bool   `json:"approximate"` // always true for class-based estimates
+	Confident   bool   `json:"confident"`
 	// Download / install advice
-	StorageNeedGB   float64        `json:"storageNeedGB"`
-	StorageNeedOK   bool           `json:"storageNeedOK"`
-	Disks           []DiskFreeSnap `json:"disks"`
-	RecommendMount  string         `json:"recommendMount"`
-	DownloadRu      string         `json:"downloadRu"`
-	DownloadEn      string         `json:"downloadEn"`
+	StorageNeedGB  float64        `json:"storageNeedGB"`
+	StorageNeedOK  bool           `json:"storageNeedOK"`
+	Disks          []DiskFreeSnap `json:"disks"`
+	RecommendMount string         `json:"recommendMount"`
+	DownloadRu     string         `json:"downloadRu"`
+	DownloadEn     string         `json:"downloadEn"`
 }
 
 // gameStorageGB is local catalog of install size (GB). Unknown → category default.
@@ -38,35 +38,138 @@ var gameStorageGB = map[string]float64{
 }
 
 func storageNeedFor(game GameInfo) (gb float64, ok bool) {
+	if game.InstallSizeGB >= 0.01 {
+		return math.Round(game.InstallSizeGB*100) / 100, true
+	}
 	id := strings.ToLower(strings.TrimSpace(game.ID))
 	if v, found := gameStorageGB[id]; found && v > 0 {
 		return v, true
 	}
-	if id := canonicalReqID(game); id != "" {
-		if v, found := gameStorageGB[id]; found && v > 0 {
+	if cid := canonicalReqID(game); cid != "" {
+		if v, found := gameStorageGB[cid]; found && v > 0 {
 			return v, true
 		}
 	}
+
+	// Check Steam / Calibrated requirements
+	data := GetCachedOrFetchGameReqs(game.SteamAppID, game.Name, game.Year, game.Category)
+	if data.StorageNeedGB > 0 {
+		return data.StorageNeedGB, true
+	}
+
+	// Era calibration
+	if game.Year > 0 && game.Year <= 2000 {
+		return 0.15, true
+	}
+	if game.Year > 2000 && game.Year <= 2008 {
+		return 2.0, true
+	}
+	if game.Year > 2008 && game.Year <= 2014 {
+		return 8.0, true
+	}
+
+	if isModestGame(game) {
+		return 1.5, true
+	}
 	switch strings.ToLower(game.Category) {
 	case "classic":
-		return 2, true
-	case "indie":
-		return 5, true
+		return 0.5, true
+	case "indie", "casual":
+		return 1.5, true
 	case "shooter", "moba", "esports":
 		return 35, true
 	case "sports", "sim":
 		return 40, true
 	case "aaa":
-		return 70, true
+		return 40, true
 	default:
-		if game.Year > 0 && game.Year < 2010 {
-			return 3, true
-		}
 		if game.Year >= 2020 {
-			return 60, true
+			return 25, true
 		}
-		return 25, true
+		return 15, true
 	}
+}
+
+// EvaluateGameFitUnified calculates the unified hardware verdict:
+// - "deficit" ("Не хватит", red / bad)
+// - "tight" ("Впритык", yellow / warn)
+// - "great" ("Отлично", green / ok)
+func EvaluateGameFitUnified(sys SystemPowerProfile, game GameInfo, req gameReqSet) (verdict, cls, labelRu, labelEn, reasonRu, reasonEn string) {
+	minVRAM := req.Low.ReqVRAMGB
+	recVRAM := req.High.ReqVRAMGB
+	if recVRAM <= 0 {
+		recVRAM = req.Med.ReqVRAMGB
+	}
+	minRAM := req.ReqRAMGB
+	if minRAM <= 0 {
+		if game.Year > 0 && game.Year <= 2008 {
+			minRAM = 1
+		} else if strings.EqualFold(game.Category, "classic") {
+			minRAM = 1
+		} else if req.Heavy {
+			minRAM = 8
+		} else {
+			minRAM = 4
+		}
+	}
+	recRAM := minRAM * 2
+	if recRAM < 8 {
+		recRAM = 8
+	}
+	if req.Heavy && recRAM < 16 {
+		recRAM = 16
+	}
+
+	userVRAM := sys.VRAMGB
+	userRAM := sys.RAMGB
+
+	gpuMin := ratio(sys.GPUPowerScore, req.Low.ReqGPUScore)
+	cpuMin := ratio(sys.CPUPowerScore, req.Low.ReqCPUScore)
+	gpuRec := ratio(sys.GPUPowerScore, recVRAM)
+
+	// 1. Deficit ("Не хватит")
+	if minVRAM > 0 && userVRAM+0.05 < minVRAM {
+		return "deficit", "bad", "Не хватит", "Not enough",
+			fmt.Sprintf("VRAM %.0f ГБ, требуется минимум %.0f ГБ", userVRAM, minVRAM),
+			fmt.Sprintf("VRAM %.0f GB, minimum %.0f GB required", userVRAM, minVRAM)
+	}
+	if minRAM > 0 && userRAM+0.05 < minRAM {
+		return "deficit", "bad", "Не хватит", "Not enough",
+			fmt.Sprintf("ОЗУ %.0f ГБ, требуется минимум %.0f ГБ", userRAM, minRAM),
+			fmt.Sprintf("RAM %.0f GB, minimum %.0f GB required", userRAM, minRAM)
+	}
+	if gpuMin < 0.85 && req.Low.ReqGPUScore > 0 {
+		return "deficit", "bad", "Не хватит", "Not enough",
+			"видеокарта слабее минимальных требований",
+			"GPU is below minimum requirements"
+	}
+	if cpuMin < 0.80 && req.Low.ReqCPUScore > 0 {
+		return "deficit", "bad", "Не хватит", "Not enough",
+			"процессор слабее минимальных требований",
+			"CPU is below minimum requirements"
+	}
+
+	// 2. Tight ("Впритык")
+	if recVRAM > 0 && userVRAM+0.05 < recVRAM {
+		return "tight", "warn", "Впритык", "Barely",
+			fmt.Sprintf("VRAM %.0f ГБ, рекомендуется %.0f ГБ", userVRAM, recVRAM),
+			fmt.Sprintf("VRAM %.0f GB, recommended %.0f GB", userVRAM, recVRAM)
+	}
+	if recRAM > 0 && userRAM+0.05 < recRAM {
+		return "tight", "warn", "Впритык", "Barely",
+			fmt.Sprintf("ОЗУ %.0f ГБ, рекомендуется %.0f ГБ", userRAM, recRAM),
+			fmt.Sprintf("RAM %.0f GB, recommended %.0f GB", userRAM, recRAM)
+	}
+	if gpuRec < 0.95 && req.High.ReqGPUScore > 0 {
+		return "tight", "warn", "Впритык", "Barely",
+			"видеокарта слабее рекомендованной",
+			"GPU is below recommended"
+	}
+
+	// 3. Great ("Отлично")
+	return "great", "ok", "Отлично", "Great",
+		"видеокарта и процессор с запасом выше рекомендованного",
+		"GPU and CPU exceed recommended specs with headroom"
 }
 
 // EvaluateGameFit compares this PC to min/rec requirement classes (no FPS guessing).
@@ -79,10 +182,6 @@ func EvaluateGameFit(sys SystemPowerProfile, game GameInfo, req gameReqSet, disk
 		LabelEn:     "Could not assess",
 	}
 	min := req.Low
-	rec := req.High
-	if rec.ReqGPUScore <= 0 {
-		rec = req.Med
-	}
 	if min.ReqGPUScore <= 0 {
 		out.ReasonRu = "Нет данных о требованиях этой игры"
 		out.ReasonEn = "No requirement data for this game"
@@ -102,42 +201,21 @@ func EvaluateGameFit(sys SystemPowerProfile, game GameInfo, req gameReqSet, disk
 		return out
 	}
 
-	gpuMin := ratio(sys.GPUPowerScore, min.ReqGPUScore)
-	cpuMin := ratio(sys.CPUPowerScore, min.ReqCPUScore)
-	gpuRec := ratio(sys.GPUPowerScore, rec.ReqGPUScore)
-	cpuRec := ratio(sys.CPUPowerScore, rec.ReqCPUScore)
-	vramMinFail := vramShortfall(sys, min.ReqVRAMGB)
-	vramRecFail := vramShortfall(sys, rec.ReqVRAMGB)
-	ramTight := sys.RAMGB > 0 && sys.RAMGB+0.5 < 8 && (req.Heavy || rec.ReqVRAMGB >= 6)
-
-	meetsMin := gpuMin >= 0.95 && cpuMin >= 0.90 && !vramMinFail
-	meetsRec := gpuRec >= 0.95 && cpuRec >= 0.90 && !vramRecFail
-	headroom := gpuRec >= 1.25 && cpuRec >= 1.15 && !vramRecFail
-
-	switch {
-	case meetsRec && headroom:
+	verdict, _, lRu, lEn, rRu, rEn := EvaluateGameFitUnified(sys, game, req)
+	switch verdict {
+	case "great":
 		out.Level = "excellent"
-		out.LabelRu, out.LabelEn = "Отлично", "Great"
-	case meetsRec:
-		out.Level = "ok"
-		out.LabelRu, out.LabelEn = "Пойдёт", "Will run"
-	case meetsMin:
+	case "tight":
 		out.Level = "tight"
-		out.LabelRu, out.LabelEn = "Впритык", "Barely"
-	default:
+	case "deficit":
 		out.Level = "wont"
-		out.LabelRu, out.LabelEn = "Не потянет", "Won't run well"
+	default:
+		out.Level = verdict
 	}
-
-	// Pre-2017 titles on mid+ VRAM must not be marked «Впритык» when the card clearly has spare memory.
-	if game.Year > 0 && game.Year <= 2016 && sys.VRAMGB >= 4 && !vramRecFail && meetsMin {
-		if meetsRec || sys.VRAMGB+0.1 >= rec.ReqVRAMGB {
-			out.Level = "excellent"
-			out.LabelRu, out.LabelEn = "Отлично", "Great"
-		}
-	}
-
-	out.ReasonRu, out.ReasonEn = fitReason(sys, min, rec, gpuMin, cpuMin, gpuRec, cpuRec, vramMinFail, vramRecFail, ramTight, out.Level)
+	out.LabelRu = lRu
+	out.LabelEn = lEn
+	out.ReasonRu = rRu
+	out.ReasonEn = rEn
 	fillDownloadAdvice(&out, game, disks)
 	return out
 }
@@ -233,12 +311,18 @@ func fillDownloadAdvice(out *GameFitVerdict, game GameInfo, disks []DiskFreeSnap
 
 	needStrRu, needStrEn := "?", "?"
 	if ok {
-		needStrRu = fmt.Sprintf("%.0f", need)
-		needStrEn = fmt.Sprintf("%.0f", need)
+		if need < 1.0 {
+			mb := need * 1024.0
+			needStrRu = fmt.Sprintf("%.0f МБ", mb)
+			needStrEn = fmt.Sprintf("%.0f MB", mb)
+		} else {
+			needStrRu = fmt.Sprintf("%.0f ГБ", need)
+			needStrEn = fmt.Sprintf("%.0f GB", need)
+		}
 	}
-	out.DownloadRu = fmt.Sprintf("Стоит ли скачивать? %s. Нужно ≈%s ГБ. Свободно: %s.%s",
+	out.DownloadRu = fmt.Sprintf("Стоит ли скачивать? %s. Нужно ≈%s. Свободно: %s.%s",
 		fitWordRu, needStrRu, diskLineRu, whereRu)
-	out.DownloadEn = fmt.Sprintf("Worth downloading? %s. Needs ≈%s GB. Free: %s.%s",
+	out.DownloadEn = fmt.Sprintf("Worth downloading? %s. Needs ≈%s. Free: %s.%s",
 		fitWordEn, needStrEn, diskLineEn, whereEn)
 }
 

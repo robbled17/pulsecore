@@ -26,6 +26,11 @@ type InstalledApp struct {
 	CanUninstall     bool    `json:"canUninstall"`
 	RegistryRoot     string  `json:"registryRoot"`
 	RegistryPath     string  `json:"registryPath"`
+	DriveLetter      string  `json:"driveLetter"`
+	LastUsedDays     int     `json:"lastUsedDays"`
+	CandidateCleanup bool    `json:"candidateCleanup"`
+	CandidateBadgeRu string  `json:"candidateBadgeRu,omitempty"`
+	CandidateBadgeEn string  `json:"candidateBadgeEn,omitempty"`
 }
 
 // AppLeftover is a residual folder after uninstall.
@@ -147,7 +152,59 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string) (Installe
 		}
 	}
 	app.SizeLabel = formatSizeLabel(app.SizeBytes)
+
+	// Determine drive letter
+	loc := strings.TrimSpace(app.InstallLocation)
+	if len(loc) >= 2 && loc[1] == ':' {
+		app.DriveLetter = strings.ToUpper(string(loc[0]))
+	} else if len(app.UninstallString) >= 2 && app.UninstallString[1] == ':' {
+		app.DriveLetter = strings.ToUpper(string(app.UninstallString[0]))
+	} else {
+		app.DriveLetter = "C"
+	}
+
+	// Inactivity & candidate detection
+	if loc != "" {
+		if info, err := os.Stat(loc); err == nil && info.IsDir() {
+			latest := getFolderLatestActivity(loc)
+			if !latest.IsZero() {
+				days := int(time.Since(latest).Hours() / 24)
+				if days > 0 {
+					app.LastUsedDays = days
+				}
+				if days >= 60 && app.SizeBytes >= 2*1024*1024*1024 {
+					app.CandidateCleanup = true
+					gb := float64(app.SizeBytes) / (1024 * 1024 * 1024)
+					app.CandidateBadgeRu = fmt.Sprintf("💡 Не запускалась %d дн. — можно освободить %.1f ГБ", days, gb)
+					app.CandidateBadgeEn = fmt.Sprintf("💡 Not launched for %d days — can free %.1f GB", days, gb)
+				}
+			}
+		}
+	}
+
 	return app, true
+}
+
+func getFolderLatestActivity(dir string) time.Time {
+	var newest time.Time
+	count := 0
+	_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return filepath.SkipDir
+		}
+		count++
+		if count > 40 {
+			return filepath.SkipDir
+		}
+		if info != nil && !info.IsDir() {
+			mod := info.ModTime()
+			if mod.After(newest) && mod.Before(time.Now().Add(24*time.Hour)) {
+				newest = mod
+			}
+		}
+		return nil
+	})
+	return newest
 }
 
 func formatSizeLabel(bytes int64) string {

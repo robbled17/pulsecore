@@ -29,7 +29,7 @@ const (
 	defaultPollMS   = 1000
 	mainWindowW     = 1280
 	mainWindowH     = 800
-	miniHUDW        = 280
+	miniHUDW        = 460
 	miniHUDH        = 56
 	gameOverlayW    = 460
 	gameOverlayH    = 52
@@ -87,97 +87,97 @@ type App struct {
 	ecoPIDs      map[int32]bool
 	prefs        appPrefs
 
-	lastBattery     time.Time
-	cachedBat       BatteryMetrics
-	lastTemp        time.Time
-	cachedTemp      float64
-	tempUnavailable bool
-	lastGPU         time.Time
-	cachedGPUPct    float64
-	cachedVRAMUsed  float64
-	cachedVRAMShare float64
-	cachedVRAMDed   float64
-	cachedGPUTemp   float64
-	cachedGPUTempOK bool
-	cachedGPUPowerW float64
-	cachedGPUPowerOK bool
+	lastBattery        time.Time
+	cachedBat          BatteryMetrics
+	lastTemp           time.Time
+	cachedTemp         float64
+	tempUnavailable    bool
+	lastGPU            time.Time
+	cachedGPUPct       float64
+	cachedVRAMUsed     float64
+	cachedVRAMShare    float64
+	cachedVRAMDed      float64
+	cachedGPUTemp      float64
+	cachedGPUTempOK    bool
+	cachedGPUPowerW    float64
+	cachedGPUPowerOK   bool
 	cachedGPUClockCore float64
 	cachedGPUClockMem  float64
-	nvidiaMissing   bool
-	cachedTempSource string
-	cachedTempLabelRu string
-	cachedTempLabelEn string
-	lastDisk        time.Time
-	cachedDisks     []DiskMetrics
-	lastVamp        time.Time
+	nvidiaMissing      bool
+	cachedTempSource   string
+	cachedTempLabelRu  string
+	cachedTempLabelEn  string
+	lastDisk           time.Time
+	cachedDisks        []DiskMetrics
+	lastVamp           time.Time
 
-	sessionStart time.Time
-	sessionHits  map[string]*sessionHit
-	lastSession  time.Time
-	lagRing          RingBuffer
-	bb               *blackBox
-	ecoExitConfirmed bool
-	forceQuit        bool
-	stats            *statsEngine
-	gameDet          *gameDetectState
-	gameBook         *gameBook
-	lastStatsTick    time.Time
-	tray             *trayManager
-	radar            *processRadar
-	memWatch         *memoryWatch
-	health           *healthEngine
-	startupScan      *startupCache
-	netMon           *networkMonitor
-	netCheck         *netCheckCache
-	intel            *intelligenceEngine
-	prepareGame        *prepareGameState
-	diskSMARTCache     map[string]DiskHealthReport // drive letter → last SMART
-	diskSMARTCacheAt   map[string]time.Time
-	diskWatch          *diskWatchEngine
-	smartFixJournal    *smartFixJournalEngine
-	dismissedProblems  *dismissedProblemsEngine
-	cleanHistory       *cleanHistoryEngine
+	sessionStart      time.Time
+	sessionHits       map[string]*sessionHit
+	lastSession       time.Time
+	lagRing           RingBuffer
+	bb                *blackBox
+	ecoExitConfirmed  bool
+	forceQuit         bool
+	stats             *statsEngine
+	gameDet           *gameDetectState
+	gameBook          *gameBook
+	lastStatsTick     time.Time
+	tray              *trayManager
+	radar             *processRadar
+	memWatch          *memoryWatch
+	health            *healthEngine
+	startupScan       *startupCache
+	netMon            *networkMonitor
+	netCheck          *netCheckCache
+	intel             *intelligenceEngine
+	prepareGame       *prepareGameState
+	diskSMARTCache    map[string]DiskHealthReport // drive letter → last SMART
+	diskSMARTCacheAt  map[string]time.Time
+	diskWatch         *diskWatchEngine
+	smartFixJournal   *smartFixJournalEngine
+	dismissedProblems *dismissedProblemsEngine
+	cleanHistory      *cleanHistoryEngine
 }
 
 // SystemMetrics is a full snapshot of live hardware state.
 type SystemMetrics struct {
-	Timestamp       string           `json:"timestamp"`
-	CPUName         string           `json:"cpuName"`
-	CPUPercent      float64          `json:"cpuPercent"`
-	CPUPerCore      []float64        `json:"cpuPerCore"`
-	GPUName         string           `json:"gpuName"`
-	GPUPercent      float64          `json:"gpuPercent"`
-	VRAMUsedMB      float64          `json:"vramUsedMB"`
-	VRAMTotalMB     float64          `json:"vramTotalMB"`
-	VRAMSharedMB    float64          `json:"vramSharedMB"`
-	VRAMDedicatedMB float64          `json:"vramDedicatedMB"`
-	RAMPercent      float64          `json:"ramPercent"`
-	RAMUsedMB       uint64           `json:"ramUsedMB"`
-	RAMTotalMB      uint64           `json:"ramTotalMB"`
-	SwapPercent     float64          `json:"swapPercent"`
-	SwapUsedMB      uint64           `json:"swapUsedMB"`
-	SwapTotalMB     uint64           `json:"swapTotalMB"`
-	Disks           []DiskMetrics    `json:"disks"`
-	Battery         BatteryMetrics   `json:"battery"`
-	Hardware        HardwareInfo     `json:"hardware"`
-	TemperatureC              float64 `json:"temperatureC"`
-	TemperatureAvailable      bool    `json:"temperatureAvailable"`
-	TemperatureSource         string  `json:"temperatureSource"` // hwinfo|lhm|acpi|""
-	TemperatureSourceLabelRu  string  `json:"temperatureSourceLabelRu"`
-	TemperatureSourceLabelEn  string  `json:"temperatureSourceLabelEn"`
-	GPUTemperatureC           float64 `json:"gpuTemperatureC"`
-	GPUTemperatureAvailable   bool    `json:"gpuTemperatureAvailable"`
-	GPUPowerW                 float64 `json:"gpuPowerW"`
-	GPUPowerAvailable         bool    `json:"gpuPowerAvailable"`
-	GPUClockCoreMHz           float64 `json:"gpuClockCoreMHz"`
-	GPUClockMemMHz            float64 `json:"gpuClockMemMHz"`
-	PowerMode                 string  `json:"powerMode"`
-	PollIntervalMS  int              `json:"pollIntervalMS"`
-	MiniHUD         bool             `json:"miniHUD"`
-	Language        string           `json:"language"`
-	LagEvents       []LagEvent       `json:"lagEvents"`
-	StutterEvents   []StutterEvent   `json:"stutterEvents"`
-	Vampires        []VampireProcess `json:"vampires"`
+	Timestamp                string           `json:"timestamp"`
+	CPUName                  string           `json:"cpuName"`
+	CPUPercent               float64          `json:"cpuPercent"`
+	CPUPerCore               []float64        `json:"cpuPerCore"`
+	GPUName                  string           `json:"gpuName"`
+	GPUPercent               float64          `json:"gpuPercent"`
+	VRAMUsedMB               float64          `json:"vramUsedMB"`
+	VRAMTotalMB              float64          `json:"vramTotalMB"`
+	VRAMSharedMB             float64          `json:"vramSharedMB"`
+	VRAMDedicatedMB          float64          `json:"vramDedicatedMB"`
+	RAMPercent               float64          `json:"ramPercent"`
+	RAMUsedMB                uint64           `json:"ramUsedMB"`
+	RAMTotalMB               uint64           `json:"ramTotalMB"`
+	SwapPercent              float64          `json:"swapPercent"`
+	SwapUsedMB               uint64           `json:"swapUsedMB"`
+	SwapTotalMB              uint64           `json:"swapTotalMB"`
+	Disks                    []DiskMetrics    `json:"disks"`
+	Battery                  BatteryMetrics   `json:"battery"`
+	Hardware                 HardwareInfo     `json:"hardware"`
+	TemperatureC             float64          `json:"temperatureC"`
+	TemperatureAvailable     bool             `json:"temperatureAvailable"`
+	TemperatureSource        string           `json:"temperatureSource"` // hwinfo|lhm|acpi|""
+	TemperatureSourceLabelRu string           `json:"temperatureSourceLabelRu"`
+	TemperatureSourceLabelEn string           `json:"temperatureSourceLabelEn"`
+	GPUTemperatureC          float64          `json:"gpuTemperatureC"`
+	GPUTemperatureAvailable  bool             `json:"gpuTemperatureAvailable"`
+	GPUPowerW                float64          `json:"gpuPowerW"`
+	GPUPowerAvailable        bool             `json:"gpuPowerAvailable"`
+	GPUClockCoreMHz          float64          `json:"gpuClockCoreMHz"`
+	GPUClockMemMHz           float64          `json:"gpuClockMemMHz"`
+	PowerMode                string           `json:"powerMode"`
+	PollIntervalMS           int              `json:"pollIntervalMS"`
+	MiniHUD                  bool             `json:"miniHUD"`
+	Language                 string           `json:"language"`
+	LagEvents                []LagEvent       `json:"lagEvents"`
+	StutterEvents            []StutterEvent   `json:"stutterEvents"`
+	Vampires                 []VampireProcess `json:"vampires"`
 }
 
 // DiskMetrics describes a mounted volume and its IO throughput.
@@ -281,6 +281,7 @@ func (a *App) startup(ctx context.Context) {
 	})
 	a.startTray()
 	go a.peripheralsWatchdog()
+	a.StartConflictWatcher()
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -539,8 +540,9 @@ func (a *App) tempCached(now time.Time, cpuPct float64, tab string) float64 {
 	a.mu.RLock()
 	cached := a.cachedTemp
 	last := a.lastTemp
+	mini := a.miniHUD
 	a.mu.RUnlock()
-	need := tab == "overview" || tab == "hardware" || tab == "health" || tab == "home"
+	need := tab == "overview" || tab == "hardware" || tab == "health" || tab == "home" || mini
 	if !need && !last.IsZero() {
 		return cached // may be 0 = unknown
 	}
@@ -603,43 +605,43 @@ func (a *App) buildSnapshot(now time.Time, cpuPct float64, perCore []float64, vm
 	hw.GPU.ClockMemMHz = gpuClockMem
 
 	return SystemMetrics{
-		Timestamp:       now.Format(time.RFC3339),
-		CPUName:         cpuName,
-		CPUPercent:      cpuPct,
-		CPUPerCore:      perCore,
-		GPUName:         gpuName,
-		GPUPercent:      gpuPct,
-		VRAMUsedMB:      vramUsed,
-		VRAMTotalMB:     vramTotal,
-		VRAMSharedMB:    vramShared,
-		VRAMDedicatedMB: vramDedicated,
-		RAMPercent:      ramPercentOf(vm),
-		RAMUsedMB:       ramUsedOf(vm),
-		RAMTotalMB:      ramTotalOf(vm),
-		SwapPercent:     swapPercentOf(sm),
-		SwapUsedMB:      swapUsedOf(sm),
-		SwapTotalMB:     swapTotalOf(sm),
-		Disks:           disks,
-		Battery:         bat,
-		Hardware:                    hw,
-		TemperatureC:                temp,
-		TemperatureAvailable:        temp > 0,
-		TemperatureSource:           tempSrc,
-		TemperatureSourceLabelRu:    tempLblRu,
-		TemperatureSourceLabelEn:    tempLblEn,
-		GPUTemperatureC:             gpuTemp,
-		GPUTemperatureAvailable:     gpuTempOK,
-		GPUPowerW:                   gpuPower,
-		GPUPowerAvailable:           gpuPowerOK,
-		GPUClockCoreMHz:             gpuClockCore,
-		GPUClockMemMHz:              gpuClockMem,
-		PowerMode:                   powerMode,
-		PollIntervalMS:  pollMS,
-		MiniHUD:         mini,
-		Language:        lang,
-		LagEvents:       lags,
-		StutterEvents:   stutters,
-		Vampires:        vamps,
+		Timestamp:                now.Format(time.RFC3339),
+		CPUName:                  cpuName,
+		CPUPercent:               cpuPct,
+		CPUPerCore:               perCore,
+		GPUName:                  gpuName,
+		GPUPercent:               gpuPct,
+		VRAMUsedMB:               vramUsed,
+		VRAMTotalMB:              vramTotal,
+		VRAMSharedMB:             vramShared,
+		VRAMDedicatedMB:          vramDedicated,
+		RAMPercent:               ramPercentOf(vm),
+		RAMUsedMB:                ramUsedOf(vm),
+		RAMTotalMB:               ramTotalOf(vm),
+		SwapPercent:              swapPercentOf(sm),
+		SwapUsedMB:               swapUsedOf(sm),
+		SwapTotalMB:              swapTotalOf(sm),
+		Disks:                    disks,
+		Battery:                  bat,
+		Hardware:                 hw,
+		TemperatureC:             temp,
+		TemperatureAvailable:     temp > 0,
+		TemperatureSource:        tempSrc,
+		TemperatureSourceLabelRu: tempLblRu,
+		TemperatureSourceLabelEn: tempLblEn,
+		GPUTemperatureC:          gpuTemp,
+		GPUTemperatureAvailable:  gpuTempOK,
+		GPUPowerW:                gpuPower,
+		GPUPowerAvailable:        gpuPowerOK,
+		GPUClockCoreMHz:          gpuClockCore,
+		GPUClockMemMHz:           gpuClockMem,
+		PowerMode:                powerMode,
+		PollIntervalMS:           pollMS,
+		MiniHUD:                  mini,
+		Language:                 lang,
+		LagEvents:                lags,
+		StutterEvents:            stutters,
+		Vampires:                 vamps,
 	}
 }
 
@@ -1137,8 +1139,8 @@ func (a *App) ResizeMiniHUD(width, height int) {
 	if width < 160 {
 		width = 160
 	}
-	if width > 640 {
-		width = 640
+	if width > 760 {
+		width = 760
 	}
 	if height < 40 {
 		height = 40
@@ -1234,7 +1236,6 @@ func (a *App) ShowWindow() {
 	runtime.WindowUnminimise(a.ctx)
 	runtime.WindowShow(a.ctx)
 }
-
 
 func (a *App) collectDisks(now time.Time) []DiskMetrics {
 	partitions, err := disk.Partitions(true)

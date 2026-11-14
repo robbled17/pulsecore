@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestExcludeNonGamesRules(t *testing.T) {
 	exclude := []string{
@@ -80,5 +85,70 @@ func TestMergeDropsEnginesKeepsGames(t *testing.T) {
 		if !names[good] {
 			t.Fatalf("should remain: %s", good)
 		}
+	}
+}
+
+func TestBuckshotIsNotAAATemplate(t *testing.T) {
+	g := synthesizeGame("Buckshot Roulette")
+	if strings.EqualFold(g.Category, "aaa") || strings.Contains(strings.ToLower(g.Badge), "aaa") {
+		t.Fatalf("small title classified as AAA: %+v", g)
+	}
+	req := requirementsFor(g)
+	if req.High.ReqVRAMGB > 2.01 {
+		t.Fatalf("default VRAM too high: %.2f", req.High.ReqVRAMGB)
+	}
+	if req.ReqRAMGB > 4.01 {
+		t.Fatalf("default RAM too high: %.2f", req.ReqRAMGB)
+	}
+	size, ok := storageNeedFor(g)
+	if !ok || size > 8 || size <= 0 {
+		t.Fatalf("indie size=%v ok=%v", size, ok)
+	}
+	if strings.Contains(strings.ToLower(finalizeGameBadge(g, req)), "aaa") {
+		t.Fatal("AAA badge without high requirements")
+	}
+}
+
+func TestInstalledSizeBeatsDefault(t *testing.T) {
+	g := GameInfo{Name: "Buckshot Roulette", Category: "indie", InstallSizeGB: 1.2}
+	size, ok := storageNeedFor(g)
+	if !ok || size < 1.1 || size > 1.3 {
+		t.Fatalf("folder size ignored: %v", size)
+	}
+}
+
+func TestAAABadgeRequiresRealWeight(t *testing.T) {
+	light := GameInfo{Name: "Tiny Indie", Category: "aaa", Badge: "AAA", Year: 2024}
+	req := requirementsFor(light)
+	if strings.Contains(strings.ToLower(finalizeGameBadge(light, req)), "aaa") && req.High.ReqVRAMGB < 6 {
+		size, _ := storageNeedFor(light)
+		if size <= 35 {
+			t.Fatalf("AAA badge on light title size=%.1f vram=%.1f", size, req.High.ReqVRAMGB)
+		}
+	}
+	heavy := GameInfo{ID: "cyberpunk", Name: "Cyberpunk 2077", Category: "aaa", Year: 2020}
+	hreq := requirementsFor(heavy)
+	badge := finalizeGameBadge(heavy, hreq)
+	if !strings.Contains(strings.ToLower(badge), "aaa") {
+		t.Fatalf("known heavy title lost AAA: %s vram=%.1f", badge, hreq.High.ReqVRAMGB)
+	}
+}
+
+func TestParseAppManifestSize(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "appmanifest_1.acf")
+	body := `"AppState"
+{
+	"appid"		"123"
+	"name"		"Buckshot Roulette"
+	"installdir"		"Buckshot Roulette"
+	"SizeOnDisk"		"2147483648"
+}`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	id, name, install, size := parseAppManifest(path)
+	if id != 123 || name != "Buckshot Roulette" || install != "Buckshot Roulette" || size != 2147483648 {
+		t.Fatalf("manifest parse: %d %q %q %d", id, name, install, size)
 	}
 }

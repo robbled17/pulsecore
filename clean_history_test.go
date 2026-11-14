@@ -33,3 +33,31 @@ func TestCleanHistoryAggregates(t *testing.T) {
 	}
 	_ = now
 }
+
+func TestChooseFreedBytesPrefersCounted(t *testing.T) {
+	const counted = uint64(145 * 1024 * 1024)
+	if got := chooseFreedBytes(1000, 1000, counted); got != counted {
+		t.Fatalf("zero disk delta dropped counted bytes: %d", got)
+	}
+	if got := chooseFreedBytes(1000, 5000, counted); got != counted {
+		t.Fatalf("disk delta must not replace counted bytes: %d", got)
+	}
+	if got := chooseFreedBytes(1000, 1800, 0); got != 800 {
+		t.Fatalf("fallback delta: %d", got)
+	}
+}
+
+func TestDeletedBytesLandInStats(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dir)
+	a := &App{}
+	const counted = uint64(145 * 1024 * 1024)
+	rec := a.recordCleanEvent("C:", "Cache", 5_000_000, 5_000_000, 20_000_000, counted)
+	if rec.DeletedBytes != counted || rec.BytesFreed != counted {
+		t.Fatalf("record=%+v", rec)
+	}
+	st := a.GetCleanStats()
+	if st.TodayFreed != counted || st.AllTimeFreed != counted {
+		t.Fatalf("stats today=%d all=%d", st.TodayFreed, st.AllTimeFreed)
+	}
+}

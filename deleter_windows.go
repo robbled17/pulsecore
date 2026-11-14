@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -18,6 +19,7 @@ const (
 	foDelete          = 0x0003
 	fofSilent         = 0x0004
 	fofNoConfirmation = 0x0010
+	fofAllowUndo      = 0x0040 // FOF_ALLOWUNDO: Preserves undo info (sends to Recycle Bin)
 	fofNoErrorUI      = 0x0400
 	fofNoConfirmMkDir = 0x0200
 )
@@ -209,4 +211,56 @@ func openPathInExplorer(folderPath string) error {
 		return exec.Command("explorer.exe", folderPath).Start()
 	}
 	return exec.Command("explorer.exe", "/select,", folderPath).Start()
+}
+
+// recycleFileOrDir sends folder to Windows Recycle Bin with undo capability.
+func recycleFileOrDir(dirPath string) error {
+	dirPath = filepath.Clean(strings.TrimSpace(dirPath))
+	if dirPath == "" || dirPath == "." || dirPath == string(os.PathSeparator) {
+		return fmt.Errorf("refusing to recycle empty/root path")
+	}
+	stripTreeAttributes(dirPath)
+
+	u, err := syscall.UTF16FromString(dirPath)
+	if err != nil {
+		return err
+	}
+	u = append(u, 0) // double null terminator
+	fromPtr := &u[0]
+
+	op := shFileOpStructW{
+		WFunc:  foDelete,
+		PFrom:  fromPtr,
+		FFlags: fofAllowUndo | fofSilent | fofNoConfirmation | fofNoErrorUI,
+	}
+	ret, _, callErr := procSHFileOperationW.Call(uintptr(unsafe.Pointer(&op)))
+	if ret != 0 {
+		if callErr != nil && callErr != windows.ERROR_SUCCESS {
+			return fmt.Errorf("SHFileOperationW recycle code=%d: %v", ret, callErr)
+		}
+		return fmt.Errorf("SHFileOperationW recycle failed code=%d", ret)
+	}
+	if op.FAnyOperationsAborted != 0 {
+		return fmt.Errorf("recycle operation aborted")
+	}
+	return nil
+}
+
+// restoreFromRecycleBin searches Windows Recycle Bin and restores item by invoking "undelete".
+func restoreFromRecycleBin(name string, originalPath string) error {
+	escName := strings.ReplaceAll(name, "'", "''")
+	script := fmt.Sprintf(`$sh = New-Object -ComObject Shell.Application; $bin = $sh.Namespace(10); foreach ($item in $bin.Items()) { if ($item.Name -eq '%s') { $item.InvokeVerb('undelete'); break } }`, escName)
+	cmd := RunHiddenCommand(
+		"powershell.exe",
+		"-NoProfile",
+		"-ExecutionPolicy", "Bypass",
+		"-Command",
+		script,
+	)
+	_ = cmd.Run()
+	time.Sleep(350 * time.Millisecond)
+	if _, err := os.Stat(originalPath); err == nil {
+		return nil
+	}
+	return fmt.Errorf("could not restore '%s' from recycle bin", name)
 }

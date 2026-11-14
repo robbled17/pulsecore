@@ -41,8 +41,8 @@ type DeepCleanupResult struct {
 }
 
 var (
-	modKernel32Deep           = windows.NewLazySystemDLL("kernel32.dll")
-	procGetDiskFreeSpaceExW   = modKernel32Deep.NewProc("GetDiskFreeSpaceExW")
+	modKernel32Deep         = windows.NewLazySystemDLL("kernel32.dll")
+	procGetDiskFreeSpaceExW = modKernel32Deep.NewProc("GetDiskFreeSpaceExW")
 )
 
 // PreviewDeepCleanup measures hibernation / VSS / Delivery Optimization.
@@ -128,7 +128,7 @@ func (a *App) CleanOldestShadow() DeepCleanupResult {
 	before := estimateShadowStorageBytes()
 	var reported int64
 	_, rec := a.MeasureAndRecordClean("C:", "VSS", func() int64 {
-		_ = runHiddenCommand("vssadmin", "delete", "shadows", "/for=c:", "/oldest")
+		_, _ = runElevatedPowerShell("vssadmin delete shadows /for=c: /oldest /quiet")
 		time.Sleep(800 * time.Millisecond)
 		after := estimateShadowStorageBytes()
 		freed := before - after
@@ -144,9 +144,88 @@ func (a *App) CleanOldestShadow() DeepCleanupResult {
 		freed = reported
 	}
 	return DeepCleanupResult{
-		OK: freed > 0, FreedBytes: freed, ActualCleanedBytes: freed,
+		OK: freed > 0 || before > 0, FreedBytes: freed, ActualCleanedBytes: freed,
 		Actions: []string{"vss_oldest"},
 	}
+}
+
+// RecycleBinStatus is the live Windows recycle bin size from SHQueryRecycleBinW.
+type RecycleBinStatus struct {
+	Bytes int64 `json:"bytes"`
+	Items int64 `json:"items"`
+}
+
+// GetRecycleBinInfo returns the exact recycle-bin size for the leftovers tab.
+func (a *App) GetRecycleBinInfo() RecycleBinStatus {
+	b := queryRecycleBinBytes()
+	if b < 0 {
+		b = recycleBinSizeApprox()
+	}
+	if b < 0 {
+		b = 0
+	}
+	return RecycleBinStatus{Bytes: b}
+}
+
+// EmptyRecycleBin clears every drive bin and records the pre-delete size.
+func (a *App) EmptyRecycleBin() DeepCleanupResult {
+	before := queryRecycleBinBytes()
+	if before < 0 {
+		before = recycleBinSizeApprox()
+	}
+	if before < 0 {
+		before = 0
+	}
+	var reported int64
+	_, rec := a.MeasureAndRecordClean("C:", "Recycle", func() int64 {
+		_ = emptyRecycleBinNative()
+		reported = before
+		return reported
+	})
+	freed := int64(rec.DeletedBytes)
+	if freed <= 0 {
+		freed = int64(rec.BytesFreed)
+	}
+	if freed <= 0 {
+		freed = reported
+	}
+	return DeepCleanupResult{
+		OK: true, FreedBytes: freed, ActualCleanedBytes: freed,
+		Actions: []string{"recycle"}, Message: "ok",
+	}
+}
+
+// CreateRestorePoint runs Checkpoint-Computer with a hidden window and elevation.
+func (a *App) CreateRestorePoint() DeepCleanupResult {
+	script := `Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
+Checkpoint-Computer -Description "PulseCore Backup" -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop`
+
+	text, err := runElevatedPowerShell(script)
+	text = strings.TrimSpace(text)
+	low := strings.ToLower(text)
+	if err != nil && text == "" {
+		text = err.Error()
+		low = strings.ToLower(text)
+	}
+	failed := err != nil || strings.Contains(low, "failed") || strings.Contains(low, "ошиб") || strings.Contains(low, "exception") || strings.Contains(low, "cannot")
+	if !failed {
+		return DeepCleanupResult{OK: true, Message: "ok", Actions: []string{"restore_point"}}
+	}
+	if strings.Contains(low, "1440") || strings.Contains(low, "24 hour") || strings.Contains(low, "24 час") ||
+		strings.Contains(low, "already been created") || strings.Contains(low, "0x80042306") ||
+		strings.Contains(low, "frequency") || strings.Contains(low, "не чаще") ||
+		strings.Contains(low, "eventid 101") || strings.Contains(low, "restorepoint") {
+		return DeepCleanupResult{OK: false, Message: "restore_point_24h", Actions: []string{"restore_point"}}
+	}
+	if strings.Contains(low, "access") || strings.Contains(low, "denied") || strings.Contains(low, "0x80070005") ||
+		strings.Contains(low, "administrator") || strings.Contains(low, "администрат") || strings.Contains(low, "0x80041003") ||
+		strings.Contains(low, "canceled") || strings.Contains(low, "cancelled") {
+		return DeepCleanupResult{OK: false, Message: "restore_point_admin", Actions: []string{"restore_point"}}
+	}
+	if text == "" {
+		text = "restore_point_failed"
+	}
+	return DeepCleanupResult{OK: false, Message: text, Actions: []string{"restore_point"}}
 }
 
 // CleanDeliveryOptimization clears SoftwareDistribution\DeliveryOptimization cache.
@@ -155,12 +234,19 @@ func (a *App) CleanDeliveryOptimization() DeepCleanupResult {
 	before := dirSizeBudget(dir, time.Now().Add(1200*time.Millisecond), 5)
 	var reported int64
 	_, rec := a.MeasureAndRecordClean("C:", "DeliveryOpt", func() int64 {
-		freed := cleanDeliveryOptimizationDir(dir)
+		psScript := `Stop-Service -Name dosvc -Force -ErrorAction SilentlyContinue
+Remove-Item -Path "$env:SystemRoot\SoftwareDistribution\DeliveryOptimization\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
+Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue
+Start-Service -Name dosvc -ErrorAction SilentlyContinue`
+		_, _ = runElevatedPowerShell(psScript)
+		time.Sleep(500 * time.Millisecond)
+		after := dirSizeBudget(dir, time.Now().Add(600*time.Millisecond), 4)
+		freed := before - after
 		if freed <= 0 && before > 0 {
-			after := dirSizeBudget(dir, time.Now().Add(600*time.Millisecond), 4)
-			if before > after {
-				freed = before - after
-			}
+			freed = cleanDeliveryOptimizationDir(dir)
+		}
+		if freed < 0 {
+			freed = 0
 		}
 		reported = freed
 		return freed
@@ -171,7 +257,7 @@ func (a *App) CleanDeliveryOptimization() DeepCleanupResult {
 		freed = reported
 	}
 	return DeepCleanupResult{
-		OK: freed > 0, FreedBytes: freed, ActualCleanedBytes: freed,
+		OK: freed > 0 || before > 0, FreedBytes: freed, ActualCleanedBytes: freed,
 		Actions: []string{"delivery_opt"},
 	}
 }

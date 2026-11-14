@@ -35,18 +35,20 @@ type appPrefs struct {
 	// MiniHUDOpacityPercent: 60 | 80 | 100
 	MiniHUDOpacityPercent int  `json:"miniHudOpacityPercent"`
 	MiniHUDAcrylic        bool `json:"miniHudAcrylic"`
+	ConflictWatcherEnabled bool `json:"conflictWatcherEnabled"`
 }
 
 func defaultPrefs() appPrefs {
 	return appPrefs{
-		TempAlerts:            true,
-		CloseToTray:           true,
-		ShowTempOnTray:        true,
-		EcoExitPolicy:         "ask",
-		MiniHUDPosX:           -1,
-		MiniHUDPosY:           -1,
-		MiniHUDOpacityPercent: 80,
-		MiniHUDAcrylic:        false,
+		TempAlerts:             true,
+		CloseToTray:            true,
+		ShowTempOnTray:         true,
+		ConflictWatcherEnabled: true,
+		EcoExitPolicy:          "ask",
+		MiniHUDPosX:            -1,
+		MiniHUDPosY:            -1,
+		MiniHUDOpacityPercent:  80,
+		MiniHUDAcrylic:         false,
 	}
 }
 
@@ -97,10 +99,29 @@ func (a *App) loadPrefs() {
 		if _, ok := keys["miniHudPosY"]; !ok {
 			p.MiniHUDPosY = -1
 		}
+		if _, ok := keys["conflictWatcherEnabled"]; !ok {
+			p.ConflictWatcherEnabled = true
+		}
 	}
 	a.mu.Lock()
 	a.prefs = p
 	a.mu.Unlock()
+}
+
+// IsConflictWatcherEnabled reports whether the locked file interceptor is enabled.
+func (a *App) IsConflictWatcherEnabled() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.prefs.ConflictWatcherEnabled
+}
+
+// SetConflictWatcherEnabled toggles the locked file interceptor.
+func (a *App) SetConflictWatcherEnabled(enabled bool) error {
+	a.mu.Lock()
+	a.prefs.ConflictWatcherEnabled = enabled
+	p := a.prefs
+	a.mu.Unlock()
+	return a.savePrefs(p)
 }
 
 func (a *App) savePrefs(p appPrefs) error {
