@@ -6,7 +6,8 @@ build/bin/
 
 # Frontend deps & build output
 frontend/node_modules/
-frontend/dist/
+frontend/dist/*
+!frontend/dist/.gitkeep
 node_modules/
 
 # Wails tooling cache

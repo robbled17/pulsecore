@@ -68,6 +68,16 @@ for (const code of codes) {
 }
 
 // Shape check via go test dump (statusReason has code field)
+// Ensure frontend/dist exists with a placeholder so package main's embed doesn't fail compilation on clean runner
+const distDir = path.join(root, 'frontend', 'dist')
+if (!fs.existsSync(distDir)) {
+  fs.mkdirSync(distDir, { recursive: true })
+}
+const keepFile = path.join(distDir, '.gitkeep')
+if (!fs.existsSync(keepFile) && fs.readdirSync(distDir).length === 0) {
+  fs.writeFileSync(keepFile, '')
+}
+
 const go = spawnSync('go', ['test', '-count=1', '-run', 'TestDiskJSONFixturesDump', '-v', '.'], {
   cwd: root,
   encoding: 'utf8',
