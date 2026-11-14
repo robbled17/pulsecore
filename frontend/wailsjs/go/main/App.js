@@ -350,6 +350,10 @@ export function KillProcess(arg1) {
   return window['go']['main']['App']['KillProcess'](arg1);
 }
 
+export function KillProcessByName(arg1) {
+  return window['go']['main']['App']['KillProcessByName'](arg1);
+}
+
 export function LagSpotterCheck(arg1, arg2) {
   return window['go']['main']['App']['LagSpotterCheck'](arg1, arg2);
 }
@@ -482,6 +486,10 @@ export function ResizeMiniHUD(arg1, arg2) {
   return window['go']['main']['App']['ResizeMiniHUD'](arg1, arg2);
 }
 
+export function ResolveGameCover(arg1) {
+  return window['go']['main']['App']['ResolveGameCover'](arg1);
+}
+
 export function ResolveGameMeta(arg1) {
   return window['go']['main']['App']['ResolveGameMeta'](arg1);
 }
@@ -500,6 +508,10 @@ export function RestartPnPDevice(arg1) {
 
 export function RestartProcess(arg1) {
   return window['go']['main']['App']['RestartProcess'](arg1);
+}
+
+export function RestartProcessByName(arg1) {
+  return window['go']['main']['App']['RestartProcessByName'](arg1);
 }
 
 export function RestoreHiddenGame(arg1) {

@@ -929,5 +929,10 @@
   "netNotChecked": "Тикшерелмәгән",
   "updateBannerTitle": "PulseCore яңартуы бар",
   "updateBannerSubtitle": "Яңа версия урнаштырырга әзер ({size} МБ)",
-  "updateBannerBtn": "Яңартырга"
+  "updateBannerBtn": "Яңартырга",
+  "ctxCopy": "Күчереп алу",
+  "copiedToClipboard": "Алмашу буферына күчерелде",
+  "procStopping": "Процессны тәмамлау...",
+  "procRestarting": "Процессны яңадан башлау...",
+  "procActionEco": "Чикләү (Eco Mode)"
 }

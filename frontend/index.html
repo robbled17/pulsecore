@@ -264,28 +264,6 @@
               <div class="meta hidden" id="power-switch-status" role="status"></div>
             </div>
           </div>
-
-          <div class="home-tile" id="tile-net">
-            <button type="button" class="home-tile-toggle" aria-expanded="false" aria-controls="tile-net-body">
-              <span class="tile-label" data-i18n="netTitle">Сеть</span>
-              <span class="tile-summary" id="ov-net-sum"></span>
-              <span class="tile-chevron" aria-hidden="true"></span>
-            </button>
-            <div class="tile-body" id="tile-net-body">
-              <div class="row-between" style="margin-bottom:8px">
-                <span class="muted" data-i18n="netDiagTitle">Диагностика сети</span>
-                <button type="button" class="btn primary compact" id="btn-home-net-diag" data-i18n="netCheckNetwork">Проверить сеть</button>
-              </div>
-              <div id="home-net-diag-box">
-                <div class="hw-grid">
-                  <div><span class="muted" data-i18n="netLocalIP">Локальный IP</span><div class="hw-val" id="home-net-local">-</div></div>
-                  <div><span class="muted" data-i18n="netPublicIP">Публичный IP</span><div class="hw-val" id="home-net-public">-</div></div>
-                  <div><span class="muted" data-i18n="netPing">Пинг</span><div class="hw-val" id="home-net-ping">-</div></div>
-                  <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="home-net-status">-</div></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div class="panel hidden" id="home-summary-panel">
@@ -413,9 +391,23 @@
         </div>
         <div class="panel" id="game-compare-panel">
           <div class="panel-title" data-i18n="gameCompare">Сравнение двух сессий</div>
-          <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-            <select id="game-cmp-a" class="lang-select"></select>
-            <select id="game-cmp-b" class="lang-select"></select>
+          <div class="btn-row game-cmp-row" style="flex-wrap:wrap;gap:8px">
+            <div class="custom-dropdown game-cmp-dropdown" id="game-cmp-dd-a" data-dropdown="game-cmp-a">
+              <button type="button" class="dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="dropdown-selected" id="game-cmp-label-a">-</span>
+                <span class="dropdown-arrow">▾</span>
+              </button>
+              <div class="dropdown-menu" id="game-cmp-menu-a" role="listbox"></div>
+              <input type="hidden" id="game-cmp-a" value="" />
+            </div>
+            <div class="custom-dropdown game-cmp-dropdown" id="game-cmp-dd-b" data-dropdown="game-cmp-b">
+              <button type="button" class="dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="dropdown-selected" id="game-cmp-label-b">-</span>
+                <span class="dropdown-arrow">▾</span>
+              </button>
+              <div class="dropdown-menu" id="game-cmp-menu-b" role="listbox"></div>
+              <input type="hidden" id="game-cmp-b" value="" />
+            </div>
             <button type="button" class="btn compact" id="btn-game-compare" data-i18n="gameCompareBtn">Сравнить</button>
           </div>
           <div id="game-compare-out" class="meta" style="margin-top:10px"></div>
@@ -434,7 +426,7 @@
                 <input id="game-search" class="game-search game-search-input" type="search" data-i18n-placeholder="gameSearchPh" placeholder="Поиск игр..." autocomplete="off" />
                 <span id="game-search-spinner" class="game-search-spinner search-spinner hidden" aria-hidden="true"></span>
               </div>
-              <button type="button" id="btn-hidden-games" class="btn soft compact hidden-games-btn hidden" data-i18n="gameHiddenBtn">Скрытые игры</button>
+              <button type="button" id="btn-hidden-games" class="btn soft compact hidden-games-btn hidden">Скрытые игры</button>
             </div>
             <div class="game-filters game-filters-row">
               <div class="custom-dropdown" id="genre-dropdown" data-dropdown="genre">
@@ -771,6 +763,13 @@
       </div>
     </div>
     <button type="button" class="update-banner-close" id="btn-banner-close" aria-label="Close">✕</button>
+  </div>
+
+  <div id="custom-context-menu" class="custom-context-menu hidden" role="menu">
+    <button type="button" id="ctx-menu-copy" class="ctx-menu-item" role="menuitem">
+      <span class="ctx-menu-icon">📋</span>
+      <span class="ctx-menu-text" data-i18n="ctxCopy">Скопировать</span>
+    </button>
   </div>
 
   <div id="toast" class="toast hidden" role="status"></div>

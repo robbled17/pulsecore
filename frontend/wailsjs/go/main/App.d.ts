@@ -177,6 +177,8 @@ export function IsMiniHUD():Promise<boolean>;
 
 export function KillProcess(arg1:number):Promise<void>;
 
+export function KillProcessByName(arg1:string):Promise<void>;
+
 export function LagSpotterCheck(arg1:Array<number>,arg2:number):Promise<Array<main.LagEvent>>;
 
 export function ListDisplays():Promise<Array<main.DisplayInfo>>;
@@ -243,6 +245,8 @@ export function ResetIntelligenceProfile():Promise<void>;
 
 export function ResizeMiniHUD(arg1:number,arg2:number):Promise<void>;
 
+export function ResolveGameCover(arg1:string):Promise<string>;
+
 export function ResolveGameMeta(arg1:string):Promise<main.GameInfo>;
 
 export function RestartAsAdmin():Promise<void>;
@@ -252,6 +256,8 @@ export function RestartHelper():Promise<main.AdvancedModeActionResult>;
 export function RestartPnPDevice(arg1:string):Promise<Record<string, any>>;
 
 export function RestartProcess(arg1:number):Promise<void>;
+
+export function RestartProcessByName(arg1:string):Promise<void>;
 
 export function RestoreHiddenGame(arg1:string):Promise<boolean>;
 

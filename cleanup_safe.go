@@ -352,14 +352,47 @@ func canWriteDir(dir string) bool {
 	return true
 }
 
+var (
+	// Allowed browser cache folder names (STRICT WHITELIST)
+	allowedBrowserCacheNames = map[string]bool{
+		"cache":      true,
+		"code cache": true,
+		"gpucache":   true,
+		"dawncache":  true,
+		"cache2":     true,
+	}
+
+	// Strictly forbidden sensitive browser data (BLACKLIST)
+	forbiddenBrowserPatterns = []string{
+		"login data", "cookies", "bookmarks", "history", "web data",
+		"preferences", "secure preferences", "extensions", "sync data",
+		"top sites", "favicons", "sessions", "session storage", "local storage",
+		`\documents\`, `\downloads\`, `\desktop\`, `\pictures\`, `\videos\`, `\music\`,
+		`\ntuser`, `\leveldb`, `\indexeddb`,
+	}
+)
+
+// IsSafeBrowserCachePath enforces that only whitelist browser cache folders can be cleaned,
+// and strictly forbids touching any passwords, cookies, bookmarks, history, or web data.
+func IsSafeBrowserCachePath(p string) bool {
+	low := strings.ToLower(filepath.Clean(p))
+	for _, b := range forbiddenBrowserPatterns {
+		if strings.Contains(low, b) {
+			return false
+		}
+	}
+	parts := strings.Split(low, string(os.PathSeparator))
+	for _, part := range parts {
+		if allowedBrowserCacheNames[part] {
+			return true
+		}
+	}
+	return false
+}
+
 func isSafeCleanupPath(p string) bool {
 	p = strings.ToLower(filepath.Clean(p))
-	blocked := []string{
-		`\documents\`, `\downloads\`, `\desktop\`, `\pictures\`, `\videos\`, `\music\`,
-		`\ntuser`, `\cookies\`, `\login data`, `\history`, `\leveldb`, `\indexeddb`,
-		`\local storage`, `\session storage`,
-	}
-	for _, b := range blocked {
+	for _, b := range forbiddenBrowserPatterns {
 		if strings.Contains(p, b) {
 			return false
 		}
@@ -384,12 +417,12 @@ func isSafeCleanupPath(p string) bool {
 		filepath.Join(la, "spotify", "data"),
 		filepath.Join(la, "microsoft", "windows", "explorer"),
 		filepath.Join(la, "microsoft", "windows", "wer"),
-		filepath.Join(la, "google", "chrome", "user data", "default", "cache"),
-		filepath.Join(la, "google", "chrome", "user data", "default", "code cache"),
-		filepath.Join(la, "google", "chrome", "user data", "default", "gpucache"),
-		filepath.Join(la, "microsoft", "edge", "user data", "default", "cache"),
-		filepath.Join(la, "microsoft", "edge", "user data", "default", "code cache"),
-		filepath.Join(la, "microsoft", "edge", "user data", "default", "gpucache"),
+		filepath.Join(la, "google", "chrome", "user data"),
+		filepath.Join(la, "microsoft", "edge", "user data"),
+		filepath.Join(la, "yandex", "yandexbrowser", "user data"),
+		filepath.Join(la, "bravesoftware", "brave-browser", "user data"),
+		filepath.Join(la, "opera software"),
+		filepath.Join(ro, "opera software"),
 		filepath.Join(la, "mozilla", "firefox", "profiles"),
 		filepath.Join(la, "npm-cache"),
 		filepath.Join(la, "pip", "cache"),
@@ -406,19 +439,32 @@ func isSafeCleanupPath(p string) bool {
 		`c:\programdata\microsoft\windows\wer`,
 		`c:\$recycle.bin`,
 	}
+	matchedPrefix := false
 	for _, pref := range safePrefixes {
 		pref = strings.ToLower(filepath.Clean(pref))
 		if pref == "" || pref == "." {
 			continue
 		}
 		if p == pref || strings.HasPrefix(p, pref+string(os.PathSeparator)) || strings.HasPrefix(p, pref+"\\") {
-			return true
+			matchedPrefix = true
+			break
 		}
 	}
-	if strings.Contains(p, `\mozilla\firefox\profiles\`) && strings.Contains(p, `\cache2`) {
-		return true
+	if !matchedPrefix {
+		return false
 	}
-	return false
+
+	// If path is inside any browser User Data, require that it is inside an allowed cache folder
+	isBrowserPath := strings.Contains(p, `\google\chrome\`) ||
+		strings.Contains(p, `\microsoft\edge\`) ||
+		strings.Contains(p, `\yandex\yandexbrowser\`) ||
+		strings.Contains(p, `\bravesoftware\brave-browser\`) ||
+		strings.Contains(p, `\opera software\`) ||
+		strings.Contains(p, `\mozilla\firefox\`)
+	if isBrowserPath {
+		return IsSafeBrowserCachePath(p)
+	}
+	return true
 }
 
 func dirSizeLimited(roots []string, maxDepth int, olderThan time.Time) int64 {
@@ -576,17 +622,58 @@ func cleanThumbcaches() int64 {
 
 func browserCacheDirs() []string {
 	la := os.Getenv("LOCALAPPDATA")
+	ro := os.Getenv("APPDATA")
 	if la == "" {
 		return nil
 	}
-	out := []string{
-		filepath.Join(la, "Google", "Chrome", "User Data", "Default", "Cache"),
-		filepath.Join(la, "Google", "Chrome", "User Data", "Default", "Code Cache"),
-		filepath.Join(la, "Google", "Chrome", "User Data", "Default", "GPUCache"),
-		filepath.Join(la, "Microsoft", "Edge", "User Data", "Default", "Cache"),
-		filepath.Join(la, "Microsoft", "Edge", "User Data", "Default", "Code Cache"),
-		filepath.Join(la, "Microsoft", "Edge", "User Data", "Default", "GPUCache"),
+	out := []string{}
+
+	// Helper to add standard Chromium cache directories for all profiles
+	addChromiumRoots := func(userDataRoot string) {
+		if _, err := os.Stat(userDataRoot); err != nil {
+			return
+		}
+		profiles := []string{"Default"}
+		if entries, err := os.ReadDir(userDataRoot); err == nil {
+			for _, e := range entries {
+				if e.IsDir() && strings.HasPrefix(strings.ToLower(e.Name()), "profile ") {
+					profiles = append(profiles, e.Name())
+				}
+			}
+		}
+		for _, prof := range profiles {
+			profDir := filepath.Join(userDataRoot, prof)
+			for _, cacheName := range []string{"Cache", "Code Cache", "GPUCache", "DawnCache"} {
+				target := filepath.Join(profDir, cacheName)
+				out = append(out, target)
+			}
+		}
 	}
+
+	// Google Chrome
+	addChromiumRoots(filepath.Join(la, "Google", "Chrome", "User Data"))
+	// Microsoft Edge
+	addChromiumRoots(filepath.Join(la, "Microsoft", "Edge", "User Data"))
+	// Yandex Browser
+	addChromiumRoots(filepath.Join(la, "Yandex", "YandexBrowser", "User Data"))
+	// Brave Browser
+	addChromiumRoots(filepath.Join(la, "BraveSoftware", "Brave-Browser", "User Data"))
+
+	// Opera & Opera GX
+	for _, baseDir := range []string{la, ro} {
+		if baseDir == "" {
+			continue
+		}
+		for _, op := range []string{"Opera Stable", "Opera GX Stable"} {
+			opDir := filepath.Join(baseDir, "Opera Software", op)
+			for _, cacheName := range []string{"Cache", "Code Cache", "GPUCache", "DawnCache"} {
+				target := filepath.Join(opDir, cacheName)
+				out = append(out, target)
+			}
+		}
+	}
+
+	// Mozilla Firefox
 	ff := filepath.Join(la, "Mozilla", "Firefox", "Profiles")
 	entries, err := os.ReadDir(ff)
 	if err == nil {

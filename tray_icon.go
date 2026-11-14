@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 )
 
-// trayIconRGBA builds a 16×16 tray glyph: solid color + optional 1-2 digit value.
+// trayIconICO builds a 16×16 tray glyph: dark glass badge + crisp pulse/metric text.
 // Returns Windows .ico bytes (one 16×16 32bpp image).
 func trayIconICO(value int, r, g, b byte) []byte {
 	const size = 16
@@ -13,17 +13,26 @@ func trayIconICO(value int, r, g, b byte) []byte {
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
 			i := (y*size + x) * 4
-			// soft rounded square background
-			edge := x == 0 || y == 0 || x == size-1 || y == size-1
-			rgba[i+0] = r
-			rgba[i+1] = g
-			rgba[i+2] = b
-			if edge {
-				rgba[i+0] = byte(int(r) * 7 / 10)
-				rgba[i+1] = byte(int(g) * 7 / 10)
-				rgba[i+2] = byte(int(b) * 7 / 10)
+			// Transparent outer corner pixels for smooth capsule
+			isCorner := (x == 0 && y == 0) || (x == size-1 && y == 0) || (x == 0 && y == size-1) || (x == size-1 && y == size-1)
+			if isCorner {
+				rgba[i+3] = 0
+				continue
 			}
-			rgba[i+3] = 255
+			isBorder := x == 0 || y == 0 || x == size-1 || y == size-1
+			if isBorder {
+				// Sleek subtle border #334155
+				rgba[i+0] = 51
+				rgba[i+1] = 65
+				rgba[i+2] = 85
+				rgba[i+3] = 230
+			} else {
+				// Clean dark background #0f172a
+				rgba[i+0] = 15
+				rgba[i+1] = 23
+				rgba[i+2] = 42
+				rgba[i+3] = 255
+			}
 		}
 	}
 	if value < 0 {
@@ -32,12 +41,50 @@ func trayIconICO(value int, r, g, b byte) []byte {
 	if value > 99 {
 		value = 99
 	}
-	inkR, inkG, inkB := byte(255), byte(255), byte(255)
-	if r > 200 && g > 200 && b > 200 {
-		inkR, inkG, inkB = 20, 20, 20
+
+	if value == 0 {
+		// Draw sleek ECG pulse wave
+		drawPulseGlyph(rgba, size, r, g, b)
+	} else {
+		// Draw crisp digits with accent color
+		drawTrayDigits(rgba, size, value, r, g, b)
+		// Small accent status line at bottom
+		for x := 4; x <= 11; x++ {
+			i := (14*size + x) * 4
+			rgba[i+0] = r
+			rgba[i+1] = g
+			rgba[i+2] = b
+			rgba[i+3] = 220
+		}
 	}
-	drawTrayDigits(rgba, size, value, inkR, inkG, inkB)
+
 	return encodeICO16(rgba)
+}
+
+func drawPulseGlyph(rgba []byte, size int, r, g, b byte) {
+	// Baseline at y = 8
+	plot := func(x, y int) {
+		if x >= 0 && x < size && y >= 0 && y < size {
+			i := (y*size + x) * 4
+			rgba[i+0] = r
+			rgba[i+1] = g
+			rgba[i+2] = b
+			rgba[i+3] = 255
+		}
+	}
+	for x := 2; x <= 4; x++ {
+		plot(x, 8)
+	}
+	plot(5, 7)
+	plot(6, 4)
+	plot(7, 3)
+	plot(8, 12)
+	plot(9, 13)
+	plot(10, 6)
+	plot(11, 8)
+	for x := 12; x <= 13; x++ {
+		plot(x, 8)
+	}
 }
 
 func trayColorForTemp(tempC float64, cpuPct float64) (value int, r, g, b byte, showTemp bool) {
@@ -67,11 +114,11 @@ func trayColorForTemp(tempC float64, cpuPct float64) (value int, r, g, b byte, s
 	}
 	switch {
 	case cpuPct < 70:
-		return v, 56, 189, 248, false
+		return v, 56, 189, 248, false // cyan
 	case cpuPct <= 85:
-		return v, 234, 179, 8, false
+		return v, 234, 179, 8, false // yellow
 	default:
-		return v, 239, 68, 68, false
+		return v, 239, 68, 68, false // red
 	}
 }
 

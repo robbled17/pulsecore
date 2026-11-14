@@ -26,6 +26,14 @@ func killProcessNative(pid int) error {
 	return RunHiddenCommand("taskkill.exe", "/F", "/PID", fmt.Sprintf("%d", pid)).Run()
 }
 
+func killProcessByNameNative(name string) error {
+	base := filepath.Base(name)
+	if !strings.HasSuffix(strings.ToLower(base), ".exe") {
+		base += ".exe"
+	}
+	return RunHiddenCommand("taskkill.exe", "/F", "/T", "/IM", base).Run()
+}
+
 func restartProcessNative(pid int) error {
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
@@ -59,7 +67,54 @@ func restartProcessNative(pid int) error {
 	return cmd.Start()
 }
 
-// sampleGPUTopProcesses identifies top processes utilizing GPU / VRAM.
+func restartProcessByNameNative(name string) error {
+	base := filepath.Base(name)
+	if !strings.HasSuffix(strings.ToLower(base), ".exe") {
+		base += ".exe"
+	}
+	procs, err := process.Processes()
+	if err != nil {
+		return err
+	}
+	var targetExe string
+	var targetArgs []string
+	var targetCwd string
+
+	for _, p := range procs {
+		pName, err := p.Name()
+		if err == nil && strings.EqualFold(filepath.Base(pName), base) {
+			if exe, err := p.Exe(); err == nil && exe != "" {
+				targetExe = exe
+				targetArgs, _ = p.CmdlineSlice()
+				targetCwd, _ = p.Cwd()
+				break
+			}
+		}
+	}
+
+	if targetExe == "" {
+		return fmt.Errorf("process %s not found", name)
+	}
+
+	_ = killProcessByNameNative(base)
+	time.Sleep(300 * time.Millisecond)
+
+	var cmd *exec.Cmd
+	if len(targetArgs) > 1 {
+		cmd = exec.Command(targetExe, targetArgs[1:]...)
+	} else {
+		cmd = exec.Command(targetExe)
+	}
+	if targetCwd != "" {
+		cmd.Dir = targetCwd
+	}
+	cmd.SysProcAttr = &windows.SysProcAttr{
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | 0x00000008, // DETACHED_PROCESS
+	}
+	return cmd.Start()
+}
+
+// sampleGPUTopProcesses identifies top processes utilizing GPU / VRAM, grouped by name.
 func sampleGPUTopProcesses() []HardwareProcessItem {
 	procs, err := process.Processes()
 	if err != nil {
@@ -67,9 +122,10 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 	}
 
 	myPID := int32(os.Getpid())
-	type gpuCandidate struct {
+	type gpuAgg struct {
 		pid   int32
 		name  string
+		count int
 		vram  uint64
 		score float64
 	}
@@ -91,7 +147,8 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 		"premiere.exe":          45.0,
 	}
 
-	candidates := make([]gpuCandidate, 0, 16)
+	byName := map[string]*gpuAgg{}
+
 	for _, p := range procs {
 		if p.Pid <= 4 || p.Pid == myPID {
 			continue
@@ -121,13 +178,28 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 		}
 
 		if score > 0 {
-			candidates = append(candidates, gpuCandidate{
-				pid:   p.Pid,
-				name:  name,
-				vram:  ram / 2, // estimate dedicated+shared VRAM proportional to RSS
-				score: score + float64(ram)/(100*1024*1024),
-			})
+			vram := ram / 2 // estimate dedicated+shared VRAM proportional to RSS
+			addScore := score + float64(ram)/(100*1024*1024)
+			g := byName[base]
+			if g == nil {
+				byName[base] = &gpuAgg{
+					pid:   p.Pid,
+					name:  name,
+					count: 1,
+					vram:  vram,
+					score: addScore,
+				}
+			} else {
+				g.count++
+				g.vram += vram
+				g.score += addScore * 0.3 // smooth scaling for multi-process apps
+			}
 		}
+	}
+
+	candidates := make([]*gpuAgg, 0, len(byName))
+	for _, g := range byName {
+		candidates = append(candidates, g)
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
@@ -142,18 +214,21 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 	out := make([]HardwareProcessItem, 0, limit)
 	for i := 0; i < limit; i++ {
 		c := candidates[i]
-		// Generate realistic GPU load/VRAM label
+		displayName := c.name
+		if c.count > 1 {
+			displayName = fmt.Sprintf("%s (%d)", c.name, c.count)
+		}
 		vramMB := float64(c.vram) / (1024 * 1024)
 		var label string
-		if vramMB >= 100 {
-			label = fmt.Sprintf("%.0f МБ VRAM", vramMB)
+		if vramMB >= 10 {
+			label = fmt.Sprintf("%.1f%% GPU · %.0f МБ VRAM", c.score, vramMB)
 		} else {
-			label = fmt.Sprintf("%.1f%%", c.score)
+			label = fmt.Sprintf("%.1f%% GPU", c.score)
 		}
 
 		out = append(out, HardwareProcessItem{
 			PID:        c.pid,
-			Name:       c.name,
+			Name:       displayName,
 			ValueLabel: label,
 			ValueNum:   c.score,
 		})

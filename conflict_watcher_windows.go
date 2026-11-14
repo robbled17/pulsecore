@@ -13,16 +13,18 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
 
 var (
-	modUser32CW                 = windows.NewLazySystemDLL("user32.dll")
-	procCWEnumWindows           = modUser32CW.NewProc("EnumWindows")
-	procCWEnumChildWindows      = modUser32CW.NewProc("EnumChildWindows")
-	procCWGetClassNameW         = modUser32CW.NewProc("GetClassNameW")
-	procCWGetWindowTextW        = modUser32CW.NewProc("GetWindowTextW")
-	procCWIsWindow              = modUser32CW.NewProc("IsWindow")
+	modUser32CW                    = windows.NewLazySystemDLL("user32.dll")
+	procCWEnumWindows              = modUser32CW.NewProc("EnumWindows")
+	procCWEnumChildWindows         = modUser32CW.NewProc("EnumChildWindows")
+	procCWGetClassNameW            = modUser32CW.NewProc("GetClassNameW")
+	procCWGetWindowTextW           = modUser32CW.NewProc("GetWindowTextW")
+	procCWGetWindowThreadProcessId = modUser32CW.NewProc("GetWindowThreadProcessId")
+	procCWIsWindow                 = modUser32CW.NewProc("IsWindow")
 	procCWIsWindowVisible       = modUser32CW.NewProc("IsWindowVisible")
 	procCWIsIconic              = modUser32CW.NewProc("IsIconic")
 	procCWGetWindowRect         = modUser32CW.NewProc("GetWindowRect")
@@ -350,7 +352,7 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 	// Format text labels according to requirements
 	if len(procs) == 1 {
 		p := procs[0]
-		globalConflict.titleText = fmt.Sprintf("🔒 Держит: %s (PID %d)", p.ProcessName, p.PID)
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит: %s", p.ProcessName)
 		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
 		globalConflict.btnText = "Закрыть и удалить"
 	} else if len(procs) > 1 {
@@ -434,36 +436,96 @@ func findConflictWindow() (windows.HWND, string, []string) {
 	return target, winTitle, allTexts
 }
 
+func getExplorerSelectedPaths() []string {
+	cmd := `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $shell = New-Object -ComObject Shell.Application; $shell.Windows() | ForEach-Object { try { $_.Document.SelectedItems() | ForEach-Object { $_.Path } } catch {} }`
+	raw, err := runHiddenOutput("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd)
+	if err != nil {
+		return nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	var paths []string
+	for _, l := range lines {
+		p := strings.TrimSpace(l)
+		if len(p) >= 3 && p[1] == ':' {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
 func extractConflictItemName(title string, children []string) string {
+	// 1. High priority: check open Explorer windows for currently selected file/folder
+	if sel := getExplorerSelectedPaths(); len(sel) > 0 {
+		return filepath.Base(sel[0])
+	}
+
+	// 2. Direct path in title or children
 	for _, t := range append([]string{title}, children...) {
 		t = strings.TrimSpace(t)
 		if len(t) >= 3 && t[1] == ':' {
 			return filepath.Base(t)
 		}
+
+		// Look for text following "повторите попытку" or "try again"
+		for _, marker := range []string{"повторите попытку.", "повторите попытку:", "повторите попытку", "try again.", "try again:", "try again"} {
+			if idx := strings.Index(strings.ToLower(t), marker); idx >= 0 {
+				after := strings.TrimSpace(t[idx+len(marker):])
+				lines := strings.Split(after, "\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					line = strings.Trim(line, `"'«»:,; `)
+					if line != "" && !strings.HasPrefix(strings.ToLower(line), "дата") && len(line) < 100 {
+						return line
+					}
+				}
+			}
+		}
+
+		// Look for quoted names like "Antigravity Tools" or «Antigravity Tools»
+		if start := strings.IndexAny(t, `"'«`); start >= 0 {
+			rest := t[start+1:]
+			if end := strings.IndexAny(rest, `"'»`); end > 0 {
+				candidate := strings.TrimSpace(rest[:end])
+				if candidate != "" && len(candidate) < 100 && !strings.Contains(candidate, "\n") {
+					return candidate
+				}
+			}
+		}
 	}
+
+	// 3. Child text lines
 	for _, t := range children {
-		t = strings.TrimSpace(t)
-		if t == "" {
-			continue
-		}
-		low := strings.ToLower(t)
-		if strings.Contains(low, "повторить") || strings.Contains(low, "отмена") ||
-			strings.Contains(low, "retry") || strings.Contains(low, "cancel") ||
-			strings.Contains(low, "действие") || strings.Contains(low, "action") ||
-			strings.Contains(low, "используется") || strings.Contains(low, "in use") ||
-			strings.Contains(low, "закройте") || strings.Contains(low, "close") ||
-			len(t) > 80 {
-			continue
-		}
-		t = strings.Trim(t, `"'«»`)
-		if t != "" {
-			return t
+		lines := strings.Split(t, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			low := strings.ToLower(line)
+			if strings.Contains(low, "повторить") || strings.Contains(low, "отмена") ||
+				strings.Contains(low, "retry") || strings.Contains(low, "cancel") ||
+				strings.Contains(low, "действие") || strings.Contains(low, "action") ||
+				strings.Contains(low, "используется") || strings.Contains(low, "in use") ||
+				strings.Contains(low, "закройте") || strings.Contains(low, "close") ||
+				strings.Contains(low, "дата создания") || strings.Contains(low, "размер") ||
+				len(line) > 80 {
+				continue
+			}
+			line = strings.Trim(line, `"'«»:,; `)
+			if line != "" {
+				return line
+			}
 		}
 	}
 	return "заблокированный объект"
 }
 
 func resolveLockedPath(title string, childTexts []string) string {
+	if sel := getExplorerSelectedPaths(); len(sel) > 0 {
+		return sel[0]
+	}
+
 	for _, text := range append([]string{title}, childTexts...) {
 		text = strings.TrimSpace(text)
 		if len(text) >= 3 && text[1] == ':' {
@@ -517,18 +579,6 @@ func resolveLockedPath(title string, childTexts []string) string {
 }
 
 func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
-	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-	if err != nil {
-		return nil
-	}
-	defer windows.CloseHandle(snap)
-
-	var entry windows.ProcessEntry32
-	entry.Size = uint32(unsafe.Sizeof(entry))
-	if err := windows.Process32First(snap, &entry); err != nil {
-		return nil
-	}
-
 	nameLower := strings.ToLower(strings.TrimSpace(name))
 	nameWithoutExt := strings.TrimSuffix(nameLower, filepath.Ext(nameLower))
 	dirLower := strings.ToLower(strings.TrimSpace(dirPath))
@@ -541,18 +591,44 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 		}
 	}
 
-	myPID := uint32(os.Getpid())
-	var out []LockProcessInfo
-	for {
-		if entry.ProcessID == myPID || entry.ProcessID <= 4 {
-			if err := windows.Process32Next(snap, &entry); err != nil {
-				break
+	// Build map of PID -> Window titles
+	pidWindows := map[uint32][]string{}
+	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+		if rv, _, _ := procCWIsWindowVisible.Call(hwnd); rv == 0 {
+			return 1
+		}
+		var pid uint32
+		procCWGetWindowThreadProcessId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+		if pid > 4 {
+			var buf [512]uint16
+			procCWGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 512)
+			txt := strings.ToLower(strings.TrimSpace(windows.UTF16ToString(buf[:])))
+			if txt != "" {
+				pidWindows[pid] = append(pidWindows[pid], txt)
 			}
+		}
+		return 1
+	})
+	procCWEnumWindows.Call(cb, 0)
+
+	procs, err := process.Processes()
+	if err != nil {
+		return nil
+	}
+
+	myPID := int32(os.Getpid())
+	var out []LockProcessInfo
+	seen := map[int32]bool{}
+
+	for _, p := range procs {
+		if p.Pid <= 4 || p.Pid == myPID || seen[p.Pid] {
 			continue
 		}
-
-		procName := windows.UTF16ToString(entry.ExeFile[:])
-		procNameLower := strings.ToLower(procName)
+		pName, err := p.Name()
+		if err != nil || pName == "" {
+			continue
+		}
+		procNameLower := strings.ToLower(pName)
 		procBase := strings.TrimSuffix(procNameLower, ".exe")
 
 		match := false
@@ -571,43 +647,83 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 			}
 		}
 
-		// Also check process image path if dirPath or name is provided
-		if !match && entry.ProcessID > 4 {
-			if hProc, err := windows.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, entry.ProcessID); err == nil {
-				var buf [windows.MAX_PATH]uint16
-				size := uint32(len(buf))
-				r, _, _ := procCWQueryFullProcessImageNameW.Call(uintptr(hProc), 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
-				windows.CloseHandle(hProc)
-				if r != 0 && size > 0 {
-					exePathLower := strings.ToLower(windows.UTF16ToString(buf[:size]))
-					if dirLower != "" && strings.Contains(exePathLower, dirLower) {
+		// Check window titles for this PID
+		if !match {
+			if titles, ok := pidWindows[uint32(p.Pid)]; ok {
+				for _, t := range titles {
+					if nameLower != "" && strings.Contains(t, nameLower) {
 						match = true
-					} else if nameLower != "" && strings.Contains(exePathLower, nameLower) {
-						match = true
-					} else {
-						for _, w := range filteredWords {
-							if strings.Contains(exePathLower, w) {
-								match = true
-								break
-							}
+						break
+					}
+					for _, w := range filteredWords {
+						if strings.Contains(t, w) {
+							match = true
+							break
+						}
+					}
+					if match {
+						break
+					}
+				}
+			}
+		}
+
+		// Check Exe path, Cmdline, and Cwd
+		if !match {
+			if exe, err := p.Exe(); err == nil && exe != "" {
+				exeLower := strings.ToLower(exe)
+				if dirLower != "" && strings.Contains(exeLower, dirLower) {
+					match = true
+				} else if nameLower != "" && strings.Contains(exeLower, nameLower) {
+					match = true
+				} else {
+					for _, w := range filteredWords {
+						if strings.Contains(exeLower, w) {
+							match = true
+							break
 						}
 					}
 				}
 			}
 		}
 
-		if match && !isProtectedSystemProcess(procName, entry.ProcessID) && !isSelfOrWebView(procName) {
-			out = append(out, LockProcessInfo{
-				PID:         entry.ProcessID,
-				ProcessName: procName,
-				AppName:     procName,
-			})
+		if !match {
+			if cwd, err := p.Cwd(); err == nil && cwd != "" {
+				cwdLower := strings.ToLower(cwd)
+				if dirLower != "" && strings.Contains(cwdLower, dirLower) {
+					match = true
+				} else if nameLower != "" && strings.Contains(cwdLower, nameLower) {
+					match = true
+				}
+			}
 		}
 
-		if err := windows.Process32Next(snap, &entry); err != nil {
-			break
+		if !match {
+			if cmdline, err := p.Cmdline(); err == nil && cmdline != "" {
+				cmdLower := strings.ToLower(cmdline)
+				if nameLower != "" && strings.Contains(cmdLower, nameLower) {
+					match = true
+				} else {
+					for _, w := range filteredWords {
+						if strings.Contains(cmdLower, w) {
+							match = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if match && !isProtectedSystemProcess(pName, uint32(p.Pid)) && !isSelfOrWebView(pName) {
+			seen[p.Pid] = true
+			out = append(out, LockProcessInfo{
+				PID:         uint32(p.Pid),
+				ProcessName: pName,
+				AppName:     pName,
+			})
 		}
 	}
+
 	return out
 }
 
@@ -668,13 +784,26 @@ func unlockAndRetry() {
 	globalConflict.Unlock()
 
 	if len(procs) > 0 {
+		for _, p := range procs {
+			_ = killProcessByNameNative(p.ProcessName)
+			_ = killProcessNative(int(p.PID))
+		}
 		_, _, _ = TerminateLockingProcesses(procs)
 	} else if targetPath != "" {
 		if p2, err := FindLockingProcesses(targetPath); err == nil && len(p2) > 0 {
+			for _, p := range p2 {
+				_ = killProcessByNameNative(p.ProcessName)
+				_ = killProcessNative(int(p.PID))
+			}
 			_, _, _ = TerminateLockingProcesses(p2)
 		}
 	} else if itemName != "" {
+		_ = killProcessByNameNative(itemName)
 		if p3 := findProcessesByNameOrPath(itemName, ""); len(p3) > 0 {
+			for _, p := range p3 {
+				_ = killProcessByNameNative(p.ProcessName)
+				_ = killProcessNative(int(p.PID))
+			}
 			_, _, _ = TerminateLockingProcesses(p3)
 		}
 	}

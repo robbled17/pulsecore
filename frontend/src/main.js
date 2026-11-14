@@ -112,7 +112,10 @@
   SetConflictWatcherEnabled,
   GetHardwareTopProcesses,
   KillProcess,
+  KillProcessByName,
   RestartProcess,
+  RestartProcessByName,
+  ResolveGameCover,
   CheckForUpdates,
   DownloadAndInstallUpdate,
 } from '../wailsjs/go/main/App.js'
@@ -508,6 +511,7 @@ function applyI18n() {
     el.setAttribute('title', t(el.getAttribute('data-i18n-title')))
   })
   syncCustomDropdownLabels()
+  updateHiddenGamesButton()
   updateChartTitle()
   syncLangSelects()
   syncOverlayPill(gameOverlayOn)
@@ -1509,11 +1513,37 @@ async function renderGamesTab() {
   if (!canCompare && out && !out.textContent) {
     out.textContent = t('statsNoWeekCompare')
   }
-  const opts = finished.map((s) =>
-    `<option value="${s.id}">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</option>`
+
+  const menuA = $('game-cmp-menu-a')
+  const menuB = $('game-cmp-menu-b')
+  const labelA = $('game-cmp-label-a')
+  const labelB = $('game-cmp-label-b')
+  const inputA = $('game-cmp-a')
+  const inputB = $('game-cmp-b')
+
+  const itemsA = finished.map((s) =>
+    `<div class="dropdown-item" data-value="${s.id}" data-target="a">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
   ).join('')
-  if (selA) selA.innerHTML = opts || `<option disabled selected>${escapeHtml(t('gameComparePick'))}</option>`
-  if (selB) selB.innerHTML = opts || `<option disabled selected>${escapeHtml(t('gameComparePick'))}</option>`
+  const itemsB = finished.map((s) =>
+    `<div class="dropdown-item" data-value="${s.id}" data-target="b">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
+  ).join('')
+
+  if (menuA) menuA.innerHTML = itemsA || `<div class="dropdown-item disabled">${escapeHtml(t('gameComparePick'))}</div>`
+  if (menuB) menuB.innerHTML = itemsB || `<div class="dropdown-item disabled">${escapeHtml(t('gameComparePick'))}</div>`
+
+  if (finished.length >= 2) {
+    if (!inputA?.value || !finished.some((s) => s.id === inputA.value)) {
+      if (inputA) inputA.value = finished[0].id
+      if (labelA) labelA.textContent = `${finished[0].name || finished[0].exe} (${t('unitsMinShort', { n: fmt(finished[0].durationMin, 0) })})`
+    }
+    if (!inputB?.value || !finished.some((s) => s.id === inputB.value)) {
+      if (inputB) inputB.value = finished[1].id
+      if (labelB) labelB.textContent = `${finished[1].name || finished[1].exe} (${t('unitsMinShort', { n: fmt(finished[1].durationMin, 0) })})`
+    }
+  } else {
+    if (labelA) labelA.textContent = t('gameComparePick')
+    if (labelB) labelB.textContent = t('gameComparePick')
+  }
 }
 
 async function runGameCompare() {
@@ -2370,6 +2400,7 @@ async function renderRadarPanel() {
     ? meaningful.map((a) => {
       const text = lang === 'en' ? (a.textEn || a.textRu) : (a.textRu || a.textEn)
       const when = a.detectedAt ? `<div class="meta">${escapeHtml(a.detectedAt)}</div>` : ''
+      const proc = a.process || a.friendly || ''
       return `
         <div class="incident-card">
           <div class="incident-body">
@@ -2377,6 +2408,12 @@ async function renderRadarPanel() {
             <div class="incident-explain">${escapeHtml(text || '')}</div>
             ${when}
           </div>
+          ${proc ? `
+            <div class="row-actions">
+              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}</button>
+              <button type="button" class="btn soft compact btn-radar-restart" data-proc="${escapeHtml(proc)}">${t('procActionRestart')}</button>
+            </div>
+          ` : ''}
         </div>`
     }).join('')
     : ''
@@ -2384,12 +2421,19 @@ async function renderRadarPanel() {
   memBox.innerHTML = memReal.length
     ? memReal.map((c) => {
       const text = lang === 'en' ? (c.textEn || c.textRu) : (c.textRu || c.textEn)
+      const proc = c.process || c.friendly || ''
       return `
         <div class="incident-card">
           <div class="incident-body">
             <div class="incident-title">${escapeHtml(c.friendly || c.process || '-')} · ${memVerdictLabel(c.verdict)}</div>
             <div class="incident-explain">${escapeHtml(text || '')}</div>
           </div>
+          ${proc ? `
+            <div class="row-actions">
+              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}</button>
+              <button type="button" class="btn soft compact btn-radar-restart" data-proc="${escapeHtml(proc)}">${t('procActionRestart')}</button>
+            </div>
+          ` : ''}
         </div>`
     }).join('')
     : ''
@@ -2587,10 +2631,11 @@ function renderHardwareProcsList(target, items) {
     return
   }
   listEl.innerHTML = items.slice(0, 5).map((p) => {
+    const val = p.valueLabel || p.displayVal || ''
     return `<div class="hw-proc-row" data-pid="${p.pid}">
       <div class="hw-proc-info">
         <span class="hw-proc-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
-        <span class="hw-proc-val">${escapeHtml(p.displayVal)}</span>
+        <span class="hw-proc-val">${escapeHtml(val)}</span>
       </div>
       <div class="hw-proc-actions">
         <button type="button" class="btn soft compact hw-proc-btn btn-kill-proc" data-pid="${p.pid}" data-name="${escapeHtml(p.name)}" title="${t('procActionKill')}">${t('procActionKill')}</button>
@@ -2780,18 +2825,6 @@ function renderHardware(m) {
         : t('desktopPC')))
     setHw('hw-pwr-cap', pwr.powerScheme || '-')
   }
-  })
-
-  guardTile('tile-net', 'tileSectionNet', () => {
-    if (netLastDetail && netLastDetail.checked) {
-      setHw('ov-net-sum', netLastDetail.publicIP ? `${netLastDetail.publicIP} · ${Math.round(netLastDetail.summaryPingMs || 0)} ms` : (netLastDetail.localIP || 'OK'))
-      setHw('home-net-local', netLastDetail.localIP || '-')
-      setHw('home-net-public', netLastDetail.publicIP || '-')
-      setHw('home-net-ping', netLastDetail.summaryPingMs >= 0 ? `${Math.round(netLastDetail.summaryPingMs)} ms` : '-')
-      setHw('home-net-status', t(netLastDetail.verdictKey || 'netVerdictOK'))
-    } else {
-      setHw('ov-net-sum', t('netNotChecked') || '-')
-    }
   })
   updateHardwareTopProcesses().catch(() => {})
 }
@@ -3210,53 +3243,117 @@ function drawSummaryChart(canvas, series) {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const w = canvas.width
-  const h = canvas.height
+  const rect = canvas.getBoundingClientRect()
+  const dpr = window.devicePixelRatio || 1
+  const displayW = rect.width || canvas.width || 600
+  const displayH = rect.height || canvas.height || 220
+
+  if (canvas.width !== Math.round(displayW * dpr) || canvas.height !== Math.round(displayH * dpr)) {
+    canvas.width = Math.round(displayW * dpr)
+    canvas.height = Math.round(displayH * dpr)
+  }
+
+  ctx.save()
+  ctx.scale(dpr, dpr)
+  const w = displayW
+  const h = displayH
+
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = 'rgba(20,24,32,0.9)'
+
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, h)
+  bgGrad.addColorStop(0, 'rgba(15, 23, 42, 0.95)')
+  bgGrad.addColorStop(1, 'rgba(10, 15, 28, 0.98)')
+  ctx.fillStyle = bgGrad
   ctx.fillRect(0, 0, w, h)
+
   if (!series.length) {
     ctx.fillStyle = '#94a3b8'
-    ctx.fillText(t('noData'), 12, h / 2)
+    ctx.font = '13px "Segoe UI", Inter, sans-serif'
+    ctx.fillText(t('noData'), 16, h / 2)
+    ctx.restore()
     return
   }
-  const pad = 14
+
+  const pad = 18
   const plotW = w - pad * 2
   const plotH = h - pad * 2
   const n = series.length
   const maxTemp = Math.max(60, ...series.map((d) => Number(d.cpuTempMax) || 0), ...series.map((d) => Number(d.gpuTempMax) || 0))
   const maxFreeze = Math.max(1, ...series.map((d) => Number(d.incidents) || 0))
-  const drawLine = (vals, color, maxV) => {
-    ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth = 2.0
-    vals.forEach((v, i) => {
+
+  const drawSmoothCurve = (vals, color, maxV, glow) => {
+    if (vals.length === 0) return
+    const pts = vals.map((v, i) => {
       const x = pad + (i / Math.max(1, n - 1)) * plotW
       const y = pad + plotH - (Math.min(maxV, Math.max(0, v)) / maxV) * plotH
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+      return { x, y }
     })
+
+    ctx.save()
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    if (glow) {
+      ctx.shadowColor = glow
+      ctx.shadowBlur = 8
+    }
+    ctx.beginPath()
+    ctx.moveTo(pts[0].x, pts[0].y)
+    if (pts.length === 1) {
+      ctx.lineTo(pts[0].x + 1, pts[0].y)
+    } else if (pts.length === 2) {
+      ctx.lineTo(pts[1].x, pts[1].y)
+    } else {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = i > 0 ? pts[i - 1] : pts[i]
+        const p1 = pts[i]
+        const p2 = pts[i + 1]
+        const p3 = i < pts.length - 2 ? pts[i + 2] : p2
+
+        const cp1x = p1.x + (p2.x - p0.x) / 6
+        const cp1y = p1.y + (p2.y - p0.y) / 6
+        const cp2x = p2.x - (p3.x - p1.x) / 6
+        const cp2y = p2.y - (p3.y - p1.y) / 6
+
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+      }
+    }
     ctx.stroke()
+    ctx.restore()
   }
-  drawLine(series.map((d) => Number(d.cpuTempMax) || 0), '#f87171', maxTemp)
-  drawLine(series.map((d) => Number(d.incidents) || 0), '#fbbf24', maxFreeze)
-  // game minutes as small bars
+
+  drawSmoothCurve(series.map((d) => Number(d.cpuTempMax) || 0), '#f87171', maxTemp, 'rgba(248,113,113,0.35)')
+  drawSmoothCurve(series.map((d) => Number(d.incidents) || 0), '#fbbf24', maxFreeze, 'rgba(251,191,36,0.35)')
+
   const maxGame = Math.max(1, ...series.map((d) => Object.values(d.gameMinutes || {}).reduce((a, b) => a + Number(b || 0), 0)))
   series.forEach((d, i) => {
     const mins = Object.values(d.gameMinutes || {}).reduce((a, b) => a + Number(b || 0), 0)
+    if (mins <= 0) return
     const x = pad + (i / Math.max(1, n - 1)) * plotW
-    const bh = (mins / maxGame) * (plotH * 0.40)
-    ctx.fillStyle = 'rgba(56,189,248,0.55)'
-    ctx.fillRect(x - 5, pad + plotH - bh, 10, bh)
+    const bh = (mins / maxGame) * (plotH * 0.35)
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.45)'
+    const bw = Math.min(10, Math.max(4, (plotW / n) * 0.6))
+    const bx = x - bw / 2
+    const by = pad + plotH - bh
+    ctx.beginPath()
+    if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 3)
+    else ctx.rect(bx, by, bw, bh)
+    ctx.fill()
   })
-  // stability baseline in #4ade80
+
   ctx.beginPath()
   ctx.strokeStyle = 'rgba(74, 222, 128, 0.4)'
+  ctx.lineWidth = 1.5
   ctx.setLineDash([4, 4])
   ctx.moveTo(pad, pad + plotH - 4)
   ctx.lineTo(pad + plotW, pad + plotH - 4)
   ctx.stroke()
   ctx.setLineDash([])
+
+  ctx.restore()
 }
 
 async function copySummaryPng() {
@@ -3825,11 +3922,15 @@ function applyGameFilters() {
   gameCatalog = narrowed.concat(extra)
 }
 
+let cachedTopGames = null
+
 async function loadGames() {
   await syncHiddenGamesFromBackend()
   const token = gameSearchToken
   try {
-    gameCatalogFull = normalizeGameList(await ListGames() || [])
+    const list = normalizeGameList(await ListGames() || [])
+    gameCatalogFull = list
+    cachedTopGames = list
   } catch (_) {
     gameCatalogFull = gameCatalogFull || []
   }
@@ -3864,9 +3965,16 @@ function mergeGameLists(localList, onlineList) {
 async function searchGamesLocal(q, token) {
   try {
     if (!q) {
-      gameCatalogFull = normalizeGameList(await ListGames() || [])
-      if (token != null && token !== gameSearchToken) return
-      gameCatalog = gameCatalogFull
+      if (cachedTopGames && cachedTopGames.length) {
+        gameCatalogFull = cachedTopGames
+        if (token != null && token !== gameSearchToken) return
+        gameCatalog = gameCatalogFull
+      } else {
+        gameCatalogFull = normalizeGameList(await ListGames() || [])
+        cachedTopGames = gameCatalogFull
+        if (token != null && token !== gameSearchToken) return
+        gameCatalog = gameCatalogFull
+      }
     } else {
       const remote = normalizeGameList(await SearchGames(q) || [])
       if (token != null && token !== gameSearchToken) return
@@ -3914,14 +4022,23 @@ async function searchGamesLive(opts = {}) {
   currentSearchQuery = q
   if (!q) {
     setSearchSpinner(false)
+    if (cachedTopGames && cachedTopGames.length) {
+      gameCatalogFull = cachedTopGames
+      gameCatalog = cachedTopGames
+      applyGameFilters()
+      renderGameGrid()
+      return
+    }
     try {
       gameCatalogFull = normalizeGameList(await ListGames() || [])
+      cachedTopGames = gameCatalogFull
       if (token !== gameSearchToken) return
       gameCatalog = gameCatalogFull
     } catch (_) {
       if (token !== gameSearchToken) return
       gameCatalog = []
     }
+    applyGameFilters()
     renderGameGrid()
     return
   }
@@ -4212,6 +4329,22 @@ function openHiddenGamesModal() {
     </div>`
   }).join('')
   modal.classList.remove('hidden')
+
+  hiddenGamesMeta.forEach((h) => {
+    if (!h.posterUrl && !h.headerUrl && typeof ResolveGameCover === 'function') {
+      const title = gameDisplayName(h)
+      ResolveGameCover(title).then((cover) => {
+        if (cover) {
+          h.posterUrl = cover
+          const row = list.querySelector(`.hidden-game-row[data-hidden-id="${escapeHtml(h.id)}"]`)
+          const thumb = row?.querySelector('.hidden-game-thumb')
+          if (thumb) {
+            thumb.innerHTML = `<img src="${escapeHtml(cover)}" alt="${escapeHtml(title)}" loading="lazy" />`
+          }
+        }
+      }).catch(() => {})
+    }
+  })
 }
 
 function closeHiddenGamesModal() {
@@ -4259,7 +4392,7 @@ async function selectGame(gameId) {
     box.innerHTML = `
       <div class="game-selected-panel-bar">
         <div class="selected-game-banner game-compact">
-          ${g ? gamePosterHTML(g).replace('class="game-poster"', 'class="game-cover selected-game-poster-mini"') : posterFallbackHTML(title, 'game-cover selected-game-poster-mini', 0, '', { hideTitle: true })}
+          ${g ? compactCoverHTML(g, { hideTitle: true }).replace('class="game-cover"', 'class="game-cover selected-game-poster-mini"') : posterFallbackHTML(title, 'game-cover selected-game-poster-mini', 0, '', { hideTitle: true })}
           <div class="selected-game-info game-compact-body">
             <div class="game-compact-title">${escapeHtml(title)}</div>
             <div class="meta">${t('checking')}</div>
@@ -4296,12 +4429,15 @@ function closeAllDropdowns() {
 function dropdownCurrentValue(kind) {
   if (kind === 'sort') return gameSort
   if (kind === 'game-req-fit') return gameReqFit
+  if (kind === 'game-cmp-a') return $('game-cmp-a')?.value || ''
+  if (kind === 'game-cmp-b') return $('game-cmp-b')?.value || ''
   return gameGenre
 }
 
 function syncCustomDropdownLabels() {
   document.querySelectorAll('.custom-dropdown').forEach((dd) => {
     const kind = dd.dataset.dropdown
+    if (kind === 'game-cmp-a' || kind === 'game-cmp-b') return
     const value = dropdownCurrentValue(kind)
     const items = dd.querySelectorAll('.dropdown-item')
     let label = ''
@@ -4322,17 +4458,38 @@ function syncCustomDropdownLabels() {
   })
 }
 
-function setDropdownValue(dd, value) {
+function setDropdownValue(dd, value, text) {
   if (!dd) return
   const kind = dd.dataset.dropdown
-  if (kind === 'sort') gameSort = value || 'popular'
-  else if (kind === 'game-req-fit') {
+  if (kind === 'sort') {
+    gameSort = value || 'popular'
+    syncCustomDropdownLabels()
+    closeAllDropdowns()
+    renderGameGrid()
+  } else if (kind === 'game-req-fit') {
     gameReqFit = value || 'all'
     if (gameReqFit !== 'all') warmCompatScores(gameCatalog)
-  } else gameGenre = value || 'all'
-  syncCustomDropdownLabels()
-  closeAllDropdowns()
-  renderGameGrid()
+    syncCustomDropdownLabels()
+    closeAllDropdowns()
+    renderGameGrid()
+  } else if (kind === 'game-cmp-a') {
+    const inp = $('game-cmp-a')
+    const lbl = $('game-cmp-label-a')
+    if (inp) inp.value = value || ''
+    if (lbl && text) lbl.textContent = text
+    closeAllDropdowns()
+  } else if (kind === 'game-cmp-b') {
+    const inp = $('game-cmp-b')
+    const lbl = $('game-cmp-label-b')
+    if (inp) inp.value = value || ''
+    if (lbl && text) lbl.textContent = text
+    closeAllDropdowns()
+  } else {
+    gameGenre = value || 'all'
+    syncCustomDropdownLabels()
+    closeAllDropdowns()
+    renderGameGrid()
+  }
 }
 
 function wireCustomDropdowns() {
@@ -4347,11 +4504,12 @@ function wireCustomDropdowns() {
         trigger.setAttribute('aria-expanded', 'true')
       }
     })
-    dd.querySelectorAll('.dropdown-item').forEach((item) => {
-      item.addEventListener('click', (ev) => {
+    dd.addEventListener('click', (ev) => {
+      const item = ev.target.closest('.dropdown-item')
+      if (item && !item.classList.contains('disabled')) {
         ev.stopPropagation()
-        setDropdownValue(dd, item.dataset.value)
-      })
+        setDropdownValue(dd, item.dataset.value, item.textContent)
+      }
     })
   })
   document.addEventListener('click', (ev) => {
@@ -6070,6 +6228,33 @@ function wireUI() {
     try { await ClearProcessAnomalies() } catch (_) {}
     renderRadarPanel().catch(() => {})
   })
+  $('radar-panel')?.addEventListener('click', async (ev) => {
+    const ecoBtn = ev.target.closest('.btn-radar-eco')
+    if (ecoBtn) {
+      const proc = ecoBtn.getAttribute('data-proc') || ''
+      const card = ecoBtn.closest('.incident-card')
+      await applyEcoFeedback({ name: proc, cardEl: card, btn: ecoBtn })
+      return
+    }
+    const restartBtn = ev.target.closest('.btn-radar-restart')
+    if (restartBtn) {
+      const proc = restartBtn.getAttribute('data-proc') || ''
+      if (proc) {
+        restartBtn.disabled = true
+        restartBtn.textContent = t('procRestarting')
+        try {
+          await RestartProcessByName(proc)
+          showToast(`${t('procActionRestart')}: ${proc}`, true, { holdMs: 3000 })
+          setTimeout(() => renderRadarPanel().catch(() => {}), 1000)
+        } catch (err) {
+          showToast(String(err), false, { holdMs: 4000 })
+          restartBtn.disabled = false
+          restartBtn.textContent = t('procActionRestart')
+        }
+      }
+      return
+    }
+  })
   $('btn-startup-refresh')?.addEventListener('click', () => { renderStartupList().catch(() => {}) })
   // Report UI lives in About / Help (toggle + copy for support).
   $('btn-intel-reset')?.addEventListener('click', async () => {
@@ -6256,25 +6441,33 @@ function wireUI() {
     if (killBtn) {
       const pid = Number(killBtn.getAttribute('data-pid'))
       const name = killBtn.getAttribute('data-name') || ''
-      if (pid > 0) {
-        killBtn.disabled = true
-        killBtn.textContent = '...'
-        KillProcess(pid).then((ok) => {
-          if (ok) {
+      killBtn.disabled = true
+      killBtn.textContent = t('procStopping')
+      const actionPromise = (name && typeof KillProcessByName === 'function')
+        ? KillProcessByName(name)
+        : (pid > 0 ? KillProcess(pid) : Promise.reject(new Error('no pid or name')))
+
+      actionPromise.then(() => {
+        showToast(`${t('procActionKill')}: ${name || pid}`, true, { holdMs: 3000 })
+        killBtn.closest('.hw-proc-row')?.remove()
+        setTimeout(() => updateHardwareTopProcesses(true), 500)
+      }).catch((err) => {
+        if (pid > 0 && name && typeof KillProcess === 'function') {
+          KillProcess(pid).then(() => {
             showToast(`${t('procActionKill')}: ${name}`, true, { holdMs: 3000 })
             killBtn.closest('.hw-proc-row')?.remove()
             setTimeout(() => updateHardwareTopProcesses(true), 500)
-          } else {
-            showToast(t('errGeneric', { err: name }), false, { holdMs: 4000 })
+          }).catch((err2) => {
+            showToast(String(err2 || err), false, { holdMs: 4000 })
             killBtn.disabled = false
             killBtn.textContent = t('procActionKill')
-          }
-        }).catch((err) => {
-          showToast(String(err), false, { holdMs: 4000 })
-          killBtn.disabled = false
-          killBtn.textContent = t('procActionKill')
-        })
-      }
+          })
+          return
+        }
+        showToast(String(err), false, { holdMs: 4000 })
+        killBtn.disabled = false
+        killBtn.textContent = t('procActionKill')
+      })
       return
     }
 
@@ -6282,24 +6475,31 @@ function wireUI() {
     if (restartBtn) {
       const pid = Number(restartBtn.getAttribute('data-pid'))
       const name = restartBtn.getAttribute('data-name') || ''
-      if (pid > 0) {
-        restartBtn.disabled = true
-        restartBtn.textContent = '...'
-        RestartProcess(pid).then((ok) => {
-          if (ok) {
+      restartBtn.disabled = true
+      restartBtn.textContent = t('procRestarting')
+      const actionPromise = (name && typeof RestartProcessByName === 'function')
+        ? RestartProcessByName(name)
+        : (pid > 0 ? RestartProcess(pid) : Promise.reject(new Error('no pid or name')))
+
+      actionPromise.then(() => {
+        showToast(`${t('procActionRestart')}: ${name || pid}`, true, { holdMs: 3000 })
+        setTimeout(() => updateHardwareTopProcesses(true), 1000)
+      }).catch((err) => {
+        if (pid > 0 && name && typeof RestartProcess === 'function') {
+          RestartProcess(pid).then(() => {
             showToast(`${t('procActionRestart')}: ${name}`, true, { holdMs: 3000 })
             setTimeout(() => updateHardwareTopProcesses(true), 1000)
-          } else {
-            showToast(t('errGeneric', { err: name }), false, { holdMs: 4000 })
+          }).catch((err2) => {
+            showToast(String(err2 || err), false, { holdMs: 4000 })
             restartBtn.disabled = false
             restartBtn.textContent = t('procActionRestart')
-          }
-        }).catch((err) => {
-          showToast(String(err), false, { holdMs: 4000 })
-          restartBtn.disabled = false
-          restartBtn.textContent = t('procActionRestart')
-        })
-      }
+          })
+          return
+        }
+        showToast(String(err), false, { holdMs: 4000 })
+        restartBtn.disabled = false
+        restartBtn.textContent = t('procActionRestart')
+      })
       return
     }
   })
@@ -6419,29 +6619,6 @@ function wireUI() {
   })
 
   $('btn-smart-fix')?.addEventListener('click', () => { openSmartFixPlan().catch(() => {}) })
-  $('btn-home-net-diag')?.addEventListener('click', async () => {
-    const btn = $('btn-home-net-diag')
-    if (btn) btn.disabled = true
-    setHw('home-net-status', t('netProgress') || '...')
-    try {
-      let d
-      if (typeof CheckNetworkDetailed === 'function') {
-        d = await CheckNetworkDetailed(true)
-      } else {
-        d = await DiagnoseLagOrigin()
-      }
-      netLastDetail = d
-      setHw('ov-net-sum', d.publicIP ? `${d.publicIP} · ${Math.round(d.summaryPingMs || 0)} ms` : (d.localIP || 'OK'))
-      setHw('home-net-local', d.localIP || '-')
-      setHw('home-net-public', d.publicIP || '-')
-      setHw('home-net-ping', d.summaryPingMs >= 0 ? `${Math.round(d.summaryPingMs)} ms` : '-')
-      setHw('home-net-status', t(d.verdictKey || 'netVerdictOK'))
-    } catch (err) {
-      setHw('home-net-status', String(err))
-    } finally {
-      if (btn) btn.disabled = false
-    }
-  })
   $('smartfix-close')?.addEventListener('click', closeSmartFixModal)
   $('diskclean-close')?.addEventListener('click', closeDiskCleanModal)
   $('diskclean-modal')?.addEventListener('click', (ev) => {
@@ -7181,7 +7358,7 @@ function initKeyboardNavigation() {
     const active = document.activeElement
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.type !== 'checkbox' && active.type !== 'radio'
 
-    if (ev.key === 'Escape') {
+    if (ev.code === 'Escape' || ev.key === 'Escape') {
       const openModalClose = document.querySelector('.modal:not(.hidden) .modal-close, .modal:not(.hidden) [id$="-close"]')
       if (openModalClose) {
         ev.preventDefault()
@@ -7193,11 +7370,25 @@ function initKeyboardNavigation() {
       return
     }
 
-    if (isTyping && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) {
+    if (isTyping) {
       return
     }
 
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) {
+    const isUp = ev.code === 'KeyW' || ev.code === 'ArrowUp' || ev.key === 'ArrowUp'
+    const isDown = ev.code === 'KeyS' || ev.code === 'ArrowDown' || ev.key === 'ArrowDown'
+    const isLeft = ev.code === 'KeyA' || ev.code === 'ArrowLeft' || ev.key === 'ArrowLeft'
+    const isRight = ev.code === 'KeyD' || ev.code === 'ArrowRight' || ev.key === 'ArrowRight'
+    const isAction = ev.code === 'Space' || ev.code === 'Enter' || ev.key === 'Enter' || ev.key === ' '
+
+    if (isAction) {
+      if (currentFocused) {
+        ev.preventDefault()
+        currentFocused.click()
+        return
+      }
+    }
+
+    if (isUp || isDown || isLeft || isRight) {
       const items = getFocusableElements()
       if (items.length === 0) return
 
@@ -7226,16 +7417,16 @@ function initKeyboardNavigation() {
         let valid = false
         let dist = Infinity
 
-        if (ev.key === 'ArrowRight' && dx > 8) {
+        if (isRight && dx > 8) {
           valid = true
           dist = Math.abs(dx) + Math.abs(dy) * 2.5
-        } else if (ev.key === 'ArrowLeft' && dx < -8) {
+        } else if (isLeft && dx < -8) {
           valid = true
           dist = Math.abs(dx) + Math.abs(dy) * 2.5
-        } else if (ev.key === 'ArrowDown' && dy > 8) {
+        } else if (isDown && dy > 8) {
           valid = true
           dist = Math.abs(dy) + Math.abs(dx) * 2.5
-        } else if (ev.key === 'ArrowUp' && dy < -8) {
+        } else if (isUp && dy < -8) {
           valid = true
           dist = Math.abs(dy) + Math.abs(dx) * 2.5
         }
@@ -7248,7 +7439,7 @@ function initKeyboardNavigation() {
 
       if (!bestEl) {
         const currIdx = items.indexOf(currentFocused)
-        if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
+        if (isRight || isDown) {
           bestEl = items[(currIdx + 1) % items.length]
         } else {
           bestEl = items[(currIdx - 1 + items.length) % items.length]
@@ -7260,20 +7451,80 @@ function initKeyboardNavigation() {
       }
       return
     }
+  })
+}
 
-    if (ev.key === 'Enter') {
-      if (currentFocused && !isTyping) {
-        ev.preventDefault()
-        currentFocused.click()
+function wireContextMenu() {
+  const menu = $('custom-context-menu')
+  const copyBtn = $('ctx-menu-copy')
+  if (!menu) return
+
+  let textToCopy = ''
+
+  function hideContextMenu() {
+    menu.classList.add('hidden')
+    textToCopy = ''
+  }
+
+  document.addEventListener('contextmenu', (ev) => {
+    const target = ev.target.closest('.hw-val, .hw-proc-name, .hw-proc-val, .tile-summary, .spec-val, .metric-value, .chart-stat-val')
+    if (!target) {
+      hideContextMenu()
+      return
+    }
+
+    const text = target.textContent?.trim()
+    if (!text) {
+      hideContextMenu()
+      return
+    }
+
+    ev.preventDefault()
+    textToCopy = text
+
+    const menuW = 160
+    const menuH = 40
+    let x = ev.clientX
+    let y = ev.clientY
+
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
+    if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
+    if (x < 8) x = 8
+    if (y < 8) y = 8
+
+    menu.style.left = `${x}px`
+    menu.style.top = `${y}px`
+    menu.classList.remove('hidden')
+  })
+
+  copyBtn?.addEventListener('click', async (ev) => {
+    ev.stopPropagation()
+    if (textToCopy) {
+      try {
+        await navigator.clipboard.writeText(textToCopy)
+        showToast(t('copiedToClipboard'), true, { holdMs: 2000 })
+      } catch (_) {
+        showToast(textToCopy, true, { holdMs: 2000 })
       }
     }
+    hideContextMenu()
   })
+
+  document.addEventListener('click', (ev) => {
+    if (!ev.target.closest('#custom-context-menu')) {
+      hideContextMenu()
+    }
+  })
+
+  window.addEventListener('blur', hideContextMenu)
+  window.addEventListener('resize', hideContextMenu)
 }
 
 function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark')
   applyI18n()
   wireUI()
+  wireContextMenu()
   initUpdater()
   initKeyboardNavigation()
   loadBehavior()

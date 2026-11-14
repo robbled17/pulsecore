@@ -929,5 +929,10 @@
   "netNotChecked": "未チェック",
   "updateBannerTitle": "PulseCoreのアップデートが利用可能です",
   "updateBannerSubtitle": "新しいバージョンがインストール準備完了 ({size} MB)",
-  "updateBannerBtn": "更新する"
+  "updateBannerBtn": "更新する",
+  "ctxCopy": "コピー",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "procStopping": "プロセスを停止しています...",
+  "procRestarting": "プロセスを再起動しています...",
+  "procActionEco": "制限 (Eco Mode)"
 }

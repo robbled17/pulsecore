@@ -929,5 +929,10 @@
   "netNotChecked": "Not checked",
   "updateBannerTitle": "PulseCore Update Available",
   "updateBannerSubtitle": "New version is ready to install ({size} MB)",
-  "updateBannerBtn": "Update"
+  "updateBannerBtn": "Update",
+  "ctxCopy": "Copy",
+  "copiedToClipboard": "Copied to clipboard",
+  "procStopping": "Stopping process...",
+  "procRestarting": "Restarting process...",
+  "procActionEco": "Limit (Eco Mode)"
 }

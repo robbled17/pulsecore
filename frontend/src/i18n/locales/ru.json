@@ -929,5 +929,10 @@
   "netNotChecked": "Не проверялась",
   "updateBannerTitle": "Доступно обновление PulseCore",
   "updateBannerSubtitle": "Новая версия готова к установке ({size} МБ)",
-  "updateBannerBtn": "Обновить"
+  "updateBannerBtn": "Обновить",
+  "ctxCopy": "Скопировать",
+  "copiedToClipboard": "Скопировано в буфер обмена",
+  "procStopping": "Завершение процесса...",
+  "procRestarting": "Перезапуск процесса...",
+  "procActionEco": "Ограничить (Eco Mode)"
 }

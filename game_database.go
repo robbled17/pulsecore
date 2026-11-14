@@ -140,6 +140,137 @@ func (a *App) ResolveGameMeta(query string) GameInfo {
 	return GameInfo{}
 }
 
+type cheapSharkGameHit struct {
+	GameID   string `json:"gameID"`
+	SteamApp string `json:"steamAppID"`
+	External string `json:"external"`
+	Thumb    string `json:"thumb"`
+}
+
+func searchCheapSharkCover(title string) string {
+	q := strings.TrimSpace(title)
+	if q == "" {
+		return ""
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	urlStr := fmt.Sprintf("https://www.cheapshark.com/api/1.0/games?title=%s&limit=5", url.QueryEscape(q))
+	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", "PulseCore/1.0")
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer resp.Body.Close()
+	var hits []cheapSharkGameHit
+	if err := json.NewDecoder(resp.Body).Decode(&hits); err != nil || len(hits) == 0 {
+		return ""
+	}
+	for _, h := range hits {
+		if h.Thumb != "" {
+			return h.Thumb
+		}
+	}
+	return ""
+}
+
+type wikipediaSummaryResp struct {
+	Thumbnail struct {
+		Source string `json:"source"`
+	} `json:"thumbnail"`
+}
+
+func searchWikipediaCover(title string) string {
+	q := strings.TrimSpace(title)
+	if q == "" {
+		return ""
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	urlStr := fmt.Sprintf("https://en.wikipedia.org/api/rest_v1/page/summary/%s", url.PathEscape(q))
+	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("User-Agent", "PulseCore/1.0")
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer resp.Body.Close()
+	var sum wikipediaSummaryResp
+	if err := json.NewDecoder(resp.Body).Decode(&sum); err == nil && sum.Thumbnail.Source != "" {
+		return sum.Thumbnail.Source
+	}
+	return ""
+}
+
+// ResolveGameCover performs a multi-stage lookup for a game poster:
+// 1. Check local disk cover cache (%LOCALAPPDATA%\PulseCore\cache\covers\)
+// 2. Local database
+// 3. Steam Store Search API
+// 4. CheapShark API (covers Tarkov, EA, Epic, Ubisoft, etc.)
+// 5. Wikipedia API
+// Caches any found remote image to disk and returns a file:// or remote URL.
+func (a *App) ResolveGameCover(query string) string {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return ""
+	}
+	if title, ok := canonicalFolderTitle(q); ok {
+		q = title
+	}
+	// 1. Check local disk cache
+	if dir, err := coversCacheDir(); err == nil {
+		key := coverCacheKey(q)
+		for _, ext := range []string{".jpg", ".png", ".webp"} {
+			p := filepath.Join(dir, key+ext)
+			if st, err := os.Stat(p); err == nil && st.Size() > 512 {
+				return coverFileURL(p)
+			}
+		}
+	}
+
+	// 2. Local database
+	if e := findLocalGameEntry(q); e != nil {
+		if e.Cover != "" {
+			return EnsureCoverCached(q, e.Cover)
+		}
+	}
+
+	// 3. Steam Store Search
+	hits := searchSteamStore(q)
+	for _, h := range hits {
+		if namesMatchStrict(q, h.Name) || len(hits) == 1 {
+			if h.PosterURL != "" {
+				return EnsureCoverCached(q, h.PosterURL)
+			}
+			if h.HeaderURL != "" {
+				return EnsureCoverCached(q, h.HeaderURL)
+			}
+		}
+	}
+
+	// 4. CheapShark API
+	if thumb := searchCheapSharkCover(q); thumb != "" {
+		return EnsureCoverCached(q, thumb)
+	}
+
+	// 5. Wikipedia API
+	if thumb := searchWikipediaCover(q); thumb != "" {
+		return EnsureCoverCached(q, thumb)
+	}
+
+	return ""
+}
+
 func firstStrictGameHit(query string, hits []GameInfo) (GameInfo, bool) {
 	for _, h := range hits {
 		if namesMatchStrict(query, h.Name) {
