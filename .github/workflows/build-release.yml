@@ -24,7 +24,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: 'go.mod'
           cache: true
 
       - name: Set up Node.js
@@ -49,6 +49,9 @@ jobs:
       - name: Install Wails CLI
         run: |
           go install github.com/wailsapp/wails/v2/cmd/wails@latest
+          $gopath = go env GOPATH
+          echo "$gopath\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "$env:USERPROFILE\go\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Run Go tests
         run: |
@@ -56,6 +59,8 @@ jobs:
 
       - name: Build Wails app
         run: |
+          $env:PATH = "$env:USERPROFILE\go\bin;$(go env GOPATH)\bin;$env:PATH"
+          wails version
           wails build -clean -s -trimpath
 
       - name: Upload build artifact

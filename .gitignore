@@ -1,6 +1,8 @@
 # Build artifacts
 build/bin/
 *.exe
+!helper/dist/PulseCoreHelper.exe
+
 
 # Frontend deps & build output
 frontend/node_modules/
