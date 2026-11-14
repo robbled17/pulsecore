@@ -178,7 +178,10 @@ function closeConfirmModal(result) {
   if (r) r(!!result)
 }
 
+let isDeletingActive = false
+
 function openDeleteProgress(label) {
+  isDeletingActive = true
   const modal = $('delete-progress-modal')
   const text = $('delete-progress-text')
   const bar = $('delete-progress-bar')
@@ -195,6 +198,7 @@ function updateDeleteProgress(ev) {
   const pct = Math.max(0, Math.min(100, Number(ev?.percent) || 0))
   if (bar) bar.style.width = `${pct}%`
   if (ev?.phase === 'done') {
+    isDeletingActive = false
     const gb = formatBytesSmart(ev?.freedBytes || 0)
     if (text) text.textContent = t('deleteProgressDone', { gb })
     done?.classList.remove('hidden')
@@ -204,6 +208,7 @@ function updateDeleteProgress(ev) {
     return
   }
   if (ev?.phase === 'error') {
+    isDeletingActive = false
     if (text) text.textContent = ev?.message || t('deleteProgressFail')
     return
   }
@@ -1522,12 +1527,16 @@ async function renderGamesTab() {
   const inputA = $('game-cmp-a')
   const inputB = $('game-cmp-b')
 
-  const itemsA = finished.map((s) =>
-    `<div class="dropdown-item" data-value="${s.id}" data-target="a">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
-  ).join('')
-  const itemsB = finished.map((s) =>
-    `<div class="dropdown-item" data-value="${s.id}" data-target="b">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
-  ).join('')
+  const curValA = inputA?.value || ''
+  const curValB = inputB?.value || ''
+  const itemsA = finished.map((s) => {
+    const act = (curValA && s.id === curValA) ? ' active' : ''
+    return `<div class="dropdown-item${act}" data-value="${s.id}" data-target="a">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
+  }).join('')
+  const itemsB = finished.map((s) => {
+    const act = (curValB && s.id === curValB) ? ' active' : ''
+    return `<div class="dropdown-item${act}" data-value="${s.id}" data-target="b">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</div>`
+  }).join('')
 
   if (menuA) menuA.innerHTML = itemsA || `<div class="dropdown-item disabled">${escapeHtml(t('gameComparePick'))}</div>`
   if (menuB) menuB.innerHTML = itemsB || `<div class="dropdown-item disabled">${escapeHtml(t('gameComparePick'))}</div>`
@@ -4160,8 +4169,8 @@ function syncGamePanelPadding(open) {
   wrap.classList.toggle('has-selection', !!open)
   grid?.classList.toggle('has-selection', !!open)
   if (open) {
-    wrap.style.setProperty('--game-panel-h', '165px')
-    wrap.style.paddingBottom = '165px'
+    wrap.style.setProperty('--game-panel-h', '125px')
+    wrap.style.removeProperty('padding-bottom')
   } else {
     wrap.style.removeProperty('--game-panel-h')
     wrap.style.removeProperty('padding-bottom')
@@ -4501,12 +4510,14 @@ function setDropdownValue(dd, value, text) {
     const lbl = $('game-cmp-label-a')
     if (inp) inp.value = value || ''
     if (lbl && text) lbl.textContent = text
+    dd.querySelectorAll('.dropdown-item').forEach((it) => it.classList.toggle('active', it.dataset.value === value))
     closeAllDropdowns()
   } else if (kind === 'game-cmp-b') {
     const inp = $('game-cmp-b')
     const lbl = $('game-cmp-label-b')
     if (inp) inp.value = value || ''
     if (lbl && text) lbl.textContent = text
+    dd.querySelectorAll('.dropdown-item').forEach((it) => it.classList.toggle('active', it.dataset.value === value))
     closeAllDropdowns()
   } else {
     gameGenre = value || 'all'
@@ -6172,6 +6183,15 @@ function wireUI() {
     syncMaximisedChrome().catch(() => {})
   })
   $('btn-close').addEventListener('click', async () => {
+    if (isDeletingActive) {
+      const ok = await glassConfirm({
+        title: t('confirmExitWhileDeletingTitle'),
+        body: t('confirmExitWhileDeletingBody'),
+        confirmLabel: t('confirmExitWhileDeletingBtn'),
+        danger: true,
+      })
+      if (!ok) return
+    }
     try {
       const p = await GetBehaviorSettings()
       if (p && p.closeToTray !== false) await HideToTray()
@@ -6403,6 +6423,10 @@ function wireUI() {
   mh?.addEventListener('contextmenu', (ev) => {
     if (!hudEnabled) return
     ev.preventDefault()
+    const curPct = mh.dataset.opacity || '80'
+    $('mh-menu')?.querySelectorAll('[data-mh-opacity]').forEach((el) => {
+      el.classList.toggle('active', el.getAttribute('data-mh-opacity') === curPct)
+    })
     $('mh-menu')?.classList.toggle('hidden')
   })
   $('mh-menu')?.addEventListener('click', async (ev) => {
@@ -6415,6 +6439,9 @@ function wireUI() {
     }
     const pct = Number(item.getAttribute('data-mh-opacity')) || 80
     mh.dataset.opacity = String(pct)
+    $('mh-menu')?.querySelectorAll('[data-mh-opacity]').forEach((el) => {
+      el.classList.toggle('active', el.getAttribute('data-mh-opacity') === String(pct))
+    })
     try { await SetMiniHUDOpacity(pct) } catch (_) { /* ignore */ }
     $('mh-menu')?.classList.add('hidden')
   })
@@ -6674,6 +6701,14 @@ function wireUI() {
   $('confirm-ok')?.addEventListener('click', () => closeConfirmModal(true))
   $('confirm-modal')?.addEventListener('click', (ev) => {
     if (ev.target?.id === 'confirm-modal') closeConfirmModal(false)
+  })
+  $('delete-progress-close')?.addEventListener('click', () => {
+    $('delete-progress-modal')?.classList.add('hidden')
+  })
+  $('delete-progress-modal')?.addEventListener('click', (ev) => {
+    if (ev.target?.id === 'delete-progress-modal') {
+      $('delete-progress-modal')?.classList.add('hidden')
+    }
   })
   try {
     EventsOn('delete-progress', (ev) => {
@@ -7286,7 +7321,12 @@ async function applyUpdate(info, source) {
   } catch (err) {
     isUpdating = false
     const errMsg = String(err && (err.message || err) || err)
-    showToast(t('updateFailed', { err: errMsg }), false, { holdMs: 6000 })
+    const isAV = errMsg.includes('Defender') || errMsg.includes('Windows') || errMsg.toLowerCase().includes('virus') || errMsg.toLowerCase().includes('potentially unwanted')
+    if (isAV) {
+      showToast(t('updateBlockedAV'), false, { holdMs: 8000 })
+    } else {
+      showToast(t('updateFailed', { err: errMsg }), false, { holdMs: 6000 })
+    }
 
     if (bannerActions) bannerActions.classList.remove('hidden')
     if (bannerProgWrap) bannerProgWrap.classList.add('hidden')

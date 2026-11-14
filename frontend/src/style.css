@@ -251,6 +251,8 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   --wails-draggable: drag;
   -webkit-app-region: drag;
   user-select: none;
+  position: relative;
+  z-index: 200;
 }
 .titlebar-brand {
   border: 0;
@@ -3450,6 +3452,9 @@ body.game-overlay-active .gameoverlay { display: flex !important; }
   backdrop-filter: blur(8px);
   padding: 18px;
 }
+#confirm-modal {
+  z-index: 150 !important;
+}
 .modal-card, .modal-content {
   width: clamp(380px, 60vw, 850px);
   max-height: 85vh;
@@ -4129,6 +4134,9 @@ body.game-overlay-active #gameoverlay {
   animation: dropFadeIn 0.15s ease-out;
 }
 .dropdown-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
@@ -4137,10 +4145,35 @@ body.game-overlay-active #gameoverlay {
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.dropdown-item:hover,
+.dropdown-item:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .dropdown-item.active {
   background: var(--accent-soft);
   color: var(--accent);
+  font-weight: 700;
+}
+.dropdown-item.active::after {
+  content: '✓';
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--accent, #38bdf8);
+  font-weight: 800;
+  font-size: 13px;
+}
+.mh-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+.mh-menu-item.active::after {
+  content: '✓';
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--accent, #38bdf8);
+  font-weight: 800;
+  font-size: 12px;
 }
 @keyframes dropFadeIn {
   from { opacity: 0; transform: translateY(-4px); }
@@ -4207,12 +4240,8 @@ body.game-overlay-active #gameoverlay {
   margin: 0;
   transition: padding-bottom 0.2s ease;
 }
-#tab-games #tab-gamepulse .games-carousel-wrapper.has-selection,
-#tab-games #tab-gamepulse .games-grid-container.has-selection,
-#tab-games #tab-gamepulse .games-container.has-selection,
-#tab-games #tab-gamepulse .games-grid.has-selection,
-#tab-games #tab-gamepulse .game-grid.has-selection {
-  padding-bottom: 165px;
+#tab-games #tab-gamepulse .games-carousel-wrapper.has-selection {
+  padding-bottom: 125px !important;
 }
 #tab-games #tab-gamepulse .game-grid,
 #tab-games #tab-gamepulse .games-grid {
@@ -4222,10 +4251,9 @@ body.game-overlay-active #gameoverlay {
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
   gap: 14px;
   align-content: start;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible !important;
   max-height: none !important;
-  padding: 12px;
+  padding: 0 !important;
   height: auto;
 }
 #tab-games #tab-gamepulse .gamepulse-detail,

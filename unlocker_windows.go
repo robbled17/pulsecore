@@ -200,14 +200,22 @@ func getProcessNameAndPath(pid uint32) (exePath string, procName string) {
 
 // isProtectedSystemProcess returns true for OS core processes that must never be terminated.
 func isProtectedSystemProcess(procName string, pid uint32) bool {
-	if pid <= 4 {
+	if pid <= 4 || pid == uint32(os.Getpid()) {
 		return true
 	}
-	low := strings.ToLower(strings.TrimSpace(procName))
-	switch low {
+	// Check if matches our own executable path
+	if myExe, err := os.Executable(); err == nil && myExe != "" {
+		if strings.EqualFold(filepath.Clean(procName), filepath.Clean(myExe)) {
+			return true
+		}
+	}
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(procName)))
+	switch base {
 	case "explorer.exe", "csrss.exe", "lsass.exe", "services.exe",
 		"smss.exe", "wininit.exe", "winlogon.exe", "system",
-		"svchost.exe", "dwm.exe", "pulsecore.exe", "fontdrvhost.exe":
+		"svchost.exe", "dwm.exe", "pulsecore.exe", "fontdrvhost.exe",
+		"msedgewebview2.exe", "pulsecorehelper.exe", "conhost.exe",
+		"runtimebroker.exe", "sihost.exe", "taskhostw.exe":
 		return true
 	}
 	return false

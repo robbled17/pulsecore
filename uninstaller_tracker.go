@@ -80,6 +80,11 @@ func (a *App) startExternalUninstallWatch(folderPath string, expectedFreed int64
 	}
 
 	go func(folderPath string, expectedFreed, baseline int64, appName, appID string, cancel <-chan struct{}) {
+		defer func() {
+			if r := recover(); r != nil {
+				logCrash("externalUninstallWatch", r)
+			}
+		}()
 		ticker := time.NewTicker(externalWatchInterval)
 		defer ticker.Stop()
 		timeout := time.After(externalWatchTimeout)

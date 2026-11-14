@@ -31,16 +31,36 @@ func (a *App) CleanupOldBinary() {
 	}
 }
 
+func checkAVError(err error) error {
+	if err == nil {
+		return nil
+	}
+	errStr := strings.ToLower(err.Error())
+	if strings.Contains(errStr, "virus") || strings.Contains(errStr, "potentially unwanted") || strings.Contains(errStr, "0x800700e1") || strings.Contains(errStr, " 225") || strings.Contains(errStr, ": 225") {
+		return fmt.Errorf("Защитник Windows или антивирус заблокировал файл обновления (ложное срабатывание). Добавьте папку PulseCore в исключения антивируса")
+	}
+	return err
+}
+
 func fileSHA256(filePath string) (string, error) {
-	f, err := os.Open(filePath)
+	var f *os.File
+	var err error
+	// Retry up to 4 times with short sleep in case AV is scanning the newly written file
+	for attempt := 0; attempt < 4; attempt++ {
+		f, err = os.Open(filePath)
+		if err == nil {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 	if err != nil {
-		return "", err
+		return "", checkAVError(err)
 	}
 	defer f.Close()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+		return "", checkAVError(err)
 	}
 	return fmt.Sprintf("sha256:%x", h.Sum(nil)), nil
 }
@@ -171,7 +191,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 
 	outFile, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
-		return fmt.Errorf("cannot create temp file: %w", err)
+		return fmt.Errorf("cannot create temp file: %w", checkAVError(err))
 	}
 
 	totalSize := resp.ContentLength
@@ -218,7 +238,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 		hash, err := fileSHA256(newPath)
 		if err != nil {
 			_ = os.Remove(newPath)
-			return fmt.Errorf("failed to verify hash: %w", err)
+			return checkAVError(err)
 		}
 		if !strings.EqualFold(hash, expectedDigest) {
 			_ = os.Remove(newPath)
@@ -235,14 +255,14 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 	// 2. Rename running binary to .old
 	if err := os.Rename(exePath, oldPath); err != nil {
 		_ = os.Remove(newPath)
-		return fmt.Errorf("failed to rename current binary: %w", err)
+		return fmt.Errorf("failed to rename current binary: %w", checkAVError(err))
 	}
 
 	// 3. Rename .new to exePath
 	if err := os.Rename(newPath, exePath); err != nil {
 		_ = os.Rename(oldPath, exePath)
 		_ = os.Remove(newPath)
-		return fmt.Errorf("failed to place new binary: %w", err)
+		return fmt.Errorf("failed to place new binary: %w", checkAVError(err))
 	}
 
 	// 4. Launch new binary as detached process

@@ -62,6 +62,11 @@ func (a *App) StartRemovePaths(paths []string, label string) map[string]interfac
 		}
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logCrash("StartRemoveOrphanLeftover", r)
+			}
+		}()
 		deleteMu.Lock()
 		defer deleteMu.Unlock()
 		a.emitDeleteProgress(deleteProgress{JobID: jobID, Phase: "started", Percent: 5, Label: label, OK: true})
@@ -122,6 +127,11 @@ func (a *App) StartUninstallWithCleanup(appID string) map[string]interface{} {
 		}
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logCrash("StartUninstallWithCleanup", r)
+			}
+		}()
 		deleteMu.Lock()
 		defer deleteMu.Unlock()
 
