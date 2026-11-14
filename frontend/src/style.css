@@ -4549,20 +4549,24 @@ select option,
 #cleaner-drives-bar,
 .cleaner-drives-bar {
   display: flex;
-  gap: 10px;
-  padding: 12px 24px 0;
-  overflow-x: auto;
   align-items: center;
+  gap: 10px;
+  padding: 10px 24px 14px 24px;
+  margin-bottom: 4px;
+  overflow-x: auto;
 }
 
-.cleaner-drives-bar .dc-drive-card {
+.cleaner-drive-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  line-height: 1;
+  box-sizing: border-box;
   background: var(--bg-card);
   border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
@@ -4572,12 +4576,12 @@ select option,
   color: var(--text-primary);
 }
 
-.cleaner-drives-bar .dc-drive-card:hover {
+.cleaner-drive-pill:hover {
   border-color: var(--accent);
   background: var(--bg-card-hover);
 }
 
-.cleaner-drives-bar .dc-drive-card.active {
+.cleaner-drive-pill.active {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);

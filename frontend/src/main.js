@@ -4521,13 +4521,13 @@ async function renderDiskCleanDrives() {
       free: `${freeGb} ${t('unitsGB', { n: '' }).trim()}`,
     })
     return `
-      <button type="button" class="dc-drive-card ${isActive ? 'active' : ''}" data-drive="${letter}" role="tab" aria-selected="${isActive}">
+      <button type="button" class="cleaner-drive-pill dc-drive-card ${isActive ? 'active' : ''}" data-drive="${letter}" role="tab" aria-selected="${isActive}">
         <span>${escapeHtml(cardText)}</span>
       </button>
     `
   }).join('')
 
-  container.querySelectorAll('.dc-drive-card').forEach((card) => {
+  container.querySelectorAll('.cleaner-drive-pill').forEach((card) => {
     card.addEventListener('click', async (ev) => {
       ev.preventDefault()
       ev.stopPropagation()

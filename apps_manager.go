@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
@@ -65,8 +66,13 @@ var uninstallHives = []uninstallHive{
 func (a *App) ListInstalledApps() []InstalledApp {
 	seen := map[string]bool{}
 	out := make([]InstalledApp, 0, 128)
+
+	bamMap := scanBAMLaunchTimes()
+	userAssistMap := scanUserAssistLaunchTimes()
+	prefetchMap := scanPrefetchLaunchTimes()
+
 	for _, h := range uninstallHives {
-		out = append(out, scanUninstallHive(h, seen)...)
+		out = append(out, scanUninstallHive(h, seen, bamMap, userAssistMap, prefetchMap)...)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].SizeBytes == out[j].SizeBytes {
@@ -77,7 +83,7 @@ func (a *App) ListInstalledApps() []InstalledApp {
 	return out
 }
 
-func scanUninstallHive(h uninstallHive, seen map[string]bool) []InstalledApp {
+func scanUninstallHive(h uninstallHive, seen map[string]bool, bamMap, userAssistMap, prefetchMap map[string]time.Time) []InstalledApp {
 	k, err := registry.OpenKey(h.root, h.path, registry.ENUMERATE_SUB_KEYS)
 	if err != nil {
 		return nil
@@ -93,7 +99,7 @@ func scanUninstallHive(h uninstallHive, seen map[string]bool) []InstalledApp {
 		if err != nil {
 			continue
 		}
-		app, ok := readInstalledApp(sk, h, name)
+		app, ok := readInstalledApp(sk, h, name, bamMap, userAssistMap, prefetchMap)
 		sk.Close()
 		if !ok {
 			continue
@@ -108,7 +114,7 @@ func scanUninstallHive(h uninstallHive, seen map[string]bool) []InstalledApp {
 	return out
 }
 
-func readInstalledApp(k registry.Key, h uninstallHive, subName string) (InstalledApp, bool) {
+func readInstalledApp(k registry.Key, h uninstallHive, subName string, bamMap, userAssistMap, prefetchMap map[string]time.Time) (InstalledApp, bool) {
 	displayName, _, err := k.GetStringValue("DisplayName")
 	displayName = strings.TrimSpace(displayName)
 	if err != nil || displayName == "" {
@@ -163,24 +169,8 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string) (Installe
 		app.DriveLetter = "C"
 	}
 
-	// Inactivity & candidate detection
-	if loc != "" {
-		if info, err := os.Stat(loc); err == nil && info.IsDir() {
-			latest := getFolderLatestActivity(loc)
-			if !latest.IsZero() {
-				days := int(time.Since(latest).Hours() / 24)
-				if days > 0 {
-					app.LastUsedDays = days
-				}
-				if days >= 60 && app.SizeBytes >= 2*1024*1024*1024 {
-					app.CandidateCleanup = true
-					gb := float64(app.SizeBytes) / (1024 * 1024 * 1024)
-					app.CandidateBadgeRu = fmt.Sprintf("💡 Не запускалась %d дн. — можно освободить %.1f ГБ", days, gb)
-					app.CandidateBadgeEn = fmt.Sprintf("💡 Not launched for %d days — can free %.1f GB", days, gb)
-				}
-			}
-		}
-	}
+	// Inactivity & candidate detection based on real launch history (BAM, Prefetch, UserAssist, AppData)
+	app.LastUsedDays, app.CandidateCleanup, app.CandidateBadgeRu, app.CandidateBadgeEn = getAppLastLaunchDays(app, bamMap, userAssistMap, prefetchMap)
 
 	return app, true
 }
@@ -525,4 +515,357 @@ func parseWindowsCommandLine(s string) (string, []string) {
 		return "", nil
 	}
 	return parts[0], parts[1:]
+}
+
+
+func filetimeToTime(ft uint64) time.Time {
+	if ft == 0 || ft > 0x7FFFFFFFFFFFFFFF {
+		return time.Time{}
+	}
+	if ft < 116444736000000000 {
+		return time.Time{}
+	}
+	nsec := int64(ft-116444736000000000) * 100
+	t := time.Unix(0, nsec)
+	now := time.Now()
+	if t.After(now.Add(48*time.Hour)) || t.Before(now.AddDate(-15, 0, 0)) {
+		return time.Time{}
+	}
+	return t
+}
+
+func rot13(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if c >= 'a' && c <= 'z' {
+			b[i] = 'a' + (c-'a'+13)%26
+		} else if c >= 'A' && c <= 'Z' {
+			b[i] = 'A' + (c-'A'+13)%26
+		}
+	}
+	return string(b)
+}
+
+func normalizeExecutablePath(p string) string {
+	low := strings.ToLower(filepath.Clean(strings.TrimSpace(p)))
+	if idx := strings.Index(low, `\device\harddiskvolume`); idx != -1 {
+		rest := low[idx+len(`\device\harddiskvolume`):]
+		digitIdx := 0
+		for digitIdx < len(rest) && rest[digitIdx] >= '0' && rest[digitIdx] <= '9' {
+			digitIdx++
+		}
+		if digitIdx < len(rest) && rest[digitIdx] == '\\' {
+			low = rest[digitIdx+1:]
+		}
+	} else if len(low) >= 3 && low[1] == ':' && low[2] == '\\' {
+		low = low[3:]
+	}
+	return strings.TrimSpace(low)
+}
+
+func scanBAMLaunchTimes() map[string]time.Time {
+	out := make(map[string]time.Time)
+	basePaths := []string{
+		`SYSTEM\CurrentControlSet\Services\bam\State\UserSettings`,
+		`SYSTEM\CurrentControlSet\Services\bam\UserSettings`,
+	}
+	for _, bp := range basePaths {
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, bp, registry.ENUMERATE_SUB_KEYS)
+		if err != nil {
+			continue
+		}
+		subKeys, err := k.ReadSubKeyNames(-1)
+		k.Close()
+		if err != nil {
+			continue
+		}
+		for _, sk := range subKeys {
+			userK, err := registry.OpenKey(registry.LOCAL_MACHINE, bp+`\`+sk, registry.QUERY_VALUE)
+			if err != nil {
+				continue
+			}
+			valNames, err := userK.ReadValueNames(-1)
+			if err == nil {
+				for _, vn := range valNames {
+					val, valType, err := userK.GetBinaryValue(vn)
+					if err == nil && valType == registry.BINARY && len(val) >= 8 {
+						ft := binary.LittleEndian.Uint64(val[:8])
+						t := filetimeToTime(ft)
+						if !t.IsZero() {
+							norm := normalizeExecutablePath(vn)
+							if prev, exists := out[norm]; !exists || t.After(prev) {
+								out[norm] = t
+							}
+							exeBase := filepath.Base(norm)
+							if prev, exists := out[exeBase]; !exists || t.After(prev) {
+								out[exeBase] = t
+							}
+						}
+					}
+				}
+			}
+			userK.Close()
+		}
+	}
+	return out
+}
+
+func scanUserAssistLaunchTimes() map[string]time.Time {
+	out := make(map[string]time.Time)
+	base := `Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist`
+	k, err := registry.OpenKey(registry.CURRENT_USER, base, registry.ENUMERATE_SUB_KEYS)
+	if err != nil {
+		return out
+	}
+	defer k.Close()
+	subKeys, err := k.ReadSubKeyNames(-1)
+	if err != nil {
+		return out
+	}
+	for _, sk := range subKeys {
+		countPath := base + `\` + sk + `\Count`
+		ck, err := registry.OpenKey(registry.CURRENT_USER, countPath, registry.QUERY_VALUE)
+		if err != nil {
+			continue
+		}
+		valNames, err := ck.ReadValueNames(-1)
+		if err == nil {
+			for _, vn := range valNames {
+				decoded := rot13(vn)
+				if !strings.HasSuffix(strings.ToLower(decoded), ".exe") && !strings.Contains(decoded, ".exe") {
+					continue
+				}
+				val, valType, err := ck.GetBinaryValue(vn)
+				if err == nil && valType == registry.BINARY && len(val) >= 68 {
+					ft := binary.LittleEndian.Uint64(val[60:68])
+					t := filetimeToTime(ft)
+					if !t.IsZero() {
+						norm := normalizeExecutablePath(decoded)
+						if prev, exists := out[norm]; !exists || t.After(prev) {
+							out[norm] = t
+						}
+						exeBase := filepath.Base(norm)
+						if prev, exists := out[exeBase]; !exists || t.After(prev) {
+							out[exeBase] = t
+						}
+					}
+				}
+			}
+		}
+		ck.Close()
+	}
+	return out
+}
+
+func scanPrefetchLaunchTimes() map[string]time.Time {
+	out := make(map[string]time.Time)
+	entries, err := os.ReadDir(`C:\Windows\Prefetch`)
+	if err != nil {
+		return out
+	}
+	for _, e := range entries {
+		name := strings.ToLower(e.Name())
+		if strings.HasSuffix(name, ".pf") {
+			parts := strings.Split(name, "-")
+			if len(parts) >= 2 {
+				exeName := parts[0]
+				if info, err := e.Info(); err == nil {
+					mod := info.ModTime()
+					if prev, ok := out[exeName]; !ok || mod.After(prev) {
+						out[exeName] = mod
+					}
+					exeNoExt := strings.TrimSuffix(exeName, ".exe")
+					if prev, ok := out[exeNoExt]; !ok || mod.After(prev) {
+						out[exeNoExt] = mod
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func scanAppDataRecentMod(displayName string, installLocation string) time.Time {
+	var newest time.Time
+	now := time.Now()
+	roots := []string{
+		os.Getenv("LOCALAPPDATA"),
+		os.Getenv("APPDATA"),
+		filepath.Join(os.Getenv("USERPROFILE"), "Saved Games"),
+		filepath.Join(os.Getenv("USERPROFILE"), "Documents"),
+	}
+
+	var keywords []string
+	cleanName := strings.ToLower(strings.TrimSpace(displayName))
+	if cleanName != "" {
+		keywords = append(keywords, cleanName)
+		words := strings.Fields(cleanName)
+		if len(words) > 1 {
+			keywords = append(keywords, words[0])
+		}
+	}
+	if installLocation != "" {
+		base := strings.ToLower(filepath.Base(installLocation))
+		if base != "" && base != cleanName {
+			keywords = append(keywords, base)
+		}
+	}
+
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			folderLower := strings.ToLower(e.Name())
+			matched := false
+			for _, kw := range keywords {
+				if len(kw) >= 3 && (folderLower == kw || strings.Contains(folderLower, kw)) {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				fullDir := filepath.Join(root, e.Name())
+				count := 0
+				_ = filepath.Walk(fullDir, func(p string, info os.FileInfo, err error) error {
+					if err != nil {
+						return filepath.SkipDir
+					}
+					count++
+					if count > 30 {
+						return filepath.SkipDir
+					}
+					if info != nil && !info.IsDir() {
+						mod := info.ModTime()
+						if mod.After(newest) && mod.Before(now.Add(24*time.Hour)) && mod.After(now.AddDate(-1, 0, 0)) {
+							newest = mod
+						}
+					}
+					return nil
+				})
+			}
+		}
+	}
+	return newest
+}
+
+func findExecutablesInDir(dir string, maxDepth int, maxCount int) []string {
+	var exes []string
+	cleanDir := filepath.Clean(dir)
+	baseDepth := strings.Count(cleanDir, string(os.PathSeparator))
+	_ = filepath.Walk(cleanDir, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			return filepath.SkipDir
+		}
+		if len(exes) >= maxCount {
+			return filepath.SkipDir
+		}
+		if info != nil && info.IsDir() {
+			d := strings.Count(p, string(os.PathSeparator)) - baseDepth
+			if d > maxDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info != nil && strings.EqualFold(filepath.Ext(p), ".exe") {
+			exes = append(exes, p)
+		}
+		return nil
+	})
+	return exes
+}
+
+func getAppLastLaunchDays(app InstalledApp, bamMap, userAssistMap, prefetchMap map[string]time.Time) (days int, isCandidate bool, badgeRu string, badgeEn string) {
+	days = -1
+	var newest time.Time
+	now := time.Now()
+
+	loc := strings.TrimSpace(app.InstallLocation)
+	var candidateExes []string
+	if loc != "" {
+		if info, err := os.Stat(loc); err == nil && info.IsDir() {
+			candidateExes = findExecutablesInDir(loc, 2, 25)
+		}
+	}
+	if app.UninstallString != "" {
+		cmd, _ := parseWindowsCommandLine(app.UninstallString)
+		if strings.EqualFold(filepath.Ext(cmd), ".exe") {
+			candidateExes = append(candidateExes, cmd)
+		}
+	}
+
+	// 1. Check candidate executables in BAM, UserAssist, Prefetch
+	for _, exe := range candidateExes {
+		norm := normalizeExecutablePath(exe)
+		exeBase := strings.ToLower(filepath.Base(exe))
+		exeNoExt := strings.TrimSuffix(exeBase, ".exe")
+
+		if t, ok := bamMap[norm]; ok && t.After(newest) {
+			newest = t
+		}
+		if t, ok := userAssistMap[norm]; ok && t.After(newest) {
+			newest = t
+		}
+		if t, ok := prefetchMap[exeBase]; ok && t.After(newest) {
+			newest = t
+		}
+		if t, ok := prefetchMap[exeNoExt]; ok && t.After(newest) {
+			newest = t
+		}
+	}
+
+	// 2. Check BAM/UserAssist prefixes by install location
+	if loc != "" {
+		normLoc := normalizeExecutablePath(loc)
+		if len(normLoc) >= 4 {
+			for pathKey, t := range bamMap {
+				if strings.Contains(pathKey, normLoc) && t.After(newest) {
+					newest = t
+				}
+			}
+			for pathKey, t := range userAssistMap {
+				if strings.Contains(pathKey, normLoc) && t.After(newest) {
+					newest = t
+				}
+			}
+		}
+	}
+
+	// 3. Check AppData logs/saves
+	if appDataTime := scanAppDataRecentMod(app.DisplayName, loc); appDataTime.After(newest) {
+		newest = appDataTime
+	}
+
+	// Strict verification: only accept real, plausible timestamps
+	if !newest.IsZero() && newest.Before(now.Add(24*time.Hour)) && newest.After(now.AddDate(-10, 0, 0)) {
+		diffDays := int(now.Sub(newest).Hours() / 24)
+		if diffDays < 0 {
+			diffDays = 0
+		}
+		if diffDays > 365 {
+			diffDays = 365
+		}
+		days = diffDays
+
+		if days >= 60 && app.SizeBytes >= 2*1024*1024*1024 {
+			isCandidate = true
+			gb := float64(app.SizeBytes) / (1024 * 1024 * 1024)
+			if days >= 365 {
+				badgeRu = fmt.Sprintf("💡 Не запускалась более года — можно освободить %.1f ГБ", gb)
+				badgeEn = fmt.Sprintf("💡 Not launched for over a year — can free %.1f GB", gb)
+			} else {
+				badgeRu = fmt.Sprintf("💡 Не запускалась %d дн. — можно освободить %.1f ГБ", days, gb)
+				badgeEn = fmt.Sprintf("💡 Not launched for %d days — can free %.1f GB", days, gb)
+			}
+		}
+	}
+
+	return
 }
