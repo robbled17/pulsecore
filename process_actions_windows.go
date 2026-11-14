@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -52,6 +53,9 @@ func restartProcessNative(pid int) error {
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
+	cmd.SysProcAttr = &windows.SysProcAttr{
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | 0x00000008, // DETACHED_PROCESS
+	}
 	return cmd.Start()
 }
 
@@ -62,6 +66,7 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 		return nil
 	}
 
+	myPID := int32(os.Getpid())
 	type gpuCandidate struct {
 		pid   int32
 		name  string
@@ -88,7 +93,7 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 
 	candidates := make([]gpuCandidate, 0, 16)
 	for _, p := range procs {
-		if p.Pid <= 4 {
+		if p.Pid <= 4 || p.Pid == myPID {
 			continue
 		}
 		name, err := p.Name()

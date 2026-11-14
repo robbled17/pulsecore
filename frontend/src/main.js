@@ -1502,12 +1502,18 @@ async function renderGamesTab() {
   }
   const finished = sessions.filter((s) => !s.active)
   const canCompare = finished.length >= 2
-  comparePanel?.classList.toggle('hidden', !canCompare)
+  comparePanel?.classList.remove('hidden')
+  const btnCmp = $('btn-game-compare')
+  if (btnCmp) btnCmp.disabled = !canCompare
+  const out = $('game-compare-out')
+  if (!canCompare && out && !out.textContent) {
+    out.textContent = t('statsNoWeekCompare')
+  }
   const opts = finished.map((s) =>
     `<option value="${s.id}">${escapeHtml(s.name || s.exe)} (${t('unitsMinShort', { n: fmt(s.durationMin, 0) })})</option>`
   ).join('')
-  if (selA) selA.innerHTML = opts
-  if (selB) selB.innerHTML = opts
+  if (selA) selA.innerHTML = opts || `<option disabled selected>${escapeHtml(t('gameComparePick'))}</option>`
+  if (selB) selB.innerHTML = opts || `<option disabled selected>${escapeHtml(t('gameComparePick'))}</option>`
 }
 
 async function runGameCompare() {
@@ -2732,6 +2738,19 @@ function renderHardware(m) {
   }
   })
 
+  guardTile('tile-motherboard', 'tileSectionMotherboard', () => {
+    const mb = hw.motherboard || {}
+    const prod = mb.product || '-'
+    const mfg = mb.manufacturer || '-'
+    setHw('ov-mb-sum', prod !== '-' ? (mfg !== '-' && mfg !== 'Unknown' ? `${mfg} ${prod}` : prod) : '-')
+    setHw('hw-mb-mfg', mfg)
+    setHw('hw-mb-prod', prod)
+    setHw('hw-mb-ver', mb.version || '-')
+    setHw('hw-mb-bios-vendor', mb.biosVendor || '-')
+    setHw('hw-mb-bios-ver', mb.biosVersion || '-')
+    setHw('hw-mb-bios-date', mb.biosDate || '-')
+  })
+
   guardTile('tile-power', 'tileSectionPower', () => {
   if (pwr.hasBattery) {
     const ln = $('hw-pwr-lbl-name'); if (ln) ln.textContent = t('lblModel')
@@ -2761,6 +2780,18 @@ function renderHardware(m) {
         : t('desktopPC')))
     setHw('hw-pwr-cap', pwr.powerScheme || '-')
   }
+  })
+
+  guardTile('tile-net', 'tileSectionNet', () => {
+    if (netLastDetail && netLastDetail.checked) {
+      setHw('ov-net-sum', netLastDetail.publicIP ? `${netLastDetail.publicIP} · ${Math.round(netLastDetail.summaryPingMs || 0)} ms` : (netLastDetail.localIP || 'OK'))
+      setHw('home-net-local', netLastDetail.localIP || '-')
+      setHw('home-net-public', netLastDetail.publicIP || '-')
+      setHw('home-net-ping', netLastDetail.summaryPingMs >= 0 ? `${Math.round(netLastDetail.summaryPingMs)} ms` : '-')
+      setHw('home-net-status', t(netLastDetail.verdictKey || 'netVerdictOK'))
+    } else {
+      setHw('ov-net-sum', t('netNotChecked') || '-')
+    }
   })
   updateHardwareTopProcesses().catch(() => {})
 }
@@ -2954,6 +2985,7 @@ function netDetailRows(d) {
   }
   add(t('netConnType'), d.connType)
   add(t('netLocalIP'), d.localIP)
+  add(t('netPublicIP'), d.publicIP)
   if (d.gateway) {
     const ms = formatPingMs(d.gatewayMs)
     add(t('netGateway'), ms ? `${d.gateway} · ${ms}` : d.gateway)
@@ -3147,25 +3179,31 @@ async function renderSummary() {
     status.textContent = resultMsg(s) || t('statsObserving', { days: s.daysObserved || 0 })
   }
   const items = [
-    { label: t('summaryGameHours'), value: fmt(s.gameHours, 1), delta: deltaText(s.gameHours, s.prevGameHours, ' h') },
-    { label: t('summaryFreezes'), value: String(s.freezes || 0), delta: deltaText(s.freezes, s.prevFreezes) },
-    { label: t('summaryCPUPeak'), value: s.cpuTempPeak ? fmt(s.cpuTempPeak, 0) : '-', delta: deltaText(s.cpuTempPeak, s.prevCPUTempPeak, '°') },
-    { label: t('summaryGPUPeak'), value: s.gpuTempPeak ? fmt(s.gpuTempPeak, 0) : '-', delta: deltaText(s.gpuTempPeak, s.prevGPUTempPeak, '°') },
-    { label: t('summaryStable'), value: s.stableDay || '-' },
-    { label: t('summaryCulprit'), value: s.topCulprit || '-' },
-    { label: t('summaryEcoRAM'), value: `${fmt(s.ecoRAMFreedMB, 0)} MB`, delta: deltaText(s.ecoRAMFreedMB, s.prevEcoRAMMB, ' MB') },
-    { label: t('summaryEcoCount'), value: String(s.ecoCount || 0), delta: deltaText(s.ecoCount, s.prevEcoCount) },
-    { label: t('summaryHighLoad'), value: fmt(s.highLoadMin, 0), delta: deltaText(s.highLoadMin, s.prevHighLoadMin) },
+    { label: t('summaryCPUPeak'), value: s.cpuTempPeak ? `${fmt(s.cpuTempPeak, 0)}°C` : (s.cpuMax ? `${fmt(s.cpuMax, 0)}%` : '-'), delta: deltaText(s.cpuTempPeak, s.prevCPUTempPeak, '°'), color: '#f87171' },
+    { label: t('summaryFreezes'), value: String(s.freezes || 0), delta: deltaText(s.freezes, s.prevFreezes), color: '#fbbf24' },
+    { label: t('summaryGameHours'), value: `${fmt(s.gameHours, 1)} ${t('unitsH') || 'h'}`, delta: deltaText(s.gameHours, s.prevGameHours, ' h'), color: '#38bdf8' },
+    { label: t('summaryStable'), value: s.stableDay ? s.stableDay : (s.ecoRAMFreedMB ? `${fmt(s.ecoRAMFreedMB, 0)} MB` : '100%'), delta: deltaText(s.ecoRAMFreedMB, s.prevEcoRAMMB, ' MB'), color: '#4ade80' },
   ]
   cards.innerHTML = items.map((it) => `
-    <div class="summary-card">
-      <div class="label">${it.label}</div>
-      <div class="value">${escapeHtml(it.value)}</div>
+    <div class="summary-card" style="border-left: 3px solid ${it.color};">
+      <div class="label" style="display:flex;align-items:center;gap:6px;">
+        <span class="summary-dot" style="background:${it.color};"></span>
+        <span>${escapeHtml(it.label)}</span>
+      </div>
+      <div class="value" style="color: ${it.color}; font-size: 1.35rem; font-weight: 700;">${escapeHtml(it.value)}</div>
       ${it.delta ? `<div class="delta">${escapeHtml(it.delta)}</div>` : ''}
     </div>
   `).join('')
   drawSummaryChart(canvas, s.series || [])
-  if (legend) legend.textContent = `${t('summaryCPUPeak')} / ${t('summaryFreezes')} / ${t('summaryGameHours')}`
+  if (legend) {
+    legend.innerHTML = `
+      <div class="summary-legend-row" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-top:8px;">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;"><span class="summary-dot" style="background:#f87171;"></span> ${escapeHtml(t('summaryCPUPeak'))}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;"><span class="summary-dot" style="background:#fbbf24;"></span> ${escapeHtml(t('summaryFreezes'))}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;"><span class="summary-dot" style="background:#38bdf8;"></span> ${escapeHtml(t('summaryGameHours'))}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;"><span class="summary-dot" style="background:#4ade80;"></span> ${escapeHtml(t('summaryStable'))}</span>
+      </div>`
+  }
 }
 
 function drawSummaryChart(canvas, series) {
@@ -3191,7 +3229,7 @@ function drawSummaryChart(canvas, series) {
   const drawLine = (vals, color, maxV) => {
     ctx.beginPath()
     ctx.strokeStyle = color
-    ctx.lineWidth = 1.6
+    ctx.lineWidth = 2.0
     vals.forEach((v, i) => {
       const x = pad + (i / Math.max(1, n - 1)) * plotW
       const y = pad + plotH - (Math.min(maxV, Math.max(0, v)) / maxV) * plotH
@@ -3207,10 +3245,18 @@ function drawSummaryChart(canvas, series) {
   series.forEach((d, i) => {
     const mins = Object.values(d.gameMinutes || {}).reduce((a, b) => a + Number(b || 0), 0)
     const x = pad + (i / Math.max(1, n - 1)) * plotW
-    const bh = (mins / maxGame) * (plotH * 0.35)
-    ctx.fillStyle = 'rgba(56,189,248,0.45)'
-    ctx.fillRect(x - 4, pad + plotH - bh, 8, bh)
+    const bh = (mins / maxGame) * (plotH * 0.40)
+    ctx.fillStyle = 'rgba(56,189,248,0.55)'
+    ctx.fillRect(x - 5, pad + plotH - bh, 10, bh)
   })
+  // stability baseline in #4ade80
+  ctx.beginPath()
+  ctx.strokeStyle = 'rgba(74, 222, 128, 0.4)'
+  ctx.setLineDash([4, 4])
+  ctx.moveTo(pad, pad + plotH - 4)
+  ctx.lineTo(pad + plotW, pad + plotH - 4)
+  ctx.stroke()
+  ctx.setLineDash([])
 }
 
 async function copySummaryPng() {
@@ -3520,11 +3566,25 @@ function syncOverlayPill(enabled) {
   }
 }
 
+let gameOverlayTimer = null
+
 function setGameOverlayMode(enabled, skipBackend = false) {
   gameOverlayOn = !!enabled
   if (enabled) {
     document.body.classList.remove('mini-hud-active')
     $('minihud').classList.add('hidden')
+    if (!gameOverlayTimer) {
+      gameOverlayTimer = setInterval(() => {
+        if (gameOverlayOn) {
+          sampleFrametime(performance.now())
+        }
+      }, 1000)
+    }
+  } else {
+    if (gameOverlayTimer) {
+      clearInterval(gameOverlayTimer)
+      gameOverlayTimer = null
+    }
   }
   document.body.classList.toggle('game-overlay-active', enabled)
   $('gameoverlay').classList.toggle('hidden', !enabled)
@@ -3974,8 +4034,9 @@ function filteredGameList() {
   if (gameReqFit && gameReqFit !== 'all') {
     list = list.filter((g) => {
       const hit = fpsCache[g.id]
-      if (!hit || !hit.verdictLevel) return true // not scored yet - keep until warm
-      return hit.verdictLevel === gameReqFit
+      const level = hit?.verdictLevel || g.fitVerdict || g.fit?.level || g.fit?.verdictLevel || g.verdictLevel
+      if (level) return level === gameReqFit
+      return false
     })
   }
   return sortGames(list)
@@ -4131,7 +4192,11 @@ function openHiddenGamesModal() {
   list.innerHTML = hiddenGamesMeta.map((h) => {
     const title = gameDisplayName(h)
     const year = Number(h.year) > 0 ? String(h.year) : ''
-    const poster = h.posterUrl || h.headerUrl || ''
+    let poster = h.posterUrl || h.headerUrl || ''
+    if (!poster) {
+      const match = lookupCatalogGame(h.id) || (Array.isArray(gameCatalogFull) && gameCatalogFull.find((g) => g.id === h.id || g.name === h.name))
+      if (match) poster = match.posterUrl || match.headerUrl || ''
+    }
     const initials = getGameInitials(title)
     const thumbHTML = poster
       ? `<div class="hidden-game-thumb"><img src="${escapeHtml(poster)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'hidden-game-initials\\'>${escapeHtml(initials)}</span>'" /></div>`
@@ -4331,8 +4396,8 @@ function formatCompactFitDetails(p, fit) {
   const best = disks.reduce((acc, d) => ((Number(d?.freeGB) || 0) > (Number(acc?.freeGB) || 0) ? d : acc), null)
   const formatVram = (gb) => {
     if (gb <= 0) return '?'
-    if (gb < 1) return t('unitsMB', { n: fmt(gb * 1024, 0) })
-    return t('unitsGB', { n: String(Math.round(gb)) })
+    if (gb < 1) return fmt(gb * 1024, 0)
+    return String(Math.round(gb))
   }
   const vram = t('fitVramYou', {
     need: formatVram(need),
@@ -6354,6 +6419,29 @@ function wireUI() {
   })
 
   $('btn-smart-fix')?.addEventListener('click', () => { openSmartFixPlan().catch(() => {}) })
+  $('btn-home-net-diag')?.addEventListener('click', async () => {
+    const btn = $('btn-home-net-diag')
+    if (btn) btn.disabled = true
+    setHw('home-net-status', t('netProgress') || '...')
+    try {
+      let d
+      if (typeof CheckNetworkDetailed === 'function') {
+        d = await CheckNetworkDetailed(true)
+      } else {
+        d = await DiagnoseLagOrigin()
+      }
+      netLastDetail = d
+      setHw('ov-net-sum', d.publicIP ? `${d.publicIP} · ${Math.round(d.summaryPingMs || 0)} ms` : (d.localIP || 'OK'))
+      setHw('home-net-local', d.localIP || '-')
+      setHw('home-net-public', d.publicIP || '-')
+      setHw('home-net-ping', d.summaryPingMs >= 0 ? `${Math.round(d.summaryPingMs)} ms` : '-')
+      setHw('home-net-status', t(d.verdictKey || 'netVerdictOK'))
+    } catch (err) {
+      setHw('home-net-status', String(err))
+    } finally {
+      if (btn) btn.disabled = false
+    }
+  })
   $('smartfix-close')?.addEventListener('click', closeSmartFixModal)
   $('diskclean-close')?.addEventListener('click', closeDiskCleanModal)
   $('diskclean-modal')?.addEventListener('click', (ev) => {
@@ -6915,10 +7003,13 @@ function showUpdateBanner(info) {
   const notes = $('update-banner-notes')
   const actions = $('update-banner-actions')
   const progressWrap = $('update-banner-progress-wrap')
+  const updateBtn = $('btn-banner-update')
   if (!banner) return
 
-  if (title) title.textContent = t('updateAvailable', { size: info.sizeMb || 0 })
-  if (notes) notes.textContent = info.releaseNotes || ''
+  const sz = info.sizeMb || info.SizeMB || 0
+  if (title) title.textContent = t('updateBannerTitle')
+  if (notes) notes.textContent = t('updateBannerSubtitle', { size: sz })
+  if (updateBtn) updateBtn.textContent = t('updateBannerBtn')
   if (actions) actions.classList.remove('hidden')
   if (progressWrap) progressWrap.classList.add('hidden')
   banner.classList.remove('hidden')
@@ -6942,9 +7033,10 @@ async function manualCheckForUpdates() {
     const info = await CheckForUpdates()
     if (info && info.available) {
       activeUpdateInfo = info
-      status.textContent = t('updateAvailable', { size: info.sizeMb || 0 })
+      const sz = info.sizeMb || info.SizeMB || 0
+      status.textContent = t('updateBannerSubtitle', { size: sz })
       if (installBtn) {
-        installBtn.textContent = t('updateInstallBtn')
+        installBtn.textContent = t('updateBannerBtn')
         installBtn.classList.remove('hidden')
       }
       showUpdateBanner(info)
@@ -7028,11 +7120,162 @@ function updateRestartingUI() {
   if (settingsProgFill) settingsProgFill.style.width = '100%'
 }
 
+function initKeyboardNavigation() {
+  const KBD_FOCUS_CLS = 'kbd-focus'
+  let currentFocused = null
+
+  function clearKbdFocus() {
+    document.querySelectorAll('.' + KBD_FOCUS_CLS).forEach((el) => el.classList.remove(KBD_FOCUS_CLS))
+    currentFocused = null
+  }
+
+  window.addEventListener('mousemove', () => {
+    if (currentFocused) {
+      clearKbdFocus()
+    }
+  }, { passive: true })
+
+  function getScope() {
+    const openModal = document.querySelector('.modal:not(.hidden), .dialog-overlay:not(.hidden), .hud-overlay:not(.hidden)')
+    if (openModal) return openModal
+    return document.body
+  }
+
+  function getFocusableElements() {
+    const scope = getScope()
+    const selector = [
+      'button:not([disabled])',
+      'a[href]',
+      'input:not([disabled]):not([type="hidden"])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+      '.game-card',
+      '.home-tile-toggle',
+      '.tab-btn',
+      '.clean-item-check',
+      '.clean-card-btn'
+    ].join(', ')
+    const candidates = Array.from(scope.querySelectorAll(selector))
+    return candidates.filter((el) => {
+      if (el.disabled || el.getAttribute('aria-hidden') === 'true') return false
+      const style = window.getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+  }
+
+  function setFocus(el) {
+    if (!el) return
+    clearKbdFocus()
+    currentFocused = el
+    el.classList.add(KBD_FOCUS_CLS)
+    try {
+      el.focus({ preventScroll: true })
+    } catch (_) {}
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }
+
+  document.addEventListener('keydown', (ev) => {
+    const active = document.activeElement
+    const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.type !== 'checkbox' && active.type !== 'radio'
+
+    if (ev.key === 'Escape') {
+      const openModalClose = document.querySelector('.modal:not(.hidden) .modal-close, .modal:not(.hidden) [id$="-close"]')
+      if (openModalClose) {
+        ev.preventDefault()
+        openModalClose.click()
+        clearKbdFocus()
+        return
+      }
+      clearKbdFocus()
+      return
+    }
+
+    if (isTyping && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) {
+      return
+    }
+
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(ev.key)) {
+      const items = getFocusableElements()
+      if (items.length === 0) return
+
+      ev.preventDefault()
+
+      if (!currentFocused || !items.includes(currentFocused)) {
+        setFocus(items[0])
+        return
+      }
+
+      const currRect = currentFocused.getBoundingClientRect()
+      const currCx = currRect.left + currRect.width / 2
+      const currCy = currRect.top + currRect.height / 2
+
+      let bestEl = null
+      let bestDist = Infinity
+
+      for (const el of items) {
+        if (el === currentFocused) continue
+        const r = el.getBoundingClientRect()
+        const cx = r.left + r.width / 2
+        const cy = r.top + r.height / 2
+        const dx = cx - currCx
+        const dy = cy - currCy
+
+        let valid = false
+        let dist = Infinity
+
+        if (ev.key === 'ArrowRight' && dx > 8) {
+          valid = true
+          dist = Math.abs(dx) + Math.abs(dy) * 2.5
+        } else if (ev.key === 'ArrowLeft' && dx < -8) {
+          valid = true
+          dist = Math.abs(dx) + Math.abs(dy) * 2.5
+        } else if (ev.key === 'ArrowDown' && dy > 8) {
+          valid = true
+          dist = Math.abs(dy) + Math.abs(dx) * 2.5
+        } else if (ev.key === 'ArrowUp' && dy < -8) {
+          valid = true
+          dist = Math.abs(dy) + Math.abs(dx) * 2.5
+        }
+
+        if (valid && dist < bestDist) {
+          bestDist = dist
+          bestEl = el
+        }
+      }
+
+      if (!bestEl) {
+        const currIdx = items.indexOf(currentFocused)
+        if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
+          bestEl = items[(currIdx + 1) % items.length]
+        } else {
+          bestEl = items[(currIdx - 1 + items.length) % items.length]
+        }
+      }
+
+      if (bestEl) {
+        setFocus(bestEl)
+      }
+      return
+    }
+
+    if (ev.key === 'Enter') {
+      if (currentFocused && !isTyping) {
+        ev.preventDefault()
+        currentFocused.click()
+      }
+    }
+  })
+}
+
 function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark')
   applyI18n()
   wireUI()
   initUpdater()
+  initKeyboardNavigation()
   loadBehavior()
   SetLanguage(lang).catch(() => {})
   syncElevatedUI().catch(() => {})

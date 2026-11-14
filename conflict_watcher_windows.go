@@ -182,6 +182,11 @@ func (a *App) StartConflictWatcher() {
 }
 
 func (a *App) conflictWatcherLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			logCrash("conflictWatcherLoop", r)
+		}
+	}()
 	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -345,9 +350,9 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 	// Format text labels according to requirements
 	if len(procs) == 1 {
 		p := procs[0]
-		globalConflict.titleText = fmt.Sprintf("🔒 Держит процесс: %s (PID %d)", p.ProcessName, p.PID)
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит: %s (PID %d)", p.ProcessName, p.PID)
 		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
-		globalConflict.btnText = "Завершить и повторить"
+		globalConflict.btnText = "Закрыть и удалить"
 	} else if len(procs) > 1 {
 		names := make([]string, 0, len(procs))
 		for _, p := range procs {
@@ -356,13 +361,13 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 				break
 			}
 		}
-		globalConflict.titleText = fmt.Sprintf("🔒 Держит процессов (%d): %s", len(procs), strings.Join(names, ", "))
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит: %s и ещё %d", names[0], len(procs)-1)
 		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
-		globalConflict.btnText = "Завершить и повторить"
+		globalConflict.btnText = "Закрыть и удалить"
 	} else {
-		globalConflict.titleText = "🔒 Папка занята системным дескриптором"
-		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
-		globalConflict.btnText = "Повторить попытку"
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит: %s", itemName)
+		globalConflict.subText = "Папка или файл заняты процессом"
+		globalConflict.btnText = "Закрыть и удалить"
 	}
 
 	procCWPostMessageW.Call(uintptr(globalConflict.overlayHWND), msgShowOverlayCW, 0, 0)
@@ -527,23 +532,47 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 	nameLower := strings.ToLower(strings.TrimSpace(name))
 	nameWithoutExt := strings.TrimSuffix(nameLower, filepath.Ext(nameLower))
 	dirLower := strings.ToLower(strings.TrimSpace(dirPath))
+	nameWords := strings.Fields(nameLower)
+	var filteredWords []string
+	for _, w := range nameWords {
+		w = strings.Trim(w, `"'«».,;:()[]{}!?`)
+		if len(w) >= 3 {
+			filteredWords = append(filteredWords, w)
+		}
+	}
 
+	myPID := uint32(os.Getpid())
 	var out []LockProcessInfo
 	for {
+		if entry.ProcessID == myPID || entry.ProcessID <= 4 {
+			if err := windows.Process32Next(snap, &entry); err != nil {
+				break
+			}
+			continue
+		}
+
 		procName := windows.UTF16ToString(entry.ExeFile[:])
 		procNameLower := strings.ToLower(procName)
+		procBase := strings.TrimSuffix(procNameLower, ".exe")
 
 		match := false
 		if nameLower != "" {
-			if procNameLower == nameLower || strings.TrimSuffix(procNameLower, ".exe") == nameWithoutExt {
+			if procNameLower == nameLower || procBase == nameWithoutExt {
 				match = true
-			} else if strings.Contains(nameLower, procNameLower) || strings.Contains(procNameLower, nameWithoutExt) {
+			} else if strings.Contains(nameLower, procBase) || strings.Contains(procBase, nameWithoutExt) {
 				match = true
+			} else {
+				for _, w := range filteredWords {
+					if procBase == w || strings.Contains(procBase, w) || strings.Contains(w, procBase) {
+						match = true
+						break
+					}
+				}
 			}
 		}
 
-		// Also check process image path if dirPath is provided
-		if !match && dirLower != "" && entry.ProcessID > 4 {
+		// Also check process image path if dirPath or name is provided
+		if !match && entry.ProcessID > 4 {
 			if hProc, err := windows.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, entry.ProcessID); err == nil {
 				var buf [windows.MAX_PATH]uint16
 				size := uint32(len(buf))
@@ -551,14 +580,23 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 				windows.CloseHandle(hProc)
 				if r != 0 && size > 0 {
 					exePathLower := strings.ToLower(windows.UTF16ToString(buf[:size]))
-					if strings.Contains(exePathLower, dirLower) || (nameLower != "" && strings.Contains(exePathLower, nameLower)) {
+					if dirLower != "" && strings.Contains(exePathLower, dirLower) {
 						match = true
+					} else if nameLower != "" && strings.Contains(exePathLower, nameLower) {
+						match = true
+					} else {
+						for _, w := range filteredWords {
+							if strings.Contains(exePathLower, w) {
+								match = true
+								break
+							}
+						}
 					}
 				}
 			}
 		}
 
-		if match && !isProtectedSystemProcess(procName, entry.ProcessID) {
+		if match && !isProtectedSystemProcess(procName, entry.ProcessID) && !isSelfOrWebView(procName) {
 			out = append(out, LockProcessInfo{
 				PID:         entry.ProcessID,
 				ProcessName: procName,
@@ -616,6 +654,11 @@ func findRetryButton(targetHWND windows.HWND) windows.HWND {
 
 // unlockAndRetry executes the termination of blocking processes, unlocks the target path, and clicks Retry.
 func unlockAndRetry() {
+	defer func() {
+		if r := recover(); r != nil {
+			logCrash("unlockAndRetry", r)
+		}
+	}()
 	globalConflict.Lock()
 	targetHWND := globalConflict.targetHWND
 	targetPath := globalConflict.targetPath
@@ -663,6 +706,11 @@ func unlockAndRetry() {
 
 // runConflictOverlayWindowThread creates the native frameless overlay on a dedicated OS thread.
 func runConflictOverlayWindowThread() {
+	defer func() {
+		if r := recover(); r != nil {
+			logCrash("conflictOverlayWindowThread", r)
+		}
+	}()
 	runtime.LockOSThread()
 
 	hInstRaw, _, _ := procCWGetModuleHandleW.Call(0)
@@ -746,7 +794,7 @@ func conflictBarWndProc(hwnd uintptr, msg uintptr, wparam uintptr, lparam uintpt
 			uintptr(swpNoActivateCW|swpShowWindowCW),
 		)
 
-		rgn, _, _ := procCWCreateRoundRectRgn.Call(0, 0, uintptr(w), uintptr(h), 12, 12)
+		rgn, _, _ := procCWCreateRoundRectRgn.Call(0, 0, uintptr(w), uintptr(h), uintptr(h), uintptr(h))
 		if rgn != 0 {
 			procCWSetWindowRgn.Call(hwnd, rgn, 1)
 		}
@@ -826,7 +874,7 @@ func conflictBarWndProc(hwnd uintptr, msg uintptr, wparam uintptr, lparam uintpt
 		oldBrush, _, _ := procCWSelectObject.Call(hdc, btnBrush)
 		oldPen, _, _ := procCWSelectObject.Call(hdc, nullPen)
 
-		procCWRoundRect.Call(hdc, uintptr(btnRect.Left), uintptr(btnRect.Top), uintptr(btnRect.Right), uintptr(btnRect.Bottom), 8, 8)
+		procCWRoundRect.Call(hdc, uintptr(btnRect.Left), uintptr(btnRect.Top), uintptr(btnRect.Right), uintptr(btnRect.Bottom), uintptr(btnH), uintptr(btnH))
 
 		procCWSelectObject.Call(hdc, oldBrush)
 		procCWSelectObject.Call(hdc, oldPen)
@@ -880,6 +928,21 @@ func conflictBarWndProc(hwnd uintptr, msg uintptr, wparam uintptr, lparam uintpt
 		return 0
 
 	case wmDestroyCW:
+		globalConflict.Lock()
+		if globalConflict.fontTitle != 0 {
+			procCWDeleteObject.Call(uintptr(globalConflict.fontTitle))
+			globalConflict.fontTitle = 0
+		}
+		if globalConflict.fontSub != 0 {
+			procCWDeleteObject.Call(uintptr(globalConflict.fontSub))
+			globalConflict.fontSub = 0
+		}
+		if globalConflict.fontBtn != 0 {
+			procCWDeleteObject.Call(uintptr(globalConflict.fontBtn))
+			globalConflict.fontBtn = 0
+		}
+		globalConflict.overlayHWND = 0
+		globalConflict.Unlock()
 		procCWPostQuitMessage.Call(0)
 		return 0
 	}

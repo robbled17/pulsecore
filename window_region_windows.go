@@ -10,6 +10,13 @@ var (
 	modGdi32            = windows.NewLazySystemDLL("gdi32.dll")
 	procCreateRoundRect = modGdi32.NewProc("CreateRoundRectRgn")
 	procSetWindowRgn    = windows.NewLazySystemDLL("user32.dll").NewProc("SetWindowRgn")
+	procGetClassLongPtr = windows.NewLazySystemDLL("user32.dll").NewProc("GetClassLongPtrW")
+	procSetClassLongPtr = windows.NewLazySystemDLL("user32.dll").NewProc("SetClassLongPtrW")
+)
+
+const (
+	gclStyleCW     = ^uintptr(25) // -26 in two's complement (GCL_STYLE)
+	csDropShadowCW = 0x00020000
 )
 
 // ApplyOverlayWindowRegion clips the frameless PulseCore window to a rounded
@@ -21,10 +28,13 @@ func (a *App) ApplyOverlayWindowRegion(width, height, radius int) {
 	if hwnd == 0 || !hwndBelongsToUs(hwnd) || width <= 0 || height <= 0 {
 		return
 	}
-	if radius < 4 {
-		radius = 16
+	// Strip CS_DROPSHADOW to eliminate dark gray rectangular border artifacts on Win10
+	if style, _, _ := procGetClassLongPtr.Call(uintptr(hwnd), gclStyleCW); style != 0 && (style&csDropShadowCW) != 0 {
+		_, _, _ = procSetClassLongPtr.Call(uintptr(hwnd), gclStyleCW, style&^csDropShadowCW)
 	}
-	rgn, _, _ := procCreateRoundRect.Call(0, 0, uintptr(width+1), uintptr(height+1), uintptr(radius*2), uintptr(radius*2))
+
+	// Create capsule rounded region
+	rgn, _, _ := procCreateRoundRect.Call(0, 0, uintptr(width), uintptr(height), uintptr(height), uintptr(height))
 	if rgn == 0 {
 		return
 	}

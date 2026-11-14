@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"io"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -10,16 +12,17 @@ import (
 
 // NetworkDetail is the expanded Lags → Network accordion payload (real data only).
 type NetworkDetail struct {
-	OK              bool    `json:"ok"`
-	Checked         bool    `json:"checked"`
-	Cached          bool    `json:"cached"`
-	Cancelled       bool    `json:"cancelled"`
-	VerdictKey      string  `json:"verdictKey"`
-	Level           string  `json:"level"`
-	SummaryPingMs   float64 `json:"summaryPingMs"`
-	ConnType        string  `json:"connType,omitempty"`
-	LocalIP         string  `json:"localIP,omitempty"`
-	Gateway         string  `json:"gateway,omitempty"`
+	OK              bool     `json:"ok"`
+	Checked         bool     `json:"checked"`
+	Cached          bool     `json:"cached"`
+	Cancelled       bool     `json:"cancelled"`
+	VerdictKey      string   `json:"verdictKey"`
+	Level           string   `json:"level"`
+	SummaryPingMs   float64  `json:"summaryPingMs"`
+	ConnType        string   `json:"connType,omitempty"`
+	LocalIP         string   `json:"localIP,omitempty"`
+	PublicIP        string   `json:"publicIP,omitempty"`
+	Gateway         string   `json:"gateway,omitempty"`
 	GatewayMs       float64 `json:"gatewayMs"`
 	DNSServers      []string `json:"dnsServers,omitempty"`
 	DNSMs           float64 `json:"dnsMs"`
@@ -104,6 +107,7 @@ func collectNetworkDetail(ctx context.Context) NetworkDetail {
 	info := probeNetworkAdapterInfo()
 	out.ConnType = info.ConnType
 	out.LocalIP = info.LocalIP
+	out.PublicIP = resolvePublicIP()
 	out.Gateway = info.Gateway
 	out.DNSServers = info.DNS
 	out.AdapterName = info.AdapterName
@@ -212,4 +216,23 @@ func maskSSIDForReport(ssid string) string {
 		return "**"
 	}
 	return string([]rune(ssid)[:1]) + "***"
+}
+
+func resolvePublicIP() string {
+	client := &http.Client{Timeout: 2 * time.Second}
+	for _, endpoint := range []string{"https://api.ipify.org", "https://icanhazip.com"} {
+		resp, err := client.Get(endpoint)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			b, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
+			_ = resp.Body.Close()
+			ipStr := strings.TrimSpace(string(b))
+			if net.ParseIP(ipStr) != nil {
+				return ipStr
+			}
+		}
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}
+	return ""
 }

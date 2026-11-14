@@ -254,6 +254,10 @@ export function GetMonthlyAppReport() {
   return window['go']['main']['App']['GetMonthlyAppReport']();
 }
 
+export function GetMotherboardInfo() {
+  return window['go']['main']['App']['GetMotherboardInfo']();
+}
+
 export function GetNetworkMonitor() {
   return window['go']['main']['App']['GetNetworkMonitor']();
 }

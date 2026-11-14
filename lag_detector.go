@@ -15,6 +15,11 @@ const (
 // A PulseCore schedule delay alone is never treated as a proven global Windows freeze.
 func (a *App) startLagDetector() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logCrash("lagDetector", r)
+			}
+		}()
 		// Startup grace: window may be hidden / cold-start; skip false first incident.
 		select {
 		case <-a.stopWorker:

@@ -20,6 +20,11 @@ var assets embed.FS
 var appIcon []byte
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			logCrash("main", r)
+		}
+	}()
 	_ = appIcon // keep embed referenced; Wails packages build/windows/icon.ico into the EXE
 	for _, arg := range os.Args[1:] {
 		if strings.EqualFold(arg, "--dev") {

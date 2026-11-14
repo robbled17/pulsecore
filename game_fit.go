@@ -125,45 +125,47 @@ func EvaluateGameFitUnified(sys SystemPowerProfile, game GameInfo, req gameReqSe
 
 	gpuMin := ratio(sys.GPUPowerScore, req.Low.ReqGPUScore)
 	cpuMin := ratio(sys.CPUPowerScore, req.Low.ReqCPUScore)
-	gpuRec := ratio(sys.GPUPowerScore, recVRAM)
+	gpuRec := ratio(sys.GPUPowerScore, req.High.ReqGPUScore)
 
-	// 1. Deficit ("Не хватит")
-	if minVRAM > 0 && userVRAM+0.05 < minVRAM {
+	// 1. Deficit ("Не хватит") - only for hard hardware shortages:
+	if minVRAM > 0 && userVRAM+0.1 < minVRAM {
 		return "deficit", "bad", "Не хватит", "Not enough",
 			fmt.Sprintf("VRAM %.0f ГБ, требуется минимум %.0f ГБ", userVRAM, minVRAM),
 			fmt.Sprintf("VRAM %.0f GB, minimum %.0f GB required", userVRAM, minVRAM)
 	}
-	if minRAM > 0 && userRAM+0.05 < minRAM {
+	if minRAM > 0 && userRAM+0.5 < minRAM {
 		return "deficit", "bad", "Не хватит", "Not enough",
 			fmt.Sprintf("ОЗУ %.0f ГБ, требуется минимум %.0f ГБ", userRAM, minRAM),
 			fmt.Sprintf("RAM %.0f GB, minimum %.0f GB required", userRAM, minRAM)
 	}
-	if gpuMin < 0.85 && req.Low.ReqGPUScore > 0 {
+	if sys.IsIntegrated && minVRAM >= 4.0 {
 		return "deficit", "bad", "Не хватит", "Not enough",
-			"видеокарта слабее минимальных требований",
-			"GPU is below minimum requirements"
+			"встроенная графика (iGPU) не подходит для тяжелых игр",
+			"Integrated graphics (iGPU) is not suitable for heavy games"
 	}
-	if cpuMin < 0.80 && req.Low.ReqCPUScore > 0 {
+	if req.Low.ReqGPUScore > 0 && gpuMin < 0.50 {
 		return "deficit", "bad", "Не хватит", "Not enough",
-			"процессор слабее минимальных требований",
-			"CPU is below minimum requirements"
+			"видеокарта существенно слабее минимальных требований",
+			"GPU is significantly below minimum requirements"
+	}
+	if req.Low.ReqCPUScore > 0 && cpuMin < 0.50 {
+		return "deficit", "bad", "Не хватит", "Not enough",
+			"процессор существенно слабее минимальных требований",
+			"CPU is significantly below minimum requirements"
 	}
 
-	// 2. Tight ("Впритык")
-	if recVRAM > 0 && userVRAM+0.05 < recVRAM {
-		return "tight", "warn", "Впритык", "Barely",
-			fmt.Sprintf("VRAM %.0f ГБ, рекомендуется %.0f ГБ", userVRAM, recVRAM),
-			fmt.Sprintf("VRAM %.0f GB, recommended %.0f GB", userVRAM, recVRAM)
-	}
-	if recRAM > 0 && userRAM+0.05 < recRAM {
-		return "tight", "warn", "Впритык", "Barely",
-			fmt.Sprintf("ОЗУ %.0f ГБ, рекомендуется %.0f ГБ", userRAM, recRAM),
-			fmt.Sprintf("RAM %.0f GB, recommended %.0f GB", userRAM, recRAM)
-	}
-	if gpuRec < 0.95 && req.High.ReqGPUScore > 0 {
-		return "tight", "warn", "Впритык", "Barely",
-			"видеокарта слабее рекомендованной",
-			"GPU is below recommended"
+	// 2. Tight ("Впритык") - meets minimums, but below high/recommended
+	if (recVRAM > 0 && userVRAM+0.1 < recVRAM) || (recRAM > 0 && userRAM+0.5 < recRAM) || (req.High.ReqGPUScore > 0 && gpuRec < 0.90) || (req.Low.ReqGPUScore > 0 && gpuMin < 0.95) {
+		reasonRu := "подходит для минимальных и средних настроек"
+		reasonEn := "suitable for minimum to medium settings"
+		if recVRAM > 0 && userVRAM+0.1 < recVRAM {
+			reasonRu = fmt.Sprintf("VRAM %.0f ГБ, для ультра рекомендуется %.0f ГБ", userVRAM, recVRAM)
+			reasonEn = fmt.Sprintf("VRAM %.0f GB, recommended %.0f GB for ultra", userVRAM, recVRAM)
+		} else if recRAM > 0 && userRAM+0.5 < recRAM {
+			reasonRu = fmt.Sprintf("ОЗУ %.0f ГБ, рекомендуется %.0f ГБ", userRAM, recRAM)
+			reasonEn = fmt.Sprintf("RAM %.0f GB, recommended %.0f GB", userRAM, recRAM)
+		}
+		return "tight", "warn", "Впритык", "Barely", reasonRu, reasonEn
 	}
 
 	// 3. Great ("Отлично")

@@ -40,11 +40,11 @@
 
   <div id="gameoverlay" class="gameoverlay hidden">
     <div class="gameoverlay-metrics">
-      <span class="ov-badge ov-fps">FPS <b id="go-fps">--</b></span>
-      <span class="ov-badge ov-low">1% Low <b id="go-low">--</b></span>
-      <span class="ov-badge ov-ft">Frametime <b id="go-ft">--</b></span>
+      <span class="ov-badge ov-fps" data-i18n-title="overlayFpsTip" title="Текущая частота кадров в секунду"><span data-i18n="overlayFps">Кадры/с</span> <span class="ov-info">(i)</span> <b id="go-fps">--</b></span>
+      <span class="ov-badge ov-low" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров — показатель плавности и отсутствия микрофризов"><span data-i18n="overlayLow">1% Редкие</span> <span class="ov-info">(i)</span> <b id="go-low">--</b></span>
+      <span class="ov-badge ov-ft" data-i18n-title="overlayFtTip" title="Время отрисовки одного кадра в миллисекундах"><span data-i18n="overlayFt">Время кадра</span> <span class="ov-info">(i)</span> <b id="go-ft">--</b></span>
     </div>
-    <button type="button" id="go-close" class="ov-close hud-nodrag" data-i18n-title="overlayClose" title="Close">✕</button>
+    <button type="button" id="go-close" class="ov-close hud-nodrag" data-i18n-title="overlayClose" title="Закрыть">✕</button>
   </div>
 
   <div id="shell" class="shell">
@@ -193,6 +193,24 @@
             </div>
           </div>
 
+          <div class="home-tile" id="tile-motherboard">
+            <button type="button" class="home-tile-toggle" aria-expanded="false" aria-controls="tile-mb-body">
+              <span class="tile-label" data-i18n="motherboardTitle">Материнская плата</span>
+              <span class="tile-summary" id="ov-mb-sum"></span>
+              <span class="tile-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="tile-body" id="tile-mb-body">
+              <div class="hw-grid">
+                <div><span class="muted" data-i18n="lblManufacturer">Производитель</span><div class="hw-val" id="hw-mb-mfg">-</div></div>
+                <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-mb-prod">-</div></div>
+                <div><span class="muted" data-i18n="lblVersion">Версия платы</span><div class="hw-val" id="hw-mb-ver">-</div></div>
+                <div><span class="muted" data-i18n="lblBiosVendor">Вендор BIOS</span><div class="hw-val" id="hw-mb-bios-vendor">-</div></div>
+                <div><span class="muted" data-i18n="lblBiosVer">Версия BIOS</span><div class="hw-val" id="hw-mb-bios-ver">-</div></div>
+                <div><span class="muted" data-i18n="lblBiosDate">Дата BIOS</span><div class="hw-val" id="hw-mb-bios-date">-</div></div>
+              </div>
+            </div>
+          </div>
+
           <div class="home-tile" id="tile-disks">
             <button type="button" class="home-tile-toggle" aria-expanded="false" aria-controls="tile-disks-body">
               <span class="tile-label" data-i18n="disksTitle">Диски</span>
@@ -244,6 +262,28 @@
                 </button>
               </div>
               <div class="meta hidden" id="power-switch-status" role="status"></div>
+            </div>
+          </div>
+
+          <div class="home-tile" id="tile-net">
+            <button type="button" class="home-tile-toggle" aria-expanded="false" aria-controls="tile-net-body">
+              <span class="tile-label" data-i18n="netTitle">Сеть</span>
+              <span class="tile-summary" id="ov-net-sum"></span>
+              <span class="tile-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="tile-body" id="tile-net-body">
+              <div class="row-between" style="margin-bottom:8px">
+                <span class="muted" data-i18n="netDiagTitle">Диагностика сети</span>
+                <button type="button" class="btn primary compact" id="btn-home-net-diag" data-i18n="netCheckNetwork">Проверить сеть</button>
+              </div>
+              <div id="home-net-diag-box">
+                <div class="hw-grid">
+                  <div><span class="muted" data-i18n="netLocalIP">Локальный IP</span><div class="hw-val" id="home-net-local">-</div></div>
+                  <div><span class="muted" data-i18n="netPublicIP">Публичный IP</span><div class="hw-val" id="home-net-public">-</div></div>
+                  <div><span class="muted" data-i18n="netPing">Пинг</span><div class="hw-val" id="home-net-ping">-</div></div>
+                  <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="home-net-status">-</div></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -371,7 +411,7 @@
           </div>
           <div id="game-sessions" class="list"></div>
         </div>
-        <div class="panel hidden" id="game-compare-panel">
+        <div class="panel" id="game-compare-panel">
           <div class="panel-title" data-i18n="gameCompare">Сравнение двух сессий</div>
           <div class="btn-row" style="flex-wrap:wrap;gap:8px">
             <select id="game-cmp-a" class="lang-select"></select>

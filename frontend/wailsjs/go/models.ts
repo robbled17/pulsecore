@@ -1443,6 +1443,28 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class MotherboardDeepInfo {
+	    manufacturer: string;
+	    product: string;
+	    version: string;
+	    biosVendor: string;
+	    biosVersion: string;
+	    biosDate: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MotherboardDeepInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.manufacturer = source["manufacturer"];
+	        this.product = source["product"];
+	        this.version = source["version"];
+	        this.biosVendor = source["biosVendor"];
+	        this.biosVersion = source["biosVersion"];
+	        this.biosDate = source["biosDate"];
+	    }
+	}
 	export class PowerDeepInfo {
 	    hasBattery: boolean;
 	    wearPercent: number;
@@ -1522,6 +1544,7 @@ export namespace main {
 	    gpu: GPUDeepInfo;
 	    ram: RAMDeepInfo;
 	    power: PowerDeepInfo;
+	    motherboard: MotherboardDeepInfo;
 	
 	    static createFrom(source: any = {}) {
 	        return new HardwareInfo(source);
@@ -1533,6 +1556,7 @@ export namespace main {
 	        this.gpu = this.convertValues(source["gpu"], GPUDeepInfo);
 	        this.ram = this.convertValues(source["ram"], RAMDeepInfo);
 	        this.power = this.convertValues(source["power"], PowerDeepInfo);
+	        this.motherboard = this.convertValues(source["motherboard"], MotherboardDeepInfo);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2168,6 +2192,7 @@ export namespace main {
 		    return a;
 		}
 	}
+	
 	export class NetworkDetail {
 	    ok: boolean;
 	    checked: boolean;
@@ -2178,6 +2203,7 @@ export namespace main {
 	    summaryPingMs: number;
 	    connType?: string;
 	    localIP?: string;
+	    publicIP?: string;
 	    gateway?: string;
 	    gatewayMs: number;
 	    dnsServers?: string[];
@@ -2207,6 +2233,7 @@ export namespace main {
 	        this.summaryPingMs = source["summaryPingMs"];
 	        this.connType = source["connType"];
 	        this.localIP = source["localIP"];
+	        this.publicIP = source["publicIP"];
 	        this.gateway = source["gateway"];
 	        this.gatewayMs = source["gatewayMs"];
 	        this.dnsServers = source["dnsServers"];

@@ -129,6 +129,8 @@ export function GetMiniHUDSettings():Promise<Record<string, any>>;
 
 export function GetMonthlyAppReport():Promise<main.MonthlyAppReport>;
 
+export function GetMotherboardInfo():Promise<main.MotherboardDeepInfo>;
+
 export function GetNetworkMonitor():Promise<main.NetworkMonitorSnapshot>;
 
 export function GetProcessAnomalies():Promise<Array<main.ProcessAnomaly>>;

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -345,15 +346,21 @@ func (a *App) isThrottledProcess(name string) bool {
 func (a *App) metricsWorker() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("recovered in metricsWorker: %v", r)
+			logCrash("metricsWorker-fatal", r)
 		}
 	}()
-	a.collectOnce()
 	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logCrash("metricsWorker-loop", r)
+				}
+			}()
+			a.collectOnce()
+		}()
 		if !a.pauseCollect() {
 			return
 		}
-		a.collectOnce()
 	}
 }
 
@@ -965,7 +972,7 @@ func (a *App) TriggerThermalCheck(temp float64) {
 func (a *App) emitThermalAlarm(temp float64) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("recovered in emitThermalAlarm: %v", r)
+			logCrash("emitThermalAlarm", r)
 		}
 	}()
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
@@ -1082,7 +1089,7 @@ func (a *App) positionGameOverlay() {
 func (a *App) peripheralsWatchdog() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("recovered in peripheralsWatchdog: %v", r)
+			logCrash("peripheralsWatchdog", r)
 		}
 	}()
 	ticker := time.NewTicker(8 * time.Second)
@@ -1577,9 +1584,16 @@ func isSelfOrWebView(name string) bool {
 	switch base {
 	case "pulsecore.exe", "zeropulse.exe", "zeropulse-gui.exe", "msedgewebview2.exe", "wails.exe":
 		return true
-	default:
-		return false
 	}
+	if strings.Contains(base, "pulsecore") || strings.Contains(base, "webview2") {
+		return true
+	}
+	if myExe, err := os.Executable(); err == nil && myExe != "" {
+		if strings.EqualFold(base, filepath.Base(myExe)) {
+			return true
+		}
+	}
+	return false
 }
 
 func processIcon(name string) string {

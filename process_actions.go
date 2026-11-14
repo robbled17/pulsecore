@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 )
 
 type HardwareProcessItem struct {
@@ -43,7 +44,11 @@ func (a *App) GetHardwareTopProcesses() HardwareTopProcesses {
 		RAM: make([]HardwareProcessItem, 0, len(topRAM)),
 	}
 
+	myPID := int32(os.Getpid())
 	for _, p := range topCPU {
+		if p.PID == myPID || isSelfOrWebView(p.Name) {
+			continue
+		}
 		out.CPU = append(out.CPU, HardwareProcessItem{
 			PID:        p.PID,
 			Name:       p.Name,
@@ -53,6 +58,9 @@ func (a *App) GetHardwareTopProcesses() HardwareTopProcesses {
 	}
 
 	for _, p := range topRAM {
+		if p.PID == myPID || isSelfOrWebView(p.Name) {
+			continue
+		}
 		out.RAM = append(out.RAM, HardwareProcessItem{
 			PID:        p.PID,
 			Name:       p.Name,

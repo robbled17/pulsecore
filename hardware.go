@@ -93,10 +93,20 @@ type DiskHealthReport struct {
 
 // HardwareInfo is a structured deep-dive inventory.
 type HardwareInfo struct {
-	CPU   CPUDeepInfo   `json:"cpu"`
-	GPU   GPUDeepInfo   `json:"gpu"`
-	RAM   RAMDeepInfo   `json:"ram"`
-	Power PowerDeepInfo `json:"power"`
+	CPU         CPUDeepInfo         `json:"cpu"`
+	GPU         GPUDeepInfo         `json:"gpu"`
+	RAM         RAMDeepInfo         `json:"ram"`
+	Power       PowerDeepInfo       `json:"power"`
+	Motherboard MotherboardDeepInfo `json:"motherboard"`
+}
+
+type MotherboardDeepInfo struct {
+	Manufacturer string `json:"manufacturer"`
+	Product      string `json:"product"`
+	Version      string `json:"version"`
+	BIOSVendor   string `json:"biosVendor"`
+	BIOSVersion  string `json:"biosVersion"`
+	BIOSDate     string `json:"biosDate"`
 }
 
 type CPUDeepInfo struct {
@@ -173,6 +183,7 @@ type staticHardware struct {
 	ramModuleModel  string
 	ramPartNumber   string
 	ramManufacturer string
+	motherboard     MotherboardDeepInfo
 }
 
 func collectStaticHardware() staticHardware {
@@ -180,6 +191,7 @@ func collectStaticHardware() staticHardware {
 		cpuName: readCPUName(),
 		gpuName: "Unknown GPU",
 	}
+	out.motherboard = readMotherboardInfo()
 	if phys, err := cpu.Counts(false); err == nil {
 		out.physicalCores = phys
 	}
@@ -194,7 +206,7 @@ func collectStaticHardware() staticHardware {
 	}
 	out.gpuName, out.gpuVRAM, out.gpuDriver = readGPUInfoDetailed()
 	out.ramType, out.ramSlotsUsed, out.ramSlotsTotal, out.ramSpeedMHz,
-		out.ramManufacturer, out.ramPartNumber, out.ramModuleModel = readRAMSlots()
+		out.ramManufacturer, out.ramPartNumber, out.ramModuleModel = readRAMSlots(out.motherboard.Product)
 	return out
 }
 
@@ -510,7 +522,101 @@ func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 	return false
 }
 
-func readRAMSlots() (memType string, used, total, speed int, manufacturer, partNumber, moduleModel string) {
+func (a *App) GetMotherboardInfo() MotherboardDeepInfo {
+	return a.staticHW.motherboard
+}
+
+func isTwoSlotBoard(name string) bool {
+	low := strings.ToLower(name)
+	twoSlotKeywords := []string{
+		"-k", "-hdv", "-s2h", "-ds3h", "prime b450m-k", "prime a320m-k",
+		"h510m", "h410m", "h610m", "a320m", "a520m", "a620m", "b450m-k", "b550m-k",
+		"b450m-hdv", "b550m-hdv", "a320m-hdv", "h310m", "h110m", "b365m-k",
+	}
+	for _, kw := range twoSlotKeywords {
+		if strings.Contains(low, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func readMotherboardInfo() MotherboardDeepInfo {
+	ensureOLE()
+	out := MotherboardDeepInfo{
+		Manufacturer: "Unknown",
+		Product:      "Motherboard",
+	}
+
+	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	if err != nil {
+		return out
+	}
+	defer locator.Release()
+	dl, err := locator.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return out
+	}
+	defer dl.Release()
+	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+	if err != nil {
+		return out
+	}
+	service := serviceRaw.ToIDispatch()
+	defer service.Release()
+
+	// Win32_BaseBoard
+	if resRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT Manufacturer, Product, Version FROM Win32_BaseBoard"); err == nil {
+		res := resRaw.ToIDispatch()
+		defer res.Release()
+		cVar, _ := oleutil.GetProperty(res, "Count")
+		if int(cVar.Val) > 0 {
+			if itemRaw, err := oleutil.CallMethod(res, "ItemIndex", 0); err == nil {
+				item := itemRaw.ToIDispatch()
+				defer item.Release()
+				if v, err := oleutil.GetProperty(item, "Manufacturer"); err == nil && v != nil {
+					out.Manufacturer = cleanRAMManufacturer(v.ToString())
+				}
+				if v, err := oleutil.GetProperty(item, "Product"); err == nil && v != nil {
+					out.Product = strings.TrimSpace(v.ToString())
+				}
+				if v, err := oleutil.GetProperty(item, "Version"); err == nil && v != nil {
+					out.Version = strings.TrimSpace(v.ToString())
+				}
+			}
+		}
+	}
+
+	// Win32_BIOS
+	if resRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT Manufacturer, SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS"); err == nil {
+		res := resRaw.ToIDispatch()
+		defer res.Release()
+		cVar, _ := oleutil.GetProperty(res, "Count")
+		if int(cVar.Val) > 0 {
+			if itemRaw, err := oleutil.CallMethod(res, "ItemIndex", 0); err == nil {
+				item := itemRaw.ToIDispatch()
+				defer item.Release()
+				if v, err := oleutil.GetProperty(item, "Manufacturer"); err == nil && v != nil {
+					out.BIOSVendor = strings.TrimSpace(v.ToString())
+				}
+				if v, err := oleutil.GetProperty(item, "SMBIOSBIOSVersion"); err == nil && v != nil {
+					out.BIOSVersion = strings.TrimSpace(v.ToString())
+				}
+				if v, err := oleutil.GetProperty(item, "ReleaseDate"); err == nil && v != nil {
+					d := strings.TrimSpace(v.ToString())
+					if len(d) >= 8 {
+						out.BIOSDate = fmt.Sprintf("%s-%s-%s", d[0:4], d[4:6], d[6:8])
+					} else {
+						out.BIOSDate = d
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func readRAMSlots(mbProduct ...string) (memType string, used, total, speed int, manufacturer, partNumber, moduleModel string) {
 	ensureOLE()
 	memType = "Unknown"
 	used = 0
@@ -535,7 +641,7 @@ func readRAMSlots() (memType string, used, total, speed int, manufacturer, partN
 	defer service.Release()
 
 	resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
-		"SELECT MemoryType, SMBIOSMemoryType, Speed, Capacity, Manufacturer, PartNumber FROM Win32_PhysicalMemory")
+		"SELECT MemoryType, SMBIOSMemoryType, Speed, Capacity, Manufacturer, PartNumber, FormFactor FROM Win32_PhysicalMemory")
 	if err != nil {
 		return
 	}
@@ -551,6 +657,7 @@ func readRAMSlots() (memType string, used, total, speed int, manufacturer, partN
 	}
 	typeCode := -1
 	var totalCap uint64
+	isSODIMM := false
 	parts := make([]string, 0, count)
 	mfgs := make([]string, 0, count)
 	for i := 0; i < count; i++ {
@@ -565,6 +672,10 @@ func readRAMSlots() (memType string, used, total, speed int, manufacturer, partN
 		capVar, _ := oleutil.GetProperty(item, "Capacity")
 		mfgVar, _ := oleutil.GetProperty(item, "Manufacturer")
 		partVar, _ := oleutil.GetProperty(item, "PartNumber")
+		ffVar, _ := oleutil.GetProperty(item, "FormFactor")
+		if ffVar != nil && int(ffVar.Val) == 12 {
+			isSODIMM = true
+		}
 		item.Release()
 		if typeCode < 0 {
 			typeCode = int(smbiosVar.Val)
@@ -614,6 +725,13 @@ func readRAMSlots() (memType string, used, total, speed int, manufacturer, partN
 				}
 			}
 		}
+	}
+	prod := ""
+	if len(mbProduct) > 0 {
+		prod = mbProduct[0]
+	}
+	if total > 2 && used <= 2 && (isSODIMM || isTwoSlotBoard(prod)) {
+		total = 2
 	}
 	return
 }
@@ -846,8 +964,9 @@ func buildHardwareInfo(static staticHardware, cpuPct float64, perCore []float64,
 				VRAMGB:        vramGB,
 			}
 		}(),
-		RAM:   buildRAMDeepInfo(static, totalMB, usedMB, freeMB, pct),
-		Power: power,
+		RAM:         buildRAMDeepInfo(static, totalMB, usedMB, freeMB, pct),
+		Power:       power,
+		Motherboard: static.motherboard,
 	}
 }
 
