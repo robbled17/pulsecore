@@ -11,12 +11,16 @@ import (
 
 func clearReadOnlyAttr(path string) {}
 
-func ForceDeleteAll(path string) error {
+func FastDeleteDirectory(path string) error {
 	path = filepath.Clean(strings.TrimSpace(path))
 	if path == "" {
 		return fmt.Errorf("empty path")
 	}
 	return os.RemoveAll(path)
+}
+
+func ForceDeleteAll(path string) error {
+	return FastDeleteDirectory(path)
 }
 
 func isDeletableInstallPath(p string) bool { return isSafeAppLeftoverPath(p) }

@@ -45,17 +45,52 @@ type shellExecuteInfoW struct {
 	hProcess     windows.Handle
 }
 
+// queryRecycleBinInfo queries SHQueryRecycleBinW (all drives). Returns (size, items, err).
+func queryRecycleBinInfo() (int64, int64, error) {
+	// SHQUERYRBINFO: DWORD cbSize, padding, int64 i64Size, int64 i64NumItems.
+	var info struct {
+		cbSize uint32
+		_      uint32
+		size   int64
+		items  int64
+	}
+	info.cbSize = uint32(unsafe.Sizeof(info))
+	r, _, err := procSHQueryRecycleBinW.Call(0, uintptr(unsafe.Pointer(&info)))
+	if r != 0 {
+		return -1, -1, err
+	}
+	size := info.size
+	if size < 0 {
+		size = 0
+	}
+	items := info.items
+	if items < 0 {
+		items = 0
+	}
+	return size, items, nil
+}
+
 // emptyRecycleBinNative calls SHEmptyRecycleBinW for all drives (hwnd=0, pszRootPath=nil).
+// It verifies bin state beforehand to avoid ERROR_FILE_NOT_FOUND when already empty.
 func emptyRecycleBinNative() error {
-	r, _, err := procSHEmptyRecycleBinW.Call(
+	size, items, err := queryRecycleBinInfo()
+	if err == nil && (size == 0 || items == 0) {
+		return nil
+	}
+	r, _, callErr := procSHEmptyRecycleBinW.Call(
 		0,
 		0, // nil = all bins
 		uintptr(sherbNoConfirmation|sherbNoProgressUI|sherbNoSound),
 	)
 	if r != 0 {
 		// S_OK == 0; non-zero HRESULT
-		if err != windows.ERROR_SUCCESS && err != nil {
-			return err
+		// If call returned an error, recheck if the recycle bin is actually empty now
+		sizeAfter, itemsAfter, errAfter := queryRecycleBinInfo()
+		if errAfter == nil && (sizeAfter == 0 || itemsAfter == 0) {
+			return nil
+		}
+		if callErr != windows.ERROR_SUCCESS && callErr != nil {
+			return callErr
 		}
 		return windows.Errno(r)
 	}
@@ -65,22 +100,11 @@ func emptyRecycleBinNative() error {
 
 // queryRecycleBinBytes uses SHQueryRecycleBinW (all drives). -1 means the call failed.
 func queryRecycleBinBytes() int64 {
-	// SHQUERYRBINFO: DWORD cbSize, padding, int64 i64Size, int64 i64NumItems.
-	var info struct {
-		cbSize uint32
-		_      uint32
-		size   int64
-		items  int64
-	}
-	info.cbSize = uint32(unsafe.Sizeof(info))
-	r, _, _ := procSHQueryRecycleBinW.Call(0, uintptr(unsafe.Pointer(&info)))
-	if r != 0 {
+	size, _, err := queryRecycleBinInfo()
+	if err != nil {
 		return -1
 	}
-	if info.size < 0 {
-		return 0
-	}
-	return info.size
+	return size
 }
 
 // runElevatedPowerShell runs PowerShell code with UTF-8 encoding and elevation when needed.

@@ -860,6 +860,7 @@
   "homeRevertLoading": "Қалпына келтіру…",
   "diskCleanRecycleTitle": "Windows себеті",
   "diskCleanRecycleAction": "Себетті тазалау",
+  "recycleBinEmptyStatus": "Бос",
   "diskCleanSearchLeftovers": "Қалдықтарды іздеу",
   "diskCleanCreateRP": "Қалпына келтіру нүктесін жасау",
   "diskCleanCreateRPWorking": "Қалпына келтіру нүктесі жасалуда…",

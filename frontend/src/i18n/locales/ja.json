@@ -860,6 +860,7 @@
   "homeRevertLoading": "元に戻しています…",
   "diskCleanRecycleTitle": "Windows のごみ箱",
   "diskCleanRecycleAction": "ごみ箱を空にする",
+  "recycleBinEmptyStatus": "空",
   "diskCleanSearchLeftovers": "残骸を検索",
   "diskCleanCreateRP": "復元ポイントを作成",
   "diskCleanCreateRPWorking": "復元ポイントを作成しています…",

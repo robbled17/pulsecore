@@ -152,9 +152,31 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string, bamMap, u
 	if kb, _, err := k.GetIntegerValue("EstimatedSize"); err == nil && kb > 0 {
 		app.SizeBytes = int64(kb) * 1024
 	}
-	if app.SizeBytes <= 0 && app.InstallLocation != "" {
-		if info, err := os.Stat(app.InstallLocation); err == nil && info.IsDir() {
-			app.SizeBytes = dirSizeBudget(app.InstallLocation, time.Now().Add(800*time.Millisecond), 4)
+
+	cleanLoc := strings.Trim(strings.TrimSpace(app.InstallLocation), `"'`)
+	if cleanLoc != "" && filepath.IsAbs(cleanLoc) {
+		if info, err := os.Stat(cleanLoc); err == nil && info.IsDir() {
+			realSize := dirSizeBudget(cleanLoc, time.Now().Add(800*time.Millisecond), 4)
+			if realSize > 0 {
+				app.SizeBytes = realSize
+			}
+		} else if err != nil && os.IsNotExist(err) {
+			// InstallLocation was deleted externally: verify if uninstaller still exists
+			if !appHasExistingFiles(app.UninstallString, app.QuietUninstall) {
+				return InstalledApp{}, false
+			}
+		}
+	} else if app.InstallLocation == "" && app.UninstallString != "" {
+		exe, _ := parseWindowsCommandLine(app.UninstallString)
+		if exe != "" && filepath.IsAbs(exe) {
+			if _, err := os.Stat(exe); err != nil && os.IsNotExist(err) && app.SizeBytes <= 0 {
+				return InstalledApp{}, false
+			}
+		}
+	}
+	if app.SizeBytes <= 0 && cleanLoc != "" {
+		if info, err := os.Stat(cleanLoc); err == nil && info.IsDir() {
+			app.SizeBytes = dirSizeBudget(cleanLoc, time.Now().Add(800*time.Millisecond), 4)
 		}
 	}
 	app.SizeLabel = formatSizeLabel(app.SizeBytes)
@@ -173,6 +195,22 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string, bamMap, u
 	app.LastUsedDays, app.CandidateCleanup, app.CandidateBadgeRu, app.CandidateBadgeEn = getAppLastLaunchDays(app, bamMap, userAssistMap, prefetchMap)
 
 	return app, true
+}
+
+func appHasExistingFiles(uninstallStr, quietUninstallStr string) bool {
+	for _, s := range []string{uninstallStr, quietUninstallStr} {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		exe, _ := parseWindowsCommandLine(s)
+		if exe != "" && filepath.IsAbs(exe) {
+			if fi, err := os.Stat(exe); err == nil && !fi.IsDir() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getFolderLatestActivity(dir string) time.Time {

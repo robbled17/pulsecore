@@ -860,6 +860,7 @@
   "homeRevertLoading": "Кире кайтару…",
   "diskCleanRecycleTitle": "Windows кәрзине",
   "diskCleanRecycleAction": "Кәрзинне чистарту",
+  "recycleBinEmptyStatus": "Буш",
   "diskCleanSearchLeftovers": "Калдыкларны эзләү",
   "diskCleanCreateRP": "Торгызу ноктасы булдыру",
   "diskCleanCreateRPWorking": "Торгызу ноктасы булдырыла…",

@@ -860,6 +860,7 @@
   "homeRevertLoading": "正在还原…",
   "diskCleanRecycleTitle": "Windows 回收站",
   "diskCleanRecycleAction": "清空回收站",
+  "recycleBinEmptyStatus": "空",
   "diskCleanSearchLeftovers": "搜索残留",
   "diskCleanCreateRP": "创建还原点",
   "diskCleanCreateRPWorking": "正在创建还原点…",

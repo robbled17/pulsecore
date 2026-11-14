@@ -102,8 +102,15 @@ func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 		if !isSafeAppLeftoverPath(p) {
 			return
 		}
+		fi, err := os.Stat(p)
+		if err != nil || !fi.IsDir() {
+			return
+		}
 		sz := dirSizeBudget(p, time.Now().Add(700*time.Millisecond), 3)
 		if sz < orphanLeftoverMinBytes {
+			return
+		}
+		if _, err := os.Stat(p); err != nil {
 			return
 		}
 

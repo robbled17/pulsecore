@@ -157,25 +157,27 @@ type RecycleBinStatus struct {
 
 // GetRecycleBinInfo returns the exact recycle-bin size for the leftovers tab.
 func (a *App) GetRecycleBinInfo() RecycleBinStatus {
-	b := queryRecycleBinBytes()
-	if b < 0 {
+	b, items, err := queryRecycleBinInfo()
+	if err != nil || b < 0 {
 		b = recycleBinSizeApprox()
+		if b < 0 {
+			b = 0
+		}
+		items = 0
 	}
-	if b < 0 {
-		b = 0
-	}
-	return RecycleBinStatus{Bytes: b}
+	return RecycleBinStatus{Bytes: b, Items: items}
 }
 
 // EmptyRecycleBin clears every drive bin and records the pre-delete size.
 func (a *App) EmptyRecycleBin() DeepCleanupResult {
-	before := queryRecycleBinBytes()
-	if before < 0 {
-		before = recycleBinSizeApprox()
+	size, items, _ := queryRecycleBinInfo()
+	if size <= 0 || items <= 0 {
+		return DeepCleanupResult{
+			OK: true, FreedBytes: 0, ActualCleanedBytes: 0,
+			Actions: []string{"recycle"}, Message: "ok",
+		}
 	}
-	if before < 0 {
-		before = 0
-	}
+	before := size
 	var reported int64
 	_, rec := a.MeasureAndRecordClean("C:", "Recycle", func() int64 {
 		_ = emptyRecycleBinNative()

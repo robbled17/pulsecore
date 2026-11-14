@@ -860,6 +860,7 @@
   "homeRevertLoading": "Vorherigen Zustand wiederherstellen…",
   "diskCleanRecycleTitle": "Windows-Papierkorb",
   "diskCleanRecycleAction": "Papierkorb leeren",
+  "recycleBinEmptyStatus": "Leer",
   "diskCleanSearchLeftovers": "Reste suchen",
   "diskCleanCreateRP": "Wiederherstellungspunkt erstellen",
   "diskCleanCreateRPWorking": "Wiederherstellungspunkt wird erstellt…",

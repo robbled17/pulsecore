@@ -59,7 +59,14 @@ func (a *App) PreviewDiskCleanup() []CleanupCat {
 			cat.SizeBytes = dirSizeLimited(shaderCacheDirs(), 4, time.Time{})
 		case "recycle":
 			cat.Irreversible = true
-			cat.SizeBytes = recycleBinSizeApprox()
+			rbBytes, _, _ := queryRecycleBinInfo()
+			if rbBytes < 0 {
+				rbBytes = recycleBinSizeApprox()
+			}
+			if rbBytes < 0 {
+				rbBytes = 0
+			}
+			cat.SizeBytes = rbBytes
 		case "app_cache":
 			cat.SizeBytes = dirSizeLimited(appCacheDirs(), 4, time.Time{})
 		case "user_temp":
@@ -638,15 +645,18 @@ func dirSizeBudget(root string, deadline time.Time, maxDepth int) int64 {
 }
 
 func emptyRecycleBin() int64 {
-	before := recycleBinSizeApprox()
+	size, items, _ := queryRecycleBinInfo()
+	if size <= 0 || items <= 0 {
+		return 0
+	}
+	before := size
 	_ = emptyRecycleBinNative()
 	// Brief settle for FS accounting.
-	time.Sleep(400 * time.Millisecond)
-	after := recycleBinSizeApprox()
-	if before > after {
+	time.Sleep(300 * time.Millisecond)
+	after, _, _ := queryRecycleBinInfo()
+	if after >= 0 && before > after {
 		return before - after
 	}
-	// Native call may have succeeded even if size probe failed.
 	if before > 0 {
 		return before
 	}

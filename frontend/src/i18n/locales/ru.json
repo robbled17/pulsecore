@@ -154,6 +154,7 @@
   "diskCleanVSSHint": "Занято ≈ {size}. Удалит самую старую точку.",
   "diskCleanRecycleTitle": "Корзина Windows",
   "diskCleanRecycleAction": "Очистить корзину",
+  "recycleBinEmptyStatus": "Пуста",
   "diskCleanSearchLeftovers": "Поиск остатков",
   "diskCleanCreateRP": "Создать точку восстановления",
   "diskCleanCreateRPWorking": "Создание точки восстановления…",

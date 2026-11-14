@@ -154,6 +154,7 @@
   "diskCleanVSSHint": "Using ≈ {size}. Removes the oldest point.",
   "diskCleanRecycleTitle": "Windows Recycle Bin",
   "diskCleanRecycleAction": "Empty recycle bin",
+  "recycleBinEmptyStatus": "Empty",
   "diskCleanSearchLeftovers": "Search leftovers",
   "diskCleanCreateRP": "Create restore point",
   "diskCleanCreateRPWorking": "Creating restore point…",
