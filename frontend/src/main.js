@@ -6388,6 +6388,7 @@ function wireUI() {
   }
 
   $('btn-hud-side')?.addEventListener('click', enableHud)
+  $('btn-home-hud')?.addEventListener('click', enableHud)
   $('btn-home-cleanup')?.addEventListener('click', () => {
     openDiskCleanupWizard('cache').catch(() => {})
   })

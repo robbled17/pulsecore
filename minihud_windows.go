@@ -16,6 +16,9 @@ var (
 	procGetDCMH             = modUser32MH.NewProc("GetDC")
 	procReleaseDCMH         = modUser32MH.NewProc("ReleaseDC")
 	procGetWindowRectMH     = modUser32MH.NewProc("GetWindowRect")
+	procGetWindowLongPtrMH  = modUser32MH.NewProc("GetWindowLongPtrW")
+	procSetWindowLongPtrMH  = modUser32MH.NewProc("SetWindowLongPtrW")
+	procSetWindowPosMH      = modUser32MH.NewProc("SetWindowPos")
 	procCreateDIBSection    = modGdi32MH.NewProc("CreateDIBSection")
 	procCreateCompatibleDC  = modGdi32MH.NewProc("CreateCompatibleDC")
 	procDeleteDC            = modGdi32MH.NewProc("DeleteDC")
@@ -76,10 +79,33 @@ const (
 	ulwAlphaOS    = 0x00000002
 )
 
-// updateLayeredCapsule draws a clean 32-bit ARGB capsule without artifacts or rectangular bleed.
+// clearLayeredWindow removes the WS_EX_LAYERED extended style when returning to standard window mode.
+func clearLayeredWindow(hwnd windows.HWND) {
+	if hwnd == 0 {
+		return
+	}
+	exStyle, _, _ := procGetWindowLongPtrMH.Call(uintptr(hwnd), gwlExStyleOS)
+	if (exStyle & wsExLayeredOS) != 0 {
+		_, _, _ = procSetWindowLongPtrMH.Call(uintptr(hwnd), gwlExStyleOS, exStyle&^wsExLayeredOS)
+		_, _, _ = procSetWindowPosMH.Call(uintptr(hwnd), 0, 0, 0, 0, 0, 0x0027 /* SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED */)
+	}
+}
+
+// updateLayeredCapsule draws a clean 32-bit ARGB capsule for Mini-HUD without rectangular bleed or underlay shadow.
 func updateLayeredCapsule(hwnd windows.HWND, width, height int, isWin11 bool) bool {
+	return updateLayeredCapsuleInternal(hwnd, width, height, isWin11, false)
+}
+
+// updateLayeredCapsuleInternal draws a clean 32-bit ARGB capsule with a completely cleared (memset 0) buffer.
+func updateLayeredCapsuleInternal(hwnd windows.HWND, width, height int, isWin11 bool, isFPSOverlay bool) bool {
 	if hwnd == 0 || width <= 0 || height <= 0 {
 		return false
+	}
+
+	// Ensure WS_EX_LAYERED is active
+	exStyle, _, _ := procGetWindowLongPtrMH.Call(uintptr(hwnd), gwlExStyleOS)
+	if (exStyle & wsExLayeredOS) == 0 {
+		_, _, _ = procSetWindowLongPtrMH.Call(uintptr(hwnd), gwlExStyleOS, exStyle|wsExLayeredOS)
 	}
 
 	hdcScreen, _, _ := procGetDCMH.Call(0)
@@ -119,7 +145,7 @@ func updateLayeredCapsule(hwnd windows.HWND, width, height int, isWin11 bool) bo
 	oldBmp, _, _ := procSelectObjectMH.Call(memDC, hBitmap)
 	defer procSelectObjectMH.Call(memDC, oldBmp)
 
-	// Step 1: Force entire pixel buffer to 0 (memset 0) - eliminates all rectangular bleed
+	// Step 1: Force entire pixel buffer to 0 (clean transparent ARGB) - eliminates all rectangular bleed and shadows
 	totalPixels := width * height
 	pixelSlice := unsafe.Slice((*uint32)(pBits), totalPixels)
 	for i := range pixelSlice {
@@ -135,30 +161,27 @@ func updateLayeredCapsule(hwnd windows.HWND, width, height int, isWin11 bool) bo
 	}
 
 	// Capsule colors (premultiplied ARGB):
-	// Background: #0f172a (R=15, G=23, B=42)
-	// Win11: 85% opacity (alpha=217)
-	// Win10: 100% opaque (alpha=255)
-	var bgA, bgR, bgG, bgB uint32
+	// Solid opaque #0f172a (alpha=255) ensures lower windows NEVER shine/bleed through!
+	bgA := uint32(255)
+	bgR := uint32(15)
+	bgG := uint32(23)
+	bgB := uint32(42)
+
 	var bdrA, bdrR, bdrG, bdrB uint32
-
-	if isWin11 {
-		bgA = 217
-		bgR = (15 * bgA) / 255
-		bgG = (23 * bgA) / 255
-		bgB = (42 * bgA) / 255
-
-		// Border: rgba(255, 255, 255, 0.20)
-		bdrA = 51
-		bdrR = bdrA
-		bdrG = bdrA
-		bdrB = bdrA
+	if isFPSOverlay {
+		// F12 overlay cyan border: #38bdf8 (R=56, G=189, B=248)
+		bdrA = 255
+		bdrR = 56
+		bdrG = 189
+		bdrB = 248
+	} else if isWin11 {
+		// Mini-HUD Win11: clean white border
+		bdrA = 255
+		bdrR = 64
+		bdrG = 75
+		bdrB = 92
 	} else {
-		// Win10: pure solid #0f172a with border #334155 (R=51, G=65, B=85)
-		bgA = 255
-		bgR = 15
-		bgG = 23
-		bgB = 42
-
+		// Mini-HUD Win10: border #334155 (R=51, G=65, B=85)
 		bdrA = 255
 		bdrR = 51
 		bdrG = 65

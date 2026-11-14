@@ -6,7 +6,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// updateFPSOverlayLayeredCapsule updates the F12 FPS overlay with clean ARGB graphics.
+// updateFPSOverlayLayeredCapsule updates the F12 FPS overlay with clean ARGB graphics without shadows.
 func updateFPSOverlayLayeredCapsule(hwnd windows.HWND, width, height int, isWin11 bool) bool {
-	return updateLayeredCapsule(hwnd, width, height, isWin11)
+	return updateLayeredCapsuleInternal(hwnd, width, height, isWin11, true)
 }

@@ -3156,11 +3156,11 @@ html.i18n-dev :is(body, #app) {
   display: none;
   gap: 10px;
   padding: 6px 14px;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
   border-radius: 9999px;
   overflow: visible;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
+  box-shadow: none !important;
   width: 100% !important;
   height: 100% !important;
   box-sizing: border-box !important;
@@ -3251,8 +3251,8 @@ body.mini-hud-active #app {
   padding: 4px 14px !important;
   background: #0f172a !important;
   border-radius: 9999px !important;
-  border: 1px solid rgba(56, 189, 248, 0.25) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: none !important;
   font-family: 'Segoe UI', Inter, -apple-system, sans-serif !important;
 }
 .gameoverlay.hidden,
@@ -5025,15 +5025,15 @@ body.win10 .gameoverlay {
 
 body.win11 .minihud,
 body.win11 .mini-hud-capsule {
-  background: rgba(15, 23, 42, 0.82) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: none !important;
 }
 
 body.win11 .gameoverlay {
-  background: rgba(15, 23, 42, 0.88) !important;
-  border: 1px solid rgba(56, 189, 248, 0.35) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  box-shadow: none !important;
 }
 
 /* Hidden Games Modal Real Posters */
