@@ -879,10 +879,15 @@
   "dcUndoFailed": "Папканы қалпына келтіру сәтсіз аяқталды",
   "diskCleanVSSNoPoints": "Жою үшін қалпына келтіру нүктелері жоқ",
   "fitVerdictDeficit": "Жетпейді",
-  "optConflictWatcher": "Бұғатталған файлдарды ақылды қағып алу",
+  "optConflictWatcher": "Бұғатталған файлдарды ақылды ұстап алу",
   "optConflictWatcherHint": "«Папка/файл қолданылуда» терезесіне PulseCore тақтасын бекітіп, процесті тауып, 1 басумен бұғаттан шығарады.",
   "diskCleanAllApps": "Барлық бағдарламалар",
   "diskCleanCandidates": "Жоюға үміткерлер",
   "diskCleanDrive": "{drive}: дискісі",
-  "diskCleanDriveFree": "{total} ГБ-тан {free} ГБ бос"
+  "diskCleanDriveFree": "{total} ГБ-тан {free} ГБ бос",
+  "optConflictWatcherDesc": "Windows «Бума қолданылуда» терезесі астында бұғатты ашу тақтасын автоматты түрде көрсетеді",
+  "optConflictWatcherToggle": "Ақылды ұстап алуды қосу",
+  "diskCleanDriveCard": "💾 {letter}: дискісінде {free} бос",
+  "diskCleanCacheNotice": "Жылдам кэш C: жүйелік бөліміне жатады",
+  "diskCleanDriveTitle": "{letter}: дискісін тазалау шебері"
 }

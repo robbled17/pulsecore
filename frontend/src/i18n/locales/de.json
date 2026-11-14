@@ -879,10 +879,15 @@
   "dcUndoFailed": "Ordner konnte nicht wiederhergestellt werden",
   "diskCleanVSSNoPoints": "Keine Wiederherstellungspunkte zum Löschen",
   "fitVerdictDeficit": "Nicht genug",
-  "optConflictWatcher": "Intelligente Abfangung gesperrter Dateien",
+  "optConflictWatcher": "Intelligenter Dateisperren-Abfangmodus",
   "optConflictWatcherHint": "Dockt automatisch ein PulseCore-Panel an den Systemdialog \"Datei/Ordner wird verwendet\" an, identifiziert den Prozess und entsperrt mit 1 Klick.",
   "diskCleanAllApps": "Alle Programme",
   "diskCleanCandidates": "Kandidaten zur Entfernung",
   "diskCleanDrive": "Laufwerk {drive}:",
-  "diskCleanDriveFree": "{free} GB frei von {total} GB"
+  "diskCleanDriveFree": "{free} GB frei von {total} GB",
+  "optConflictWatcherDesc": "Zeigt automatisch eine Entsperrleiste unter dem Windows-Dialog „Ordner wird verwendet“ an",
+  "optConflictWatcherToggle": "Intelligentes Abfangen aktivieren",
+  "diskCleanDriveCard": "💾 Laufwerk {letter}: {free} frei",
+  "diskCleanCacheNotice": "Schnell-Cache gehört zur Systempartition C:",
+  "diskCleanDriveTitle": "Datenträgerbereinigung-Assistent ({letter}:)"
 }

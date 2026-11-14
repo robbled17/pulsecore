@@ -884,5 +884,10 @@
   "diskCleanAllApps": "Все программы",
   "diskCleanCandidates": "Кандидаты на удаление",
   "diskCleanDrive": "Диск {drive}:",
-  "diskCleanDriveFree": "{free} ГБ свободно из {total} ГБ"
+  "diskCleanDriveFree": "{free} ГБ свободно из {total} ГБ",
+  "optConflictWatcherDesc": "Автоматически показывает панель разблокировки под окном Windows «Папка уже используется»",
+  "optConflictWatcherToggle": "Включить умный перехват",
+  "diskCleanDriveCard": "💾 Диск {letter}: {free} свободно",
+  "diskCleanCacheNotice": "Быстрый кэш относится к системному разделу C:",
+  "diskCleanDriveTitle": "Мастер очистки диска {letter}:"
 }

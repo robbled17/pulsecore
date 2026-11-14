@@ -484,8 +484,6 @@
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-start-min" /> <span data-i18n="optStartMin">Запуск свёрнутым на панели задач</span></label>
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-close-tray" /> <span data-i18n="optCloseTray">Сворачивать в трей при закрытии</span></label>
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-tray-temp" /> <span data-i18n="optTrayTemp">Температура CPU на иконке трея</span></label>
-          <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-conflict-watcher" /> <span data-i18n="optConflictWatcher">Умный перехват заблокированных файлов</span></label>
-          <p class="settings-hint" data-i18n="optConflictWatcherHint" style="margin-top: 2px; margin-bottom: 8px;">Автоматически показывать плавающее окно разблокировки при ошибках Explorer «Файл используется»</p>
           <div class="settings-section-title settings-section-title-sub" data-i18n="ecoExitTitle">Eco Mode при выходе</div>
           <select id="opt-eco-exit" class="lang-select lang-select-block settings-select" aria-label="Eco exit policy">
             <option value="ask" data-i18n="ecoExitAsk">Спрашивать, снять ли ограничения</option>
@@ -503,6 +501,12 @@
             <button type="button" class="btn poll settings-btn" data-poll="2000">2 s</button>
           </div>
           <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-temp-alert" /> <span data-i18n="optTempAlert">Уведомление при превышении температуры CPU/GPU выше 85°C</span></label>
+        </div>
+
+        <div class="settings-card settings-group">
+          <div class="settings-section-title" data-i18n="optConflictWatcher">Умный перехват заблокированных файлов</div>
+          <label class="settings-checkbox-row check-row"><input type="checkbox" id="toggle-conflict-watcher" /> <span data-i18n="optConflictWatcherToggle">Включить умный перехват</span></label>
+          <p class="settings-hint" data-i18n="optConflictWatcherDesc">Автоматически показывает панель разблокировки под окном Windows «Папка уже используется»</p>
         </div>
 
         <div class="settings-card settings-group">
@@ -553,7 +557,7 @@
         <h2 id="diskclean-title" data-i18n="diskCleanTitle">Мастер очистки диска C</h2>
         <button type="button" class="win-btn" id="diskclean-close">✕</button>
       </div>
-      <div id="diskclean-drives" class="diskclean-drives"></div>
+      <div id="cleaner-drives-bar" class="cleaner-drives-bar diskclean-drives"></div>
       <div id="diskclean-tabs" class="diskclean-tabs" role="tablist"></div>
       <div id="diskclean-body" class="modal-body"></div>
     </div>

@@ -2249,6 +2249,7 @@ export namespace main {
 	export class OrphanLeftover {
 	    path: string;
 	    name: string;
+	    driveLetter: string;
 	    sizeBytes: number;
 	    sizeLabel: string;
 	    rootKind: string;
@@ -2266,6 +2267,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.name = source["name"];
+	        this.driveLetter = source["driveLetter"];
 	        this.sizeBytes = source["sizeBytes"];
 	        this.sizeLabel = source["sizeLabel"];
 	        this.rootKind = source["rootKind"];

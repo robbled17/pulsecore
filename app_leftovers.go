@@ -19,9 +19,10 @@ const orphanLeftoverMinBytes = 100 * 1024 * 1024 // 100 MB
 type OrphanLeftover struct {
 	Path        string    `json:"path"`
 	Name        string    `json:"name"`
+	DriveLetter string    `json:"driveLetter"` // e.g. "C", "D", "E"
 	SizeBytes   int64     `json:"sizeBytes"`
 	SizeLabel   string    `json:"sizeLabel"`
-	RootKind    string    `json:"rootKind"` // local|roaming|programdata
+	RootKind    string    `json:"rootKind"` // local|roaming|programdata|drive_root|drive_games
 	LastModTime time.Time `json:"lastModTime"`
 	DaysAgo     int       `json:"daysAgo"`
 	AgeBadgeRu  string    `json:"ageBadgeRu"`
@@ -97,7 +98,68 @@ func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 	installed := a.ListInstalledApps()
 	names := installedNameSet(installed)
 	out := make([]OrphanLeftover, 0, 16)
-	scan := func(root, kind string) {
+	scanItem := func(p, name, kind string) {
+		if !isSafeAppLeftoverPath(p) {
+			return
+		}
+		sz := dirSizeBudget(p, time.Now().Add(700*time.Millisecond), 3)
+		if sz < orphanLeftoverMinBytes {
+			return
+		}
+
+		// Check freshness of files inside
+		modTime := latestDirModTime(p, time.Now().Add(120*time.Millisecond), 2)
+		daysAgo := int(time.Since(modTime).Hours() / 24)
+		if daysAgo < 0 {
+			daysAgo = 0
+		}
+
+		ageStatus := "neutral"
+		ageBadgeRu := ""
+		ageBadgeEn := ""
+
+		if daysAgo <= 14 {
+			ageStatus = "recent"
+			if daysAgo == 0 {
+				ageBadgeRu = "⚠️ Использовалось сегодня — проверьте перед удалением"
+				ageBadgeEn = "⚠️ Used today — check before deleting"
+			} else if daysAgo == 1 {
+				ageBadgeRu = "⚠️ Использовалось вчера — проверьте перед удалением"
+				ageBadgeEn = "⚠️ Used yesterday — check before deleting"
+			} else {
+				ageBadgeRu = fmt.Sprintf("⚠️ Использовалось недавно (%d дн. назад) — проверьте перед удалением", daysAgo)
+				ageBadgeEn = fmt.Sprintf("⚠️ Used recently (%d days ago) — check before deleting", daysAgo)
+			}
+		} else if daysAgo > 30 {
+			ageStatus = "safe"
+			ageBadgeRu = fmt.Sprintf("✓ Не использовалось %d дн. — можно безопасно очистить", daysAgo)
+			ageBadgeEn = fmt.Sprintf("✓ Not used for %d days — safe to clean", daysAgo)
+		} else {
+			ageBadgeRu = fmt.Sprintf("Не использовалось %d дн.", daysAgo)
+			ageBadgeEn = fmt.Sprintf("Not used for %d days", daysAgo)
+		}
+
+		driveLetter := strings.ToUpper(strings.TrimSuffix(filepath.VolumeName(p), ":"))
+		if driveLetter == "" {
+			driveLetter = "C"
+		}
+
+		out = append(out, OrphanLeftover{
+			Path:        p,
+			Name:        name,
+			DriveLetter: driveLetter,
+			SizeBytes:   sz,
+			SizeLabel:   formatSizeLabel(sz),
+			RootKind:    kind,
+			LastModTime: modTime,
+			DaysAgo:     daysAgo,
+			AgeBadgeRu:  ageBadgeRu,
+			AgeBadgeEn:  ageBadgeEn,
+			AgeStatus:   ageStatus,
+		})
+	}
+
+	scanDir := func(root, kind string) {
 		if root == "" {
 			return
 		}
@@ -111,68 +173,70 @@ func (a *App) ListOrphanLeftovers() []OrphanLeftover {
 			}
 			name := e.Name()
 			key := strings.ToLower(strings.TrimSpace(name))
-			if key == "" || leftoverProtectedNames[key] || strings.HasPrefix(key, ".") {
+			if key == "" || leftoverProtectedNames[key] || strings.HasPrefix(key, ".") || strings.HasPrefix(key, "$") {
 				continue
 			}
 			if matchesInstalledApp(key, names) {
 				continue
 			}
 			p := filepath.Join(root, name)
-			if !isSafeAppLeftoverPath(p) {
-				continue
-			}
-			sz := dirSizeBudget(p, time.Now().Add(700*time.Millisecond), 3)
-			if sz < orphanLeftoverMinBytes {
-				continue
-			}
-
-			// Check freshness of files inside
-			modTime := latestDirModTime(p, time.Now().Add(120*time.Millisecond), 2)
-			daysAgo := int(time.Since(modTime).Hours() / 24)
-			if daysAgo < 0 {
-				daysAgo = 0
-			}
-
-			ageStatus := "neutral"
-			ageBadgeRu := ""
-			ageBadgeEn := ""
-
-			if daysAgo <= 14 {
-				ageStatus = "recent"
-				if daysAgo == 0 {
-					ageBadgeRu = "⚠️ Использовалось сегодня — проверьте перед удалением"
-					ageBadgeEn = "⚠️ Used today — check before deleting"
-				} else if daysAgo == 1 {
-					ageBadgeRu = "⚠️ Использовалось вчера — проверьте перед удалением"
-					ageBadgeEn = "⚠️ Used yesterday — check before deleting"
-				} else {
-					ageBadgeRu = fmt.Sprintf("⚠️ Использовалось недавно (%d дн. назад) — проверьте перед удалением", daysAgo)
-					ageBadgeEn = fmt.Sprintf("⚠️ Used recently (%d days ago) — check before deleting", daysAgo)
-				}
-			} else if daysAgo > 30 {
-				ageStatus = "safe"
-				ageBadgeRu = fmt.Sprintf("✓ Не использовалось %d дн. — можно безопасно очистить", daysAgo)
-				ageBadgeEn = fmt.Sprintf("✓ Not used for %d days — safe to clean", daysAgo)
-			} else {
-				ageBadgeRu = fmt.Sprintf("Не использовалось %d дн.", daysAgo)
-				ageBadgeEn = fmt.Sprintf("Not used for %d days", daysAgo)
-			}
-
-			out = append(out, OrphanLeftover{
-				Path: p, Name: name, SizeBytes: sz,
-				SizeLabel:   formatSizeLabel(sz),
-				RootKind:    kind,
-				LastModTime: modTime,
-				DaysAgo:     daysAgo,
-				AgeBadgeRu:  ageBadgeRu,
-				AgeBadgeEn:  ageBadgeEn,
-				AgeStatus:   ageStatus,
-			})
+			scanItem(p, name, kind)
 		}
 	}
-	scan(os.Getenv("LOCALAPPDATA"), "local")
-	scan(os.Getenv("APPDATA"), "roaming")
-	scan(os.Getenv("PROGRAMDATA"), "programdata")
+
+	scanDir(os.Getenv("LOCALAPPDATA"), "local")
+	scanDir(os.Getenv("APPDATA"), "roaming")
+	scanDir(os.Getenv("PROGRAMDATA"), "programdata")
+
+	// Also scan local drives roots for forgotten app/game folders
+	for _, d := range getLocalDrivesNative() {
+		root := d.Mount
+		if root == "" {
+			continue
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			key := strings.ToLower(strings.TrimSpace(name))
+			if key == "" || leftoverProtectedNames[key] || strings.HasPrefix(key, ".") || strings.HasPrefix(key, "$") {
+				continue
+			}
+			switch key {
+			case "windows", "users", "perflogs", "program files", "program files (x86)", "programdata",
+				"system volume information", "recovery", "msocache", "config.msi", "boot", "efi":
+				continue
+			}
+			p := filepath.Join(root, name)
+			// For game hubs like D:\Games, scan subdirectories
+			if key == "games" || key == "steambackup" || key == "steamlibrary" {
+				subEntries, err := os.ReadDir(p)
+				if err == nil {
+					for _, subE := range subEntries {
+						if !subE.IsDir() {
+							continue
+						}
+						subName := subE.Name()
+						subKey := strings.ToLower(strings.TrimSpace(subName))
+						if subKey == "" || matchesInstalledApp(subKey, names) {
+							continue
+						}
+						scanItem(filepath.Join(p, subName), subName, "drive_games")
+					}
+				}
+				continue
+			}
+			if matchesInstalledApp(key, names) {
+				continue
+			}
+			scanItem(p, name, "drive_root")
+		}
+	}
 
 	// Sort: non-recent first, recent last; inside group - by daysAgo descending then size descending
 	sort.Slice(out, func(i, j int) bool {

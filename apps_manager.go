@@ -447,11 +447,16 @@ func isSafeAppLeftoverPath(p string) bool {
 	blockedContains := []string{
 		`\windows\`, `\system32\`, `\syswow64\`, `\winsxs\`,
 		`\microsoft\windows`, `\documents\`, `\desktop\`, `\downloads\`,
+		`\$recycle.bin`, `\system volume information`, `\recovery`,
 	}
 	for _, b := range blockedContains {
 		if strings.Contains(p, b) {
 			return false
 		}
+	}
+	vol := strings.ToLower(filepath.VolumeName(p))
+	if p == vol || p == vol+`\` || len(p) <= 3 {
+		return false // never delete volume root
 	}
 	appdata := strings.ToLower(filepath.Clean(os.Getenv("APPDATA")))
 	local := strings.ToLower(filepath.Clean(os.Getenv("LOCALAPPDATA")))
@@ -475,6 +480,14 @@ func isSafeAppLeftoverPath(p string) bool {
 			}
 			return true
 		}
+	}
+	// Also permit non-system folders on secondary drives (D:\, E:\) or root subfolders
+	if vol != "" && strings.HasPrefix(p, vol+`\`) {
+		rel := strings.TrimPrefix(p, vol+`\`)
+		if rel == "windows" || rel == "users" || rel == "perflogs" || rel == "program files" || rel == "program files (x86)" || rel == "programdata" {
+			return false
+		}
+		return len(rel) >= 3
 	}
 	return false
 }

@@ -879,10 +879,15 @@
   "dcUndoFailed": "无法还原文件夹",
   "diskCleanVSSNoPoints": "没有可删除的还原点",
   "fitVerdictDeficit": "配置不足",
-  "optConflictWatcher": "智能拦截被占用的文件",
+  "optConflictWatcher": "智能占用文件拦截器",
   "optConflictWatcherHint": "自动将 PulseCore 面板停靠在系统“文件/文件夹正在使用”窗口下方，找出占用进程并一键解锁。",
   "diskCleanAllApps": "所有程序",
   "diskCleanCandidates": "建议卸载项",
   "diskCleanDrive": "{drive} 盘:",
-  "diskCleanDriveFree": "{total} GB 中剩余 {free} GB"
+  "diskCleanDriveFree": "{total} GB 中剩余 {free} GB",
+  "optConflictWatcherDesc": "在 Windows“文件夹正在使用”对话框下方自动显示解锁操作栏",
+  "optConflictWatcherToggle": "启用智能拦截",
+  "diskCleanDriveCard": "💾 驱动器 {letter}: {free} 可用",
+  "diskCleanCacheNotice": "快捷缓存位于系统分区 C:",
+  "diskCleanDriveTitle": "磁盘清理向导 ({letter}:)"
 }

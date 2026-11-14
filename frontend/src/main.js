@@ -893,7 +893,7 @@ function readBehavior() {
     showTempOnTray: !!$('opt-tray-temp')?.checked,
     tempAlerts: !!$('opt-temp-alert')?.checked,
     ecoExitPolicy: $('opt-eco-exit')?.value || 'ask',
-    conflictWatcherEnabled: $('opt-conflict-watcher') ? !!$('opt-conflict-watcher').checked : true,
+    conflictWatcherEnabled: $('toggle-conflict-watcher') ? !!$('toggle-conflict-watcher').checked : ($('opt-conflict-watcher') ? !!$('opt-conflict-watcher').checked : true),
   }
 }
 
@@ -911,7 +911,9 @@ async function loadBehavior() {
     if ($('opt-tray-temp')) $('opt-tray-temp').checked = p.showTempOnTray !== false
     if ($('opt-temp-alert')) $('opt-temp-alert').checked = p.tempAlerts !== false
     if ($('opt-eco-exit')) $('opt-eco-exit').value = p.ecoExitPolicy || 'ask'
-    if ($('opt-conflict-watcher')) $('opt-conflict-watcher').checked = p.conflictWatcherEnabled !== false
+    const watcherVal = p.conflictWatcherEnabled !== false
+    if ($('toggle-conflict-watcher')) $('toggle-conflict-watcher').checked = watcherVal
+    if ($('opt-conflict-watcher')) $('opt-conflict-watcher').checked = watcherVal
   } catch (_) {}
 }
 
@@ -4483,12 +4485,13 @@ function closeDiskCleanModal() {
   renderHome().catch(() => {})
 }
 
+let selectedCleanerDrive = 'C'
 let selectedCleanDrive = 'C'
 let diskCleanFilterCandidates = false
 let localDrivesCache = []
 
 async function renderDiskCleanDrives() {
-  const container = $('diskclean-drives')
+  const container = $('cleaner-drives-bar') || $('diskclean-drives')
   if (!container) return
   try {
     localDrivesCache = await GetLocalDrives()
@@ -4501,42 +4504,36 @@ async function renderDiskCleanDrives() {
     return
   }
 
-  const driveLetters = localDrivesCache.map((d) => (d.letter || '').replace(/[:\\/]/g, '').toUpperCase())
-  if (!driveLetters.includes(selectedCleanDrive.toUpperCase()) && driveLetters.length > 0) {
-    selectedCleanDrive = driveLetters[0]
+  const driveLetters = localDrivesCache.map((d) => (d.letter || '').replace(/[:\\\/]/g, '').toUpperCase())
+  if (!driveLetters.includes(selectedCleanerDrive.toUpperCase()) && driveLetters.length > 0) {
+    selectedCleanerDrive = driveLetters[0]
   }
+  selectedCleanDrive = selectedCleanerDrive
 
   updateDiskCleanTitle()
 
   container.innerHTML = localDrivesCache.map((d) => {
-    const letter = (d.letter || '').replace(/[:\\/]/g, '').toUpperCase()
-    const isActive = letter === selectedCleanDrive.toUpperCase()
-    const freeGb = bytesToGB(d.freeBytes)
-    const totalGb = bytesToGB(d.totalBytes)
-    const usedPercent = Math.min(100, Math.max(0, Math.round(d.usedPercent || 0)))
-    const nameStr = d.volumeName ? ` (${escapeHtml(d.volumeName)})` : ''
-    const freeText = t('diskCleanDriveFree', {
-      free: escapeHtml(t('unitsGB', { n: freeGb })),
-      total: escapeHtml(t('unitsGB', { n: totalGb })),
+    const letter = (d.letter || '').replace(/[:\\\/]/g, '').toUpperCase()
+    const isActive = letter === selectedCleanerDrive.toUpperCase()
+    const freeGb = Math.round(d.freeGB || ((d.freeBytes || 0) / (1024 * 1024 * 1024)))
+    const cardText = t('diskCleanDriveCard', {
+      letter,
+      free: `${freeGb} ${t('unitsGB', { n: '' }).trim()}`,
     })
     return `
-      <div class="dc-drive-card ${isActive ? 'active' : ''}" data-drive="${letter}" role="button" tabindex="0">
-        <div class="dc-drive-head">
-          <span class="dc-drive-letter">💽 ${t('diskCleanDrive', { letter: `${letter}:` })}${nameStr}</span>
-          <span class="dc-drive-percent">${usedPercent}%</span>
-        </div>
-        <div class="dc-drive-bar-wrap">
-          <div class="dc-drive-bar ${usedPercent > 90 ? 'critical' : usedPercent > 75 ? 'warn' : ''}" style="width: ${usedPercent}%;"></div>
-        </div>
-        <div class="dc-drive-sub">${freeText}</div>
-      </div>
+      <button type="button" class="dc-drive-card ${isActive ? 'active' : ''}" data-drive="${letter}" role="tab" aria-selected="${isActive}">
+        <span>${escapeHtml(cardText)}</span>
+      </button>
     `
   }).join('')
 
   container.querySelectorAll('.dc-drive-card').forEach((card) => {
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', async (ev) => {
+      ev.preventDefault()
+      ev.stopPropagation()
       const drv = card.getAttribute('data-drive')
-      if (drv && drv !== selectedCleanDrive) {
+      if (drv && drv !== selectedCleanerDrive) {
+        selectedCleanerDrive = drv
         selectedCleanDrive = drv
         await renderDiskCleanDrives()
         await renderDiskCleanBody()
@@ -4548,7 +4545,7 @@ async function renderDiskCleanDrives() {
 function updateDiskCleanTitle() {
   const title = $('diskclean-title')
   if (title) {
-    title.textContent = t('diskCleanTitle') + (selectedCleanDrive ? ` (${selectedCleanDrive}:)` : '')
+    title.textContent = t('diskCleanDriveTitle', { letter: selectedCleanerDrive || 'C' })
   }
 }
 
@@ -4685,7 +4682,7 @@ async function renderDiskCleanApps(body) {
   }
   diskCleanAppsCache = Array.isArray(apps) ? apps : []
 
-  const targetDrive = (selectedCleanDrive || 'C').toUpperCase()
+  const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
   const driveFiltered = diskCleanAppsCache.filter((a) => {
     const appDrive = (a.driveLetter || '').toUpperCase()
     if (!appDrive) {
@@ -5005,6 +5002,7 @@ async function renderDiskCleanCache(body) {
   body.innerHTML = `
     <div class="dc-pane">
       <div id="dc-stats-slot"></div>
+      ${(selectedCleanerDrive || 'C').toUpperCase() !== 'C' ? `<div class="dc-cache-notice">ℹ️ ${escapeHtml(t('diskCleanCacheNotice'))}</div>` : ''}
       <div class="sf-glass-block">
         <div class="sf-block-title">${t('diskCleanTabCache')}</div>
         <div class="sf-cleanup-list">${list.map((c) => {
@@ -5821,8 +5819,11 @@ function wireUI() {
     btn.addEventListener('click', () => applyTheme(btn.dataset.theme))
   })
   wireCustomDropdowns()
-  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
+  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'toggle-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
     $(id)?.addEventListener('change', saveBehavior)
+  })
+  $('toggle-conflict-watcher')?.addEventListener('change', async (ev) => {
+    try { await SetConflictWatcherEnabled(!!ev.target.checked) } catch (err) { console.error(err) }
   })
   $('btn-adv-diag-toggle')?.addEventListener('click', () => {
     const panel = $('adv-diag-panel')

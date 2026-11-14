@@ -879,10 +879,15 @@
   "dcUndoFailed": "フォルダーを復元できませんでした",
   "diskCleanVSSNoPoints": "削除する復元ポイントがありません",
   "fitVerdictDeficit": "不足",
-  "optConflictWatcher": "ロックされたファイルのスマート検出",
+  "optConflictWatcher": "スマートファイルロック代行インターセプト",
   "optConflictWatcherHint": "「ファイル/フォルダーが使用中」ダイアログにPulseCoreパネルを自動ドッキングし、プロセスを特定して1クリックで解除します。",
   "diskCleanAllApps": "すべてのプログラム",
   "diskCleanCandidates": "削除候補",
   "diskCleanDrive": "ドライブ {drive}:",
-  "diskCleanDriveFree": "{total} GB中 {free} GB空き"
+  "diskCleanDriveFree": "{total} GB中 {free} GB空き",
+  "optConflictWatcherDesc": "Windowsの「ファイルまたはフォルダーが使用中」ダイアログの下に解除パネルを自動表示します",
+  "optConflictWatcherToggle": "スマートインターセプトを有効化",
+  "diskCleanDriveCard": "💾 ドライブ {letter}: {free} 空き",
+  "diskCleanCacheNotice": "クイックキャッシュはシステムパーティション C: に属します",
+  "diskCleanDriveTitle": "ディスククリーンアップウィザード ({letter}:)"
 }

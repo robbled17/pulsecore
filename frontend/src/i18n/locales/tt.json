@@ -879,10 +879,15 @@
   "dcUndoFailed": "Папканы кире кайтарып булмады",
   "diskCleanVSSNoPoints": "Бетерү өчен кире кайтару нокталары юк",
   "fitVerdictDeficit": "Җитми",
-  "optConflictWatcher": "Блокланган файлларны акыллы тоту",
+  "optConflictWatcher": "Блоктаган файлларны акыллы тоту",
   "optConflictWatcherHint": "«Папка/файл кулланылышта» тәрәзәсенә PulseCore плашкасын беркетә, процессны таба һәм 1 басуда блоктан чыгара.",
   "diskCleanAllApps": "Барлык программалар",
   "diskCleanCandidates": "Бетерүгә кандидатлар",
   "diskCleanDrive": "{drive}: дискы",
-  "diskCleanDriveFree": "{total} ГБ-тан {free} ГБ буш"
+  "diskCleanDriveFree": "{total} ГБ-тан {free} ГБ буш",
+  "optConflictWatcherDesc": "Windows «Папка инде кулланыла» тәрәзәсе астында блоклауны чишү панелен автоматик күрсәтә",
+  "optConflictWatcherToggle": "Акыллы тотуны кабызу",
+  "diskCleanDriveCard": "💾 {letter}: дискында {free} буш",
+  "diskCleanCacheNotice": "Тиз кэш C: система бүлегенә карый",
+  "diskCleanDriveTitle": "{letter}: дискын чистарту остасы"
 }

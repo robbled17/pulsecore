@@ -879,10 +879,15 @@
   "dcUndoFailed": "Could not restore folder",
   "diskCleanVSSNoPoints": "No restore points to delete",
   "fitVerdictDeficit": "Not enough",
-  "optConflictWatcher": "Smart locked file interception",
+  "optConflictWatcher": "Smart Locked File Interceptor",
   "optConflictWatcherHint": "Automatically docks a PulseCore panel to the \"File/folder in use\" dialog, identifies the process, and unlocks in 1 click.",
   "diskCleanAllApps": "All programs",
   "diskCleanCandidates": "Candidates for removal",
   "diskCleanDrive": "Drive {drive}:",
-  "diskCleanDriveFree": "{free} GB free of {total} GB"
+  "diskCleanDriveFree": "{free} GB free of {total} GB",
+  "optConflictWatcherDesc": "Automatically shows unlock panel below Windows 'Folder In Use' dialog",
+  "optConflictWatcherToggle": "Enable smart interception",
+  "diskCleanDriveCard": "💾 Drive {letter}: {free} free",
+  "diskCleanCacheNotice": "Quick cache belongs to system partition C:",
+  "diskCleanDriveTitle": "Disk Cleanup Wizard ({letter}:)"
 }

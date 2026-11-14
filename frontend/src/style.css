@@ -4543,3 +4543,56 @@ select option,
   color: var(--status-warn-text, #fbbf24);
   width: fit-content;
 }
+
+
+/* Cleaner drives bar in modal head */
+#cleaner-drives-bar,
+.cleaner-drives-bar {
+  display: flex;
+  gap: 10px;
+  padding: 12px 24px 0;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.cleaner-drives-bar .dc-drive-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cleaner-drives-bar .dc-drive-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-card-hover);
+}
+
+.cleaner-drives-bar .dc-drive-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 0 0 14px rgba(96, 165, 250, 0.35);
+}
+
+.dc-cache-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
