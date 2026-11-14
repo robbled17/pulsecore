@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "スマートインターセプトを有効化",
   "diskCleanDriveCard": "💾 ドライブ {letter}: {free} 空き",
   "diskCleanCacheNotice": "クイックキャッシュはシステムパーティション C: に属します",
-  "diskCleanDriveTitle": "ディスククリーンアップウィザード ({letter}:)"
+  "diskCleanDriveTitle": "ディスククリーンアップウィザード ({letter}:)",
+  "updateSectionTitle": "アプリアップデート",
+  "updateVersionLabel": "現在のバージョン:",
+  "updateStatusLabel": "ステータス:",
+  "updateAvailable": "PulseCoreのアップデートが利用可能です ({size} MB)",
+  "updateCheckBtn": "アップデートを確認",
+  "updateChecking": "アップデートを確認中...",
+  "updateUpToDate": "最新バージョンがインストールされています",
+  "updateDownloading": "アップデートをダウンロード中... {percent}%",
+  "updateRestarting": "アプリを再起動しています...",
+  "updateInstallBtn": "更新して再起動",
+  "updateLaterBtn": "後で",
+  "updateFailed": "アップデートに失敗しました: {err}"
 }

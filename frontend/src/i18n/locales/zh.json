@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "启用智能拦截",
   "diskCleanDriveCard": "💾 驱动器 {letter}: {free} 可用",
   "diskCleanCacheNotice": "快捷缓存位于系统分区 C:",
-  "diskCleanDriveTitle": "磁盘清理向导 ({letter}:)"
+  "diskCleanDriveTitle": "磁盘清理向导 ({letter}:)",
+  "updateSectionTitle": "应用程序更新",
+  "updateVersionLabel": "当前版本:",
+  "updateStatusLabel": "状态:",
+  "updateAvailable": "有可用的 PulseCore 更新 ({size} MB)",
+  "updateCheckBtn": "检查更新",
+  "updateChecking": "正在检查更新...",
+  "updateUpToDate": "已安装最新版本",
+  "updateDownloading": "正在下载更新... {percent}%",
+  "updateRestarting": "正在重启应用程序...",
+  "updateInstallBtn": "更新并重启",
+  "updateLaterBtn": "稍后",
+  "updateFailed": "更新失败: {err}"
 }

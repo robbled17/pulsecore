@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "Ақылды ұстап алуды қосу",
   "diskCleanDriveCard": "💾 {letter}: дискісінде {free} бос",
   "diskCleanCacheNotice": "Жылдам кэш C: жүйелік бөліміне жатады",
-  "diskCleanDriveTitle": "{letter}: дискісін тазалау шебері"
+  "diskCleanDriveTitle": "{letter}: дискісін тазалау шебері",
+  "updateSectionTitle": "Бағдарламаны жаңарту",
+  "updateVersionLabel": "Ағымдағы нұсқасы:",
+  "updateStatusLabel": "Күйі:",
+  "updateAvailable": "PulseCore жаңартуы қолжетімді ({size} МБ)",
+  "updateCheckBtn": "Жаңартуларды тексеру",
+  "updateChecking": "Жаңартулар тексерілуде...",
+  "updateUpToDate": "Соңғы нұсқасы орнатылған",
+  "updateDownloading": "Жаңарту жүктелуде... {percent}%",
+  "updateRestarting": "Қолданба қайта қосылуда...",
+  "updateInstallBtn": "Жаңартып, қайта қосу",
+  "updateLaterBtn": "Кейінірек",
+  "updateFailed": "Жаңарту сәтсіз аяқталды: {err}"
 }

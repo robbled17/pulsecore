@@ -27,6 +27,8 @@ export function CheckDiskHealth(arg1:string):Promise<main.DiskHealthReport>;
 
 export function CheckDiskHealthForce(arg1:string):Promise<main.DiskHealthReport>;
 
+export function CheckForUpdates():Promise<main.UpdateInfo>;
+
 export function CheckNetworkDetailed(arg1:boolean):Promise<main.NetworkDetail>;
 
 export function CheckSleepBlockers():Promise<main.SleepReport>;
@@ -34,6 +36,8 @@ export function CheckSleepBlockers():Promise<main.SleepReport>;
 export function CleanDeliveryOptimization():Promise<main.DeepCleanupResult>;
 
 export function CleanOldestShadow():Promise<main.DeepCleanupResult>;
+
+export function CleanupOldBinary():Promise<void>;
 
 export function ClearOverlayWindowRegion():Promise<void>;
 
@@ -58,6 +62,8 @@ export function DisableHibernation():Promise<main.DeepCleanupResult>;
 export function DiskWatchPrior(arg1:string,arg2:number):Promise<number>;
 
 export function DismissHomeProblem(arg1:string):Promise<boolean>;
+
+export function DownloadAndInstallUpdate(arg1:string,arg2:string):Promise<void>;
 
 export function EcoModeByProcessName(arg1:string,arg2:boolean):Promise<void>;
 

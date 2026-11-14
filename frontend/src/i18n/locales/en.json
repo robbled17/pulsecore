@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "Enable smart interception",
   "diskCleanDriveCard": "💾 Drive {letter}: {free} free",
   "diskCleanCacheNotice": "Quick cache belongs to system partition C:",
-  "diskCleanDriveTitle": "Disk Cleanup Wizard ({letter}:)"
+  "diskCleanDriveTitle": "Disk Cleanup Wizard ({letter}:)",
+  "updateSectionTitle": "Application Updates",
+  "updateVersionLabel": "Current version:",
+  "updateStatusLabel": "Status:",
+  "updateAvailable": "PulseCore update available ({size} MB)",
+  "updateCheckBtn": "Check for updates",
+  "updateChecking": "Checking for updates...",
+  "updateUpToDate": "Latest version installed",
+  "updateDownloading": "Downloading update... {percent}%",
+  "updateRestarting": "Restarting application...",
+  "updateInstallBtn": "Update and restart",
+  "updateLaterBtn": "Later",
+  "updateFailed": "Update failed: {err}"
 }

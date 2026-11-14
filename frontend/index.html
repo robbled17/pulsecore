@@ -534,6 +534,26 @@
           <div class="settings-section-title" data-i18n="statsBlock">Статистика</div>
           <button type="button" class="btn danger settings-btn" id="btn-clear-stats" data-i18n="clearStats">Очистить статистику</button>
         </div>
+
+        <div class="settings-card settings-group" id="settings-update-group">
+          <div class="settings-section-title" data-i18n="updateSectionTitle">Обновление программы</div>
+          <div class="settings-status-line">
+            <span data-i18n="updateVersionLabel">Текущая версия:</span>
+            <span class="adv-status">v1.1.0</span>
+          </div>
+          <div id="update-status-line" class="settings-status-line">
+            <span data-i18n="updateStatusLabel">Статус:</span>
+            <span id="update-status-text" class="adv-status" data-i18n="updateUpToDate">Установлена последняя версия</span>
+          </div>
+          <div class="btn-row settings-btn-row" id="update-actions-row">
+            <button type="button" class="btn soft compact settings-btn" id="btn-check-updates" data-i18n="updateCheckBtn">Проверить обновления</button>
+            <button type="button" class="btn primary compact settings-btn hidden" id="btn-install-update" data-i18n="updateInstallBtn">Обновить и перезапустить</button>
+          </div>
+          <div id="update-progress-wrap" class="update-progress-wrap hidden">
+            <div class="update-progress-label" id="update-progress-text"></div>
+            <div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill"></div></div>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -695,6 +715,24 @@
   </div>
 
   <div id="tip-float" class="tip-float hidden"></div>
+
+  <div id="update-banner" class="update-banner hidden" role="alert">
+    <div class="update-banner-icon">⚡</div>
+    <div class="update-banner-body">
+      <div class="update-banner-title" id="update-banner-title"></div>
+      <div class="update-banner-notes" id="update-banner-notes"></div>
+      <div class="update-progress-wrap hidden" id="update-banner-progress-wrap">
+        <div class="update-progress-label" id="update-banner-progress-text"></div>
+        <div class="update-progress-bar"><div class="update-progress-fill" id="update-banner-progress-fill"></div></div>
+      </div>
+      <div class="update-banner-actions" id="update-banner-actions">
+        <button type="button" class="btn primary compact" id="btn-banner-update" data-i18n="updateInstallBtn">Обновить и перезапустить</button>
+        <button type="button" class="btn soft compact" id="btn-banner-later" data-i18n="updateLaterBtn">Позже</button>
+      </div>
+    </div>
+    <button type="button" class="update-banner-close" id="btn-banner-close" aria-label="Close">✕</button>
+  </div>
+
   <div id="toast" class="toast hidden" role="status"></div>
   <script type="module" src="./src/main.js"></script>
 </body>

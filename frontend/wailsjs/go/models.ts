@@ -3142,6 +3142,28 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class UpdateInfo {
+	    available: boolean;
+	    downloadUrl: string;
+	    sizeMb: number;
+	    publishedAt: string;
+	    releaseNotes: string;
+	    digest: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.available = source["available"];
+	        this.downloadUrl = source["downloadUrl"];
+	        this.sizeMb = source["sizeMb"];
+	        this.publishedAt = source["publishedAt"];
+	        this.releaseNotes = source["releaseNotes"];
+	        this.digest = source["digest"];
+	    }
+	}
 	
 	export class WeeklySummary {
 	    ok: boolean;

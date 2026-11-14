@@ -113,6 +113,8 @@
   GetHardwareTopProcesses,
   KillProcess,
   RestartProcess,
+  CheckForUpdates,
+  DownloadAndInstallUpdate,
 } from '../wailsjs/go/main/App.js'
 import { EventsOn, WindowMinimise, BrowserOpenURL, WindowIsMaximised } from '../wailsjs/runtime/runtime.js'
 
@@ -511,6 +513,10 @@ function applyI18n() {
   syncOverlayPill(gameOverlayOn)
   renderGameGrid()
   if (selectedGameId) predictSelectedGame()
+  if (activeUpdateInfo) {
+    const title = $('update-banner-title')
+    if (title) title.textContent = t('updateAvailable', { size: activeUpdateInfo.sizeMb || 0 })
+  }
 }
 
 function syncLangSelects() {
@@ -6857,10 +6863,176 @@ async function pollMetrics() {
   }
 }
 
+let activeUpdateInfo = null
+let isUpdating = false
+
+function initUpdater() {
+  try {
+    EventsOn('update:progress', (pct) => {
+      const p = Math.max(0, Math.min(100, Number(pct) || 0))
+      updateProgressUI(p)
+    })
+    EventsOn('update:restarting', () => {
+      updateRestartingUI()
+    })
+  } catch (_) {}
+
+  setTimeout(async () => {
+    try {
+      const info = await CheckForUpdates()
+      if (info && info.available) {
+        showUpdateBanner(info)
+      }
+    } catch (_) {}
+  }, 4000)
+
+  $('btn-banner-update')?.addEventListener('click', () => {
+    if (activeUpdateInfo) {
+      applyUpdate(activeUpdateInfo, 'banner')
+    }
+  })
+  $('btn-banner-later')?.addEventListener('click', () => {
+    hideUpdateBanner()
+  })
+  $('btn-banner-close')?.addEventListener('click', () => {
+    hideUpdateBanner()
+  })
+
+  $('btn-check-updates')?.addEventListener('click', async () => {
+    await manualCheckForUpdates()
+  })
+  $('btn-install-update')?.addEventListener('click', () => {
+    if (activeUpdateInfo) {
+      applyUpdate(activeUpdateInfo, 'settings')
+    }
+  })
+}
+
+function showUpdateBanner(info) {
+  activeUpdateInfo = info
+  const banner = $('update-banner')
+  const title = $('update-banner-title')
+  const notes = $('update-banner-notes')
+  const actions = $('update-banner-actions')
+  const progressWrap = $('update-banner-progress-wrap')
+  if (!banner) return
+
+  if (title) title.textContent = t('updateAvailable', { size: info.sizeMb || 0 })
+  if (notes) notes.textContent = info.releaseNotes || ''
+  if (actions) actions.classList.remove('hidden')
+  if (progressWrap) progressWrap.classList.add('hidden')
+  banner.classList.remove('hidden')
+}
+
+function hideUpdateBanner() {
+  const banner = $('update-banner')
+  if (banner) banner.classList.add('hidden')
+}
+
+async function manualCheckForUpdates() {
+  const btn = $('btn-check-updates')
+  const status = $('update-status-text')
+  const installBtn = $('btn-install-update')
+  if (!btn || !status) return
+
+  btn.disabled = true
+  status.textContent = t('updateChecking')
+
+  try {
+    const info = await CheckForUpdates()
+    if (info && info.available) {
+      activeUpdateInfo = info
+      status.textContent = t('updateAvailable', { size: info.sizeMb || 0 })
+      if (installBtn) {
+        installBtn.textContent = t('updateInstallBtn')
+        installBtn.classList.remove('hidden')
+      }
+      showUpdateBanner(info)
+    } else {
+      activeUpdateInfo = null
+      status.textContent = t('updateUpToDate')
+      if (installBtn) installBtn.classList.add('hidden')
+    }
+  } catch (err) {
+    status.textContent = t('updateFailed', { err: String(err && (err.message || err) || 'error') })
+    if (installBtn) installBtn.classList.add('hidden')
+  } finally {
+    btn.disabled = false
+  }
+}
+
+async function applyUpdate(info, source) {
+  if (isUpdating || !info || !info.downloadUrl) return
+  isUpdating = true
+
+  const bannerActions = $('update-banner-actions')
+  const bannerProgWrap = $('update-banner-progress-wrap')
+  const bannerProgText = $('update-banner-progress-text')
+  const bannerProgFill = $('update-banner-progress-fill')
+
+  if (bannerActions) bannerActions.classList.add('hidden')
+  if (bannerProgWrap) bannerProgWrap.classList.remove('hidden')
+  if (bannerProgText) bannerProgText.textContent = t('updateDownloading', { percent: 0 })
+  if (bannerProgFill) bannerProgFill.style.width = '0%'
+
+  const settingsProgWrap = $('update-progress-wrap')
+  const settingsProgText = $('update-progress-text')
+  const settingsProgFill = $('update-progress-fill')
+  const settingsBtn = $('btn-install-update')
+  const checkBtn = $('btn-check-updates')
+
+  if (settingsBtn) settingsBtn.disabled = true
+  if (checkBtn) checkBtn.disabled = true
+  if (settingsProgWrap) settingsProgWrap.classList.remove('hidden')
+  if (settingsProgText) settingsProgText.textContent = t('updateDownloading', { percent: 0 })
+  if (settingsProgFill) settingsProgFill.style.width = '0%'
+
+  try {
+    await DownloadAndInstallUpdate(info.downloadUrl, info.digest || '')
+  } catch (err) {
+    isUpdating = false
+    const errMsg = String(err && (err.message || err) || err)
+    showToast(t('updateFailed', { err: errMsg }), false, { holdMs: 6000 })
+
+    if (bannerActions) bannerActions.classList.remove('hidden')
+    if (bannerProgWrap) bannerProgWrap.classList.add('hidden')
+    if (settingsProgWrap) settingsProgWrap.classList.add('hidden')
+    if (settingsBtn) settingsBtn.disabled = false
+    if (checkBtn) checkBtn.disabled = false
+  }
+}
+
+function updateProgressUI(pct) {
+  const text = t('updateDownloading', { percent: pct })
+  const bannerProgText = $('update-banner-progress-text')
+  const bannerProgFill = $('update-banner-progress-fill')
+  if (bannerProgText) bannerProgText.textContent = text
+  if (bannerProgFill) bannerProgFill.style.width = `${pct}%`
+
+  const settingsProgText = $('update-progress-text')
+  const settingsProgFill = $('update-progress-fill')
+  if (settingsProgText) settingsProgText.textContent = text
+  if (settingsProgFill) settingsProgFill.style.width = `${pct}%`
+}
+
+function updateRestartingUI() {
+  const text = t('updateRestarting')
+  const bannerProgText = $('update-banner-progress-text')
+  const bannerProgFill = $('update-banner-progress-fill')
+  if (bannerProgText) bannerProgText.textContent = text
+  if (bannerProgFill) bannerProgFill.style.width = '100%'
+
+  const settingsProgText = $('update-progress-text')
+  const settingsProgFill = $('update-progress-fill')
+  if (settingsProgText) settingsProgText.textContent = text
+  if (settingsProgFill) settingsProgFill.style.width = '100%'
+}
+
 function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark')
   applyI18n()
   wireUI()
+  initUpdater()
   loadBehavior()
   SetLanguage(lang).catch(() => {})
   syncElevatedUI().catch(() => {})

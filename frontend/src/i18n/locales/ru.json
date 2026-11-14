@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "Включить умный перехват",
   "diskCleanDriveCard": "💾 Диск {letter}: {free} свободно",
   "diskCleanCacheNotice": "Быстрый кэш относится к системному разделу C:",
-  "diskCleanDriveTitle": "Мастер очистки диска {letter}:"
+  "diskCleanDriveTitle": "Мастер очистки диска {letter}:",
+  "updateSectionTitle": "Обновление программы",
+  "updateVersionLabel": "Текущая версия:",
+  "updateStatusLabel": "Статус:",
+  "updateAvailable": "Доступно обновление PulseCore ({size} МБ)",
+  "updateCheckBtn": "Проверить обновления",
+  "updateChecking": "Проверка обновлений...",
+  "updateUpToDate": "Установлена последняя версия",
+  "updateDownloading": "Скачивание обновления... {percent}%",
+  "updateRestarting": "Перезапуск приложения...",
+  "updateInstallBtn": "Обновить и перезапустить",
+  "updateLaterBtn": "Позже",
+  "updateFailed": "Сбой обновления: {err}"
 }

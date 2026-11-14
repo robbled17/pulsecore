@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "Акыллы тотуны кабызу",
   "diskCleanDriveCard": "💾 {letter}: дискында {free} буш",
   "diskCleanCacheNotice": "Тиз кэш C: система бүлегенә карый",
-  "diskCleanDriveTitle": "{letter}: дискын чистарту остасы"
+  "diskCleanDriveTitle": "{letter}: дискын чистарту остасы",
+  "updateSectionTitle": "Программаны яңарту",
+  "updateVersionLabel": "Хәзерге версия:",
+  "updateStatusLabel": "Хәле:",
+  "updateAvailable": "PulseCore яңартуы бар ({size} МБ)",
+  "updateCheckBtn": "Яңартуларны тикшерү",
+  "updateChecking": "Яңартулар тикшерелә...",
+  "updateUpToDate": "Иң соңгы версия урнаштырылган",
+  "updateDownloading": "Яңарту йөкләнә... {percent}%",
+  "updateRestarting": "Кушымта яңадан кабызыла...",
+  "updateInstallBtn": "Яңартып, яңадан кабызу",
+  "updateLaterBtn": "Соңрак",
+  "updateFailed": "Яңарту хатасы: {err}"
 }

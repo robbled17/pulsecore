@@ -898,5 +898,17 @@
   "optConflictWatcherToggle": "Intelligentes Abfangen aktivieren",
   "diskCleanDriveCard": "💾 Laufwerk {letter}: {free} frei",
   "diskCleanCacheNotice": "Schnell-Cache gehört zur Systempartition C:",
-  "diskCleanDriveTitle": "Datenträgerbereinigung-Assistent ({letter}:)"
+  "diskCleanDriveTitle": "Datenträgerbereinigung-Assistent ({letter}:)",
+  "updateSectionTitle": "Programm-Updates",
+  "updateVersionLabel": "Aktuelle Version:",
+  "updateStatusLabel": "Status:",
+  "updateAvailable": "PulseCore-Update verfügbar ({size} MB)",
+  "updateCheckBtn": "Nach Updates suchen",
+  "updateChecking": "Nach Updates suchen...",
+  "updateUpToDate": "Neueste Version installiert",
+  "updateDownloading": "Update wird heruntergeladen... {percent}%",
+  "updateRestarting": "Anwendung wird neu gestartet...",
+  "updateInstallBtn": "Aktualisieren und neu starten",
+  "updateLaterBtn": "Später",
+  "updateFailed": "Update fehlgeschlagen: {err}"
 }

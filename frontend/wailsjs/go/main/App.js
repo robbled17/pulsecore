@@ -50,6 +50,10 @@ export function CheckDiskHealthForce(arg1) {
   return window['go']['main']['App']['CheckDiskHealthForce'](arg1);
 }
 
+export function CheckForUpdates() {
+  return window['go']['main']['App']['CheckForUpdates']();
+}
+
 export function CheckNetworkDetailed(arg1) {
   return window['go']['main']['App']['CheckNetworkDetailed'](arg1);
 }
@@ -64,6 +68,10 @@ export function CleanDeliveryOptimization() {
 
 export function CleanOldestShadow() {
   return window['go']['main']['App']['CleanOldestShadow']();
+}
+
+export function CleanupOldBinary() {
+  return window['go']['main']['App']['CleanupOldBinary']();
 }
 
 export function ClearOverlayWindowRegion() {
@@ -112,6 +120,10 @@ export function DiskWatchPrior(arg1, arg2) {
 
 export function DismissHomeProblem(arg1) {
   return window['go']['main']['App']['DismissHomeProblem'](arg1);
+}
+
+export function DownloadAndInstallUpdate(arg1, arg2) {
+  return window['go']['main']['App']['DownloadAndInstallUpdate'](arg1, arg2);
 }
 
 export function EcoModeByProcessName(arg1, arg2) {
