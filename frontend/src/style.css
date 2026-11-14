@@ -208,13 +208,11 @@ body {
   box-sizing: border-box;
   scrollbar-gutter: stable;
 }
-html {
+.modal-body,
+.sf-scroll-pane {
   scrollbar-gutter: stable;
 }
-/* Maximised: drop reserved scrollbar gutter (~50px empty strip). */
-html.window-maximized {
-  scrollbar-gutter: auto;
-}
+/* Maximised: drop reserved scrollbar gutter */
 html.window-maximized .tab-pane.active,
 html.window-maximized .tab.active,
 html.window-maximized .content {
@@ -1382,7 +1380,10 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   flex-direction: column;
 }
 #diskclean-modal .modal-body {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  flex: 1;
   max-height: min(68vh, 640px);
 }
 .diskclean-tabs {
@@ -4550,13 +4551,17 @@ select option,
 .cleaner-drives-bar {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 10px;
-  padding: 10px 24px 14px 24px;
-  margin-bottom: 4px;
+  padding: 12px 24px 14px;
+  margin-bottom: 0;
   overflow-x: auto;
 }
 
 .cleaner-drive-pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -4599,4 +4604,98 @@ select option,
   border: 1px solid rgba(96, 165, 250, 0.3);
   color: var(--text-primary);
   font-size: 12.5px;
+}
+
+/* Hardware Top Processes in CPU/GPU/RAM cards */
+.hw-procs-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hw-procs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hw-procs-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.btn-freeze-procs {
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-freeze-procs.frozen {
+  background: rgba(96, 165, 250, 0.22);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.hw-procs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hw-proc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  transition: background 0.15s ease;
+}
+.hw-proc-row:hover {
+  background: var(--bg-card-hover);
+}
+.hw-proc-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.hw-proc-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hw-proc-val {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.hw-proc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.hw-proc-btn {
+  padding: 3px 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
+}
+/* Scanning skeleton & ring loader */
+.home-score-measuring {
+  animation: pulseScan 1.6s ease-in-out infinite;
+}
+@keyframes pulseScan {
+  0%, 100% { opacity: 0.6; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.02); }
 }

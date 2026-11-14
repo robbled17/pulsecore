@@ -17,3 +17,8 @@ func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 func TerminateLockingProcesses(procs []LockProcessInfo) (int, int, error) {
 	return 0, 0, nil
 }
+
+func UnlockPath(targetPath string) (int, error) {
+	return 0, nil
+}
+

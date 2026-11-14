@@ -18,6 +18,8 @@ type HomeState struct {
 	Problems        []HomeProblem     `json:"problems"`
 	AllGood         bool              `json:"allGood"`
 	Incomplete      bool              `json:"incomplete"`
+	Initialized     bool              `json:"initialized"`
+	HasSamples      bool              `json:"hasSamples"`
 	MissingNote     string            `json:"missingNote"`
 	Deductions      []HealthDeduction `json:"deductions"`
 	PrepareActive   bool              `json:"prepareActive"`
@@ -106,6 +108,17 @@ func (a *App) GetHomeState() HomeState {
 		lagEco = c.CanEco && !c.SystemProc
 	}
 
+	if topRAMName != "" && a.isThrottledProcess(topRAMName) {
+		topRAMName = ""
+		topFriend = ""
+		topEco = false
+	}
+	if lagCulprit != "" && a.isThrottledProcess(lagCulprit) {
+		lagCulprit = ""
+		lagFriend = ""
+		lagEco = false
+	}
+
 	diskBad, diskCaution := false, false
 	diskLetter := ""
 	var diskReason loc.Msg
@@ -175,6 +188,14 @@ func (a *App) GetHomeState() HomeState {
 	}
 	probs := EvaluateHomeProblems(in, 3)
 	probs = a.filterDismissedProblems(probs, sysUsed, sysOK)
+	filtered := make([]HomeProblem, 0, len(probs))
+	for _, p := range probs {
+		if p.ActionID == "eco_process" && a.isThrottledProcess(p.ActionArg) {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	probs = filtered
 	status := HomeStatusWord(health.Score)
 
 	pg := a.ensurePrepare()
@@ -190,11 +211,15 @@ func (a *App) GetHomeState() HomeState {
 		}
 	}
 
+	initialized := m.Timestamp != "" && m.RAMTotalMB > 0
+	hasSamples := initialized && len(m.Disks) > 0
+
 	return HomeState{
 		Score: health.Score, ScoreIfAllFixed: ScoreIfAllFixed(health.Score, probs),
 		Status: status,
 		CheckedAgoSec: 2, Problems: probs, AllGood: len(probs) == 0,
 		Incomplete: health.Incomplete, MissingNote: health.MissingNote,
+		Initialized: initialized, HasSamples: hasSamples,
 		Deductions: health.Deductions,
 		PrepareActive: prepOn, PrepareRAMMB: prepRAM,
 		EcoLimitedCount: ecoCount, PowerMode: power,
@@ -226,6 +251,7 @@ func (a *App) RunHomeAction(actionID, actionArg string) HomeActionResult {
 		return HomeActionResult{OK: true, ScoreBefore: before, ScoreAfter: after,
 			Message: loc.M("homeProblemDismissed", nil)}
 	case "eco_process":
+		a.recordThrottledProcess(actionArg)
 		res := a.ApplyEcoWithFeedback(actionArg)
 		after := a.GetSystemHealth().Score
 		freed := ecoFreedMB(res)

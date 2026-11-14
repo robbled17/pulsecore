@@ -235,3 +235,17 @@ func TerminateLockingProcesses(procs []LockProcessInfo) (terminated int, skipped
 	}
 	return terminated, skipped, nil
 }
+
+// UnlockPath finds locking processes for targetPath and terminates them.
+func UnlockPath(targetPath string) (int, error) {
+	procs, err := FindLockingProcesses(targetPath)
+	if err != nil {
+		return 0, err
+	}
+	if len(procs) == 0 {
+		return 0, nil
+	}
+	term, _, err := TerminateLockingProcesses(procs)
+	return term, err
+}
+

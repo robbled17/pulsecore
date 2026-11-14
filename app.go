@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"os/exec"
 	"path/filepath"
@@ -84,8 +85,9 @@ type App struct {
 	stopWorker   chan struct{}
 	workerOnce   sync.Once
 	flightOnce   sync.Once
-	ecoPIDs      map[int32]bool
-	prefs        appPrefs
+	ecoPIDs            map[int32]bool
+	throttledProcesses map[string]time.Time
+	prefs              appPrefs
 
 	lastBattery        time.Time
 	cachedBat          BatteryMetrics
@@ -310,7 +312,41 @@ func (a *App) shutdown(ctx context.Context) {
 	}
 }
 
+func (a *App) recordThrottledProcess(name string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.throttledProcesses == nil {
+		a.throttledProcesses = make(map[string]time.Time)
+	}
+	key := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
+	if key != "" {
+		a.throttledProcesses[key] = time.Now().Add(5 * time.Minute)
+	}
+}
+
+func (a *App) isThrottledProcess(name string) bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.throttledProcesses == nil {
+		return false
+	}
+	key := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
+	if key == "" {
+		return false
+	}
+	until, ok := a.throttledProcesses[key]
+	if !ok {
+		return false
+	}
+	return time.Now().Before(until)
+}
+
 func (a *App) metricsWorker() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("recovered in metricsWorker: %v", r)
+		}
+	}()
 	a.collectOnce()
 	for {
 		if !a.pauseCollect() {
@@ -351,6 +387,11 @@ func (a *App) pauseCollect() bool {
 }
 
 func (a *App) collectOnce() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("recovered in collectOnce: %v", r)
+		}
+	}()
 	if a.ctx != nil {
 		select {
 		case <-a.ctx.Done():
@@ -921,6 +962,11 @@ func (a *App) TriggerThermalCheck(temp float64) {
 }
 
 func (a *App) emitThermalAlarm(temp float64) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("recovered in emitThermalAlarm: %v", r)
+		}
+	}()
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
 	title := "PulseCore Emergency Hardware Alarm"
 	body := fmt.Sprintf("CPU temperature %.1f°C exceeded 85°C for %ds. Consider Silent mode.", temp, thermalHoldSec)
@@ -1033,6 +1079,11 @@ func (a *App) positionGameOverlay() {
 
 // peripheralsWatchdog polls PnP inventory every ~2.5s and emits changes.
 func (a *App) peripheralsWatchdog() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("recovered in peripheralsWatchdog: %v", r)
+		}
+	}()
 	ticker := time.NewTicker(8 * time.Second)
 	defer ticker.Stop()
 	for {

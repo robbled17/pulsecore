@@ -28,6 +28,34 @@ func main() {
 	}
 	app := NewApp()
 
+	isWin11 := isWindows11OrGreater()
+	var bgColour *options.RGBA
+	var winOptions *windows.Options
+
+	if isWin11 {
+		bgColour = &options.RGBA{R: 0, G: 0, B: 0, A: 0}
+		winOptions = &windows.Options{
+			WebviewIsTransparent:              true,
+			WindowIsTranslucent:               true,
+			DisableWindowIcon:                 false,
+			DisableFramelessWindowDecorations: false,
+			BackdropType:                      windows.Mica,
+			Theme:                             windows.SystemDefault,
+		}
+	} else {
+		// Windows 10 or earlier (< build 22000):
+		// Disable Acrylic/Mica/Translucent backdrop to eliminate flickering transparent trail next to scrollbar
+		bgColour = &options.RGBA{R: 11, G: 15, B: 25, A: 255}
+		winOptions = &windows.Options{
+			WebviewIsTransparent:              false,
+			WindowIsTranslucent:               false,
+			DisableWindowIcon:                 false,
+			DisableFramelessWindowDecorations: false,
+			BackdropType:                      windows.None,
+			Theme:                             windows.SystemDefault,
+		}
+	}
+
 	err := wails.Run(&options.App{
 		Title:             "PulseCore",
 		Width:             1280,
@@ -39,7 +67,7 @@ func main() {
 		Frameless:         true,
 		StartHidden:       false,
 		HideWindowOnClose: false,
-		BackgroundColour:  &options.RGBA{R: 0, G: 0, B: 0, A: 0},
+		BackgroundColour:  bgColour,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -49,14 +77,7 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
-		Windows: &windows.Options{
-			WebviewIsTransparent:              true,
-			WindowIsTranslucent:               true,
-			DisableWindowIcon:                 false,
-			DisableFramelessWindowDecorations: false,
-			BackdropType:                      windows.Mica,
-			Theme:                             windows.SystemDefault,
-		},
+		Windows: winOptions,
 	})
 	if err != nil {
 		println("Error:", err.Error())

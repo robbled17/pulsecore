@@ -110,6 +110,9 @@
   GetLocalDrives,
   IsConflictWatcherEnabled,
   SetConflictWatcherEnabled,
+  GetHardwareTopProcesses,
+  KillProcess,
+  RestartProcess,
 } from '../wailsjs/go/main/App.js'
 import { EventsOn, WindowMinimise, BrowserOpenURL, WindowIsMaximised } from '../wailsjs/runtime/runtime.js'
 
@@ -990,6 +993,32 @@ async function renderHome() {
   let st
   try { st = await GetHomeState() } catch (_) { st = null }
   if (!st) return
+
+  const isMeasuring = !st.initialized || !st.hasSamples
+  if (isMeasuring) {
+    scoreEl.textContent = '—'
+    if (statusEl) statusEl.textContent = t('homeMeasuringHealth')
+    if (checkedEl) checkedEl.textContent = ''
+    if (ringFg) {
+      ringFg.style.strokeDasharray = '40 20'
+      ringFg.style.strokeDashoffset = '0'
+      ringFg.style.stroke = themeToken('--accent', '#38bdf8')
+      ringFg.classList.add('home-score-measuring')
+    }
+    findings.innerHTML = `<div class="home-problem home-all-good st-good">
+      <div class="home-all-good-head">
+        <div class="problem-title" style="display:flex;align-items:center;gap:8px;">
+          <span class="home-score-measuring" aria-hidden="true">⏳</span> ${t('homeMeasuringHealth')}
+        </div>
+        <div class="home-all-good-sub meta">${t('diskScanning')}</div>
+      </div>
+    </div>`
+    return
+  }
+
+  if (ringFg) {
+    ringFg.classList.remove('home-score-measuring')
+  }
   const score = Number(st.score) || 0
   scoreEl.textContent = String(score)
   if (statusEl) statusEl.textContent = msgText(st.status, st.statusRu, st.statusEn)
@@ -1005,7 +1034,23 @@ async function renderHome() {
         ? themeToken('--warn', '#fbbf24')
         : themeToken('--danger', '#fb7185')
   }
-  const probs = Array.isArray(st.problems) ? st.problems : []
+
+  window.__throttledProcesses = window.__throttledProcesses || {}
+  const now = Date.now()
+  for (const k in window.__throttledProcesses) {
+    if (now - window.__throttledProcesses[k] > 5 * 60 * 1000) {
+      delete window.__throttledProcesses[k]
+    }
+  }
+
+  let probs = Array.isArray(st.problems) ? st.problems : []
+  probs = probs.filter((p) => {
+    if (p.actionId === 'eco_process' && p.actionArg) {
+      const name = p.actionArg.toLowerCase().trim()
+      if (window.__throttledProcesses[name]) return false
+    }
+    return true
+  })
   const showGains = score < 95
   const scoreIfAll = Number(st.scoreIfAllFixed) || score
   const smartBtn = $('btn-smart-fix')
@@ -2484,6 +2529,65 @@ function renderVampExclusions(wl = loadVampWhitelist()) {
   `).join('')
 }
 
+const hwProcsFrozen = { cpu: false, gpu: false, ram: false }
+let lastHwTopProcesses = null
+let hwTopProcsFetchInFlight = false
+let lastHwProcsFetchTime = 0
+
+async function updateHardwareTopProcesses(force = false) {
+  const cpuOpen = uiExpand.tiles.has('tile-cpu')
+  const gpuOpen = uiExpand.tiles.has('tile-gpu')
+  const ramOpen = uiExpand.tiles.has('tile-ram')
+
+  if (!force && !cpuOpen && !gpuOpen && !ramOpen) {
+    return
+  }
+
+  const now = Date.now()
+  if (!force && now - lastHwProcsFetchTime < 1500) {
+    return
+  }
+  if (hwTopProcsFetchInFlight) return
+
+  hwTopProcsFetchInFlight = true
+  lastHwProcsFetchTime = now
+  try {
+    const data = await GetHardwareTopProcesses()
+    if (data) {
+      lastHwTopProcesses = data
+      renderHardwareProcsList('cpu', data.cpu || [])
+      renderHardwareProcsList('gpu', data.gpu || [])
+      renderHardwareProcsList('ram', data.ram || [])
+    }
+  } catch (err) {
+    console.error('[PulseCore] GetHardwareTopProcesses', err)
+  } finally {
+    hwTopProcsFetchInFlight = false
+  }
+}
+
+function renderHardwareProcsList(target, items) {
+  if (hwProcsFrozen[target]) return
+  const listEl = $(`hw-procs-${target}-list`)
+  if (!listEl) return
+  if (!items || !items.length) {
+    listEl.innerHTML = `<div class="empty meta" style="padding:6px 0;font-size:12px;">-</div>`
+    return
+  }
+  listEl.innerHTML = items.slice(0, 5).map((p) => {
+    return `<div class="hw-proc-row" data-pid="${p.pid}">
+      <div class="hw-proc-info">
+        <span class="hw-proc-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+        <span class="hw-proc-val">${escapeHtml(p.displayVal)}</span>
+      </div>
+      <div class="hw-proc-actions">
+        <button type="button" class="btn soft compact hw-proc-btn btn-kill-proc" data-pid="${p.pid}" data-name="${escapeHtml(p.name)}" title="${t('procActionKill')}">${t('procActionKill')}</button>
+        <button type="button" class="btn soft compact hw-proc-btn btn-restart-proc" data-pid="${p.pid}" data-name="${escapeHtml(p.name)}" title="${t('procActionRestart')}">${t('procActionRestart')}</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
 function renderHardware(m) {
   const hw = m.hardware || {}
   const cpu = hw.cpu || {}
@@ -2652,6 +2756,7 @@ function renderHardware(m) {
     setHw('hw-pwr-cap', pwr.powerScheme || '-')
   }
   })
+  updateHardwareTopProcesses().catch(() => {})
 }
 
 function isDefenderName(name) {
@@ -3162,7 +3267,7 @@ function updateHomeDiskSummary(m) {
     if (!sum) return
     const disks = m.disks || []
     if (!disks.length) {
-      sum.innerHTML = ''
+      sum.innerHTML = `<span class="meta" style="font-size:12px;opacity:0.8;">⏳ ${t('diskScanning')}</span>`
       return
     }
     sum.innerHTML = buildDiskPillsHTML(disks, (letter) => cachedDiskReport[letter], {
@@ -6049,10 +6154,83 @@ function wireUI() {
       const open = tile.classList.toggle('open')
       btn.setAttribute('aria-expanded', open ? 'true' : 'false')
       if (tile.id) {
-        if (open) uiExpand.tiles.add(tile.id)
-        else uiExpand.tiles.delete(tile.id)
+        if (open) {
+          uiExpand.tiles.add(tile.id)
+          if (tile.id === 'tile-cpu' || tile.id === 'tile-gpu' || tile.id === 'tile-ram') {
+            updateHardwareTopProcesses(true).catch(() => {})
+          }
+        } else {
+          uiExpand.tiles.delete(tile.id)
+        }
       }
     })
+  })
+
+  document.addEventListener('click', (e) => {
+    const freezeBtn = e.target.closest('.btn-freeze-procs')
+    if (freezeBtn) {
+      const target = freezeBtn.getAttribute('data-target')
+      if (target && hwProcsFrozen.hasOwnProperty(target)) {
+        hwProcsFrozen[target] = !hwProcsFrozen[target]
+        freezeBtn.classList.toggle('frozen', hwProcsFrozen[target])
+        freezeBtn.textContent = hwProcsFrozen[target] ? t('resumeProcesses') : t('freezeProcesses')
+        if (!hwProcsFrozen[target] && lastHwTopProcesses) {
+          renderHardwareProcsList(target, lastHwTopProcesses[target] || [])
+        }
+      }
+      return
+    }
+
+    const killBtn = e.target.closest('.btn-kill-proc')
+    if (killBtn) {
+      const pid = Number(killBtn.getAttribute('data-pid'))
+      const name = killBtn.getAttribute('data-name') || ''
+      if (pid > 0) {
+        killBtn.disabled = true
+        killBtn.textContent = '...'
+        KillProcess(pid).then((ok) => {
+          if (ok) {
+            showToast(`${t('procActionKill')}: ${name}`, true, { holdMs: 3000 })
+            killBtn.closest('.hw-proc-row')?.remove()
+            setTimeout(() => updateHardwareTopProcesses(true), 500)
+          } else {
+            showToast(t('errGeneric', { err: name }), false, { holdMs: 4000 })
+            killBtn.disabled = false
+            killBtn.textContent = t('procActionKill')
+          }
+        }).catch((err) => {
+          showToast(String(err), false, { holdMs: 4000 })
+          killBtn.disabled = false
+          killBtn.textContent = t('procActionKill')
+        })
+      }
+      return
+    }
+
+    const restartBtn = e.target.closest('.btn-restart-proc')
+    if (restartBtn) {
+      const pid = Number(restartBtn.getAttribute('data-pid'))
+      const name = restartBtn.getAttribute('data-name') || ''
+      if (pid > 0) {
+        restartBtn.disabled = true
+        restartBtn.textContent = '...'
+        RestartProcess(pid).then((ok) => {
+          if (ok) {
+            showToast(`${t('procActionRestart')}: ${name}`, true, { holdMs: 3000 })
+            setTimeout(() => updateHardwareTopProcesses(true), 1000)
+          } else {
+            showToast(t('errGeneric', { err: name }), false, { holdMs: 4000 })
+            restartBtn.disabled = false
+            restartBtn.textContent = t('procActionRestart')
+          }
+        }).catch((err) => {
+          showToast(String(err), false, { holdMs: 4000 })
+          restartBtn.disabled = false
+          restartBtn.textContent = t('procActionRestart')
+        })
+      }
+      return
+    }
   })
   $('home-findings')?.addEventListener('click', async (ev) => {
     const more = ev.target.closest('.problem-more, .btn-details')
@@ -6082,6 +6260,9 @@ function wireUI() {
     const actionsHost = btn.closest('.home-prepare-actions') || btn.parentElement
     btn.disabled = true
     const labelEl = btn.querySelector('.home-prepare-label')
+    if (action === 'eco_process') {
+      btn.classList.add('is-loading')
+    }
     if (action === 'prepare_game' || action === 'revert_prepare') {
       // Immediate honest UI: indeterminate progress, no fake %.
       if (actionsHost) {
@@ -6136,6 +6317,18 @@ function wireUI() {
     if (res?.openTab) setActiveTab(res.openTab)
     if (action === 'open_disk') {
       revealDiskSpecs(arg || 'C')
+    }
+    if (action === 'eco_process') {
+      const probCard = btn.closest('.home-problem')
+      if (res?.ok) {
+        if (arg) {
+          window.__throttledProcesses = window.__throttledProcesses || {}
+          window.__throttledProcesses[arg.toLowerCase().trim()] = Date.now()
+        }
+        if (probCard) {
+          probCard.innerHTML = `<div class="home-eco-pill" style="color:var(--ok,#4ade80);padding:8px 12px;font-size:12.5px;">✓ ${escapeHtml(t('homeRamThrottledStatus', { name: arg || '' }))}</div>`
+        }
+      }
     }
     // Clear in-flight marker so renderHome can rebuild result/restore UI.
     actionsHost?.querySelector('.home-prepare-progress')?.remove()

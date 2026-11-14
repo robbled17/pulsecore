@@ -182,6 +182,10 @@ export function GetGameSessions() {
   return window['go']['main']['App']['GetGameSessions']();
 }
 
+export function GetHardwareTopProcesses() {
+  return window['go']['main']['App']['GetHardwareTopProcesses']();
+}
+
 export function GetHelperDiagnostics() {
   return window['go']['main']['App']['GetHelperDiagnostics']();
 }
@@ -324,6 +328,10 @@ export function IsFullscreen() {
 
 export function IsMiniHUD() {
   return window['go']['main']['App']['IsMiniHUD']();
+}
+
+export function KillProcess(arg1) {
+  return window['go']['main']['App']['KillProcess'](arg1);
 }
 
 export function LagSpotterCheck(arg1, arg2) {
@@ -472,6 +480,10 @@ export function RestartHelper() {
 
 export function RestartPnPDevice(arg1) {
   return window['go']['main']['App']['RestartPnPDevice'](arg1);
+}
+
+export function RestartProcess(arg1) {
+  return window['go']['main']['App']['RestartProcess'](arg1);
 }
 
 export function RestoreHiddenGame(arg1) {

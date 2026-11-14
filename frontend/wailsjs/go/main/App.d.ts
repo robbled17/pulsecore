@@ -93,6 +93,8 @@ export function GetGameExclusions():Promise<Array<string>>;
 
 export function GetGameSessions():Promise<Array<main.GameSession>>;
 
+export function GetHardwareTopProcesses():Promise<main.HardwareTopProcesses>;
+
 export function GetHelperDiagnostics():Promise<string>;
 
 export function GetHomeState():Promise<main.HomeState>;
@@ -164,6 +166,8 @@ export function IsElevated():Promise<boolean>;
 export function IsFullscreen():Promise<boolean>;
 
 export function IsMiniHUD():Promise<boolean>;
+
+export function KillProcess(arg1:number):Promise<void>;
 
 export function LagSpotterCheck(arg1:Array<number>,arg2:number):Promise<Array<main.LagEvent>>;
 
@@ -238,6 +242,8 @@ export function RestartAsAdmin():Promise<void>;
 export function RestartHelper():Promise<main.AdvancedModeActionResult>;
 
 export function RestartPnPDevice(arg1:string):Promise<Record<string, any>>;
+
+export function RestartProcess(arg1:number):Promise<void>;
 
 export function RestoreHiddenGame(arg1:string):Promise<boolean>;
 

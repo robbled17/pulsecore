@@ -49,6 +49,10 @@ var (
 	procCWSetCursor             = modUser32CW.NewProc("SetCursor")
 	procCWGetCursorPos          = modUser32CW.NewProc("GetCursorPos")
 	procCWScreenToClient        = modUser32CW.NewProc("ScreenToClient")
+	procCWGetForegroundWindow   = modUser32CW.NewProc("GetForegroundWindow")
+	procCWGetWindowThreadProcId = modUser32CW.NewProc("GetWindowThreadProcessId")
+	procCWGetAncestor           = modUser32CW.NewProc("GetAncestor")
+	procCWGetParent             = modUser32CW.NewProc("GetParent")
 
 	modGdi32CW                  = windows.NewLazySystemDLL("gdi32.dll")
 	procCWCreateSolidBrush      = modGdi32CW.NewProc("CreateSolidBrush")
@@ -62,8 +66,9 @@ var (
 	procCWRoundRect             = modGdi32CW.NewProc("RoundRect")
 	procCWCreatePen             = modGdi32CW.NewProc("CreatePen")
 
-	modKernel32CW               = windows.NewLazySystemDLL("kernel32.dll")
-	procCWGetModuleHandleW      = modKernel32CW.NewProc("GetModuleHandleW")
+	modKernel32CW                    = windows.NewLazySystemDLL("kernel32.dll")
+	procCWGetModuleHandleW           = modKernel32CW.NewProc("GetModuleHandleW")
+	procCWQueryFullProcessImageNameW = modKernel32CW.NewProc("QueryFullProcessImageNameW")
 )
 
 const (
@@ -200,6 +205,32 @@ func (a *App) conflictWatcherLoop() {
 	}
 }
 
+// isConflictTargetFocused returns true if the foreground window is the target dialog,
+// the overlay itself, a child/ancestor of the target, or belongs to the same Explorer process.
+func isConflictTargetFocused(targetHWND, overlayHWND windows.HWND) bool {
+	fg, _, _ := procCWGetForegroundWindow.Call()
+	if fg == 0 {
+		return false
+	}
+	fgHWND := windows.HWND(fg)
+	if fgHWND == targetHWND || (overlayHWND != 0 && fgHWND == overlayHWND) {
+		return true
+	}
+	rootTarget, _, _ := procCWGetAncestor.Call(uintptr(targetHWND), 2 /* GA_ROOT */)
+	rootFg, _, _ := procCWGetAncestor.Call(fg, 2 /* GA_ROOT */)
+	if rootTarget != 0 && rootTarget == rootFg {
+		return true
+	}
+	var fgPID uint32
+	procCWGetWindowThreadProcId.Call(fg, uintptr(unsafe.Pointer(&fgPID)))
+	var targetPID uint32
+	procCWGetWindowThreadProcId.Call(uintptr(targetHWND), uintptr(unsafe.Pointer(&targetPID)))
+	if fgPID != 0 && fgPID == targetPID {
+		return true
+	}
+	return false
+}
+
 func checkActiveConflictDialogs() {
 	globalConflict.Lock()
 	currentTarget := globalConflict.targetHWND
@@ -225,10 +256,24 @@ func checkActiveConflictDialogs() {
 			return
 		}
 
+		// Focus check: only show overlay if target or its parent Explorer window or overlay is focused
+		focused := isConflictTargetFocused(currentTarget, overlay)
+		globalConflict.Lock()
+		if !focused {
+			if globalConflict.visible && overlay != 0 {
+				procCWPostMessageW.Call(uintptr(overlay), msgHideOverlayCW, 0, 0)
+				globalConflict.visible = false
+			}
+			globalConflict.Unlock()
+			return
+		} else if !globalConflict.visible && overlay != 0 {
+			procCWPostMessageW.Call(uintptr(overlay), msgShowOverlayCW, 0, 0)
+			globalConflict.visible = true
+		}
+
 		// Update position if target moved
 		var rc rectCW
 		procCWGetWindowRect.Call(uintptr(currentTarget), uintptr(unsafe.Pointer(&rc)))
-		globalConflict.Lock()
 		if rc != globalConflict.lastRect && overlay != 0 {
 			globalConflict.lastRect = rc
 			w := rc.Right - rc.Left
@@ -248,6 +293,11 @@ func checkActiveConflictDialogs() {
 	// Search for an active conflict window
 	foundHWND, foundTitle, childTexts := findConflictWindow()
 	if foundHWND == 0 {
+		return
+	}
+
+	// Only show overlay if the conflict dialog or Explorer is currently focused
+	if !isConflictTargetFocused(foundHWND, overlay) {
 		return
 	}
 
@@ -292,12 +342,12 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 	globalConflict.posW = w
 	globalConflict.posH = 60
 
-	// Format text labels
+	// Format text labels according to requirements
 	if len(procs) == 1 {
 		p := procs[0]
-		globalConflict.titleText = fmt.Sprintf("🔒 Занято: %s (PID %d)", p.ProcessName, p.PID)
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит процесс: %s (PID %d)", p.ProcessName, p.PID)
 		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
-		globalConflict.btnText = "Завершить и удалить"
+		globalConflict.btnText = "Завершить и повторить"
 	} else if len(procs) > 1 {
 		names := make([]string, 0, len(procs))
 		for _, p := range procs {
@@ -306,13 +356,13 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 				break
 			}
 		}
-		globalConflict.titleText = fmt.Sprintf("🔒 Занято (%d проц.): %s", len(procs), strings.Join(names, ", "))
+		globalConflict.titleText = fmt.Sprintf("🔒 Держит процессов (%d): %s", len(procs), strings.Join(names, ", "))
 		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
-		globalConflict.btnText = "Завершить и удалить"
+		globalConflict.btnText = "Завершить и повторить"
 	} else {
-		globalConflict.titleText = fmt.Sprintf("🔒 Заблокировано: %s", itemName)
-		globalConflict.subText = "Процесс не определен (нажмите для поиска)"
-		globalConflict.btnText = "Найти и закрыть"
+		globalConflict.titleText = "🔒 Папка занята системным дескриптором"
+		globalConflict.subText = fmt.Sprintf("Объект: %s", itemName)
+		globalConflict.btnText = "Повторить попытку"
 	}
 
 	procCWPostMessageW.Call(uintptr(globalConflict.overlayHWND), msgShowOverlayCW, 0, 0)
@@ -445,8 +495,13 @@ func resolveLockedPath(title string, childTexts []string) string {
 
 	explorerDirs := getOpenExplorerPaths()
 	for _, name := range candidateNames {
-		for _, expDir := range explorerDirs {
-			candidatePath := filepath.Join(expDir, name)
+		for _, expPath := range explorerDirs {
+			if strings.EqualFold(filepath.Base(expPath), name) {
+				if _, err := os.Stat(expPath); err == nil {
+					return expPath
+				}
+			}
+			candidatePath := filepath.Join(expPath, name)
 			if _, err := os.Stat(candidatePath); err == nil {
 				return candidatePath
 			}
@@ -471,6 +526,7 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 
 	nameLower := strings.ToLower(strings.TrimSpace(name))
 	nameWithoutExt := strings.TrimSuffix(nameLower, filepath.Ext(nameLower))
+	dirLower := strings.ToLower(strings.TrimSpace(dirPath))
 
 	var out []LockProcessInfo
 	for {
@@ -478,10 +534,28 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 		procNameLower := strings.ToLower(procName)
 
 		match := false
-		if procNameLower == nameLower || strings.TrimSuffix(procNameLower, ".exe") == nameWithoutExt {
-			match = true
-		} else if strings.Contains(nameLower, procNameLower) || strings.Contains(procNameLower, nameWithoutExt) {
-			match = true
+		if nameLower != "" {
+			if procNameLower == nameLower || strings.TrimSuffix(procNameLower, ".exe") == nameWithoutExt {
+				match = true
+			} else if strings.Contains(nameLower, procNameLower) || strings.Contains(procNameLower, nameWithoutExt) {
+				match = true
+			}
+		}
+
+		// Also check process image path if dirPath is provided
+		if !match && dirLower != "" && entry.ProcessID > 4 {
+			if hProc, err := windows.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, entry.ProcessID); err == nil {
+				var buf [windows.MAX_PATH]uint16
+				size := uint32(len(buf))
+				r, _, _ := procCWQueryFullProcessImageNameW.Call(uintptr(hProc), 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+				windows.CloseHandle(hProc)
+				if r != 0 && size > 0 {
+					exePathLower := strings.ToLower(windows.UTF16ToString(buf[:size]))
+					if strings.Contains(exePathLower, dirLower) || (nameLower != "" && strings.Contains(exePathLower, nameLower)) {
+						match = true
+					}
+				}
+			}
 		}
 
 		if match && !isProtectedSystemProcess(procName, entry.ProcessID) {
@@ -500,7 +574,7 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 }
 
 func getOpenExplorerPaths() []string {
-	cmd := `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $shell = New-Object -ComObject Shell.Application; $shell.Windows() | ForEach-Object { try { $_.Document.Folder.Self.Path } catch {} }`
+	cmd := `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $shell = New-Object -ComObject Shell.Application; $shell.Windows() | ForEach-Object { try { $_.Document.SelectedItems() | ForEach-Object { $_.Path } } catch {}; try { $_.Document.Folder.Self.Path } catch {} }`
 	raw, err := runHiddenOutput("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd)
 	if err != nil {
 		return nil
@@ -540,7 +614,7 @@ func findRetryButton(targetHWND windows.HWND) windows.HWND {
 	return retryBtn
 }
 
-// unlockAndRetry executes the termination of blocking processes and clicks Retry.
+// unlockAndRetry executes the termination of blocking processes, unlocks the target path, and clicks Retry.
 func unlockAndRetry() {
 	globalConflict.Lock()
 	targetHWND := globalConflict.targetHWND
@@ -560,6 +634,10 @@ func unlockAndRetry() {
 		if p3 := findProcessesByNameOrPath(itemName, ""); len(p3) > 0 {
 			_, _, _ = TerminateLockingProcesses(p3)
 		}
+	}
+
+	if targetPath != "" {
+		_, _ = UnlockPath(targetPath)
 	}
 
 	time.Sleep(250 * time.Millisecond)

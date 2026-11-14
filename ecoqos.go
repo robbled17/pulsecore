@@ -22,6 +22,8 @@ const (
 var (
 	procSetProcessInformation = modKernel32.NewProc("SetProcessInformation")
 	procSetPriorityClass      = modKernel32.NewProc("SetPriorityClass")
+	modPsapiEco               = windows.NewLazySystemDLL("psapi.dll")
+	procEmptyWorkingSet       = modPsapiEco.NewProc("EmptyWorkingSet")
 )
 
 // processPowerThrottlingState mirrors PROCESS_POWER_THROTTLING_STATE.
@@ -187,10 +189,16 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	prio := uintptr(normalPriorityClass)
 	if enable {
 		prio = uintptr(idlePriorityClass)
+		// Immediately trim working set from physical RAM to pagefile
+		_, _, _ = procEmptyWorkingSet.Call(uintptr(h))
 	}
 	r2, _, _ := procSetPriorityClass.Call(uintptr(h), prio)
 	if r2 == 0 {
 		// Priority failure after EcoQoS success is non-fatal for user outcome.
+	}
+
+	if enable && name != "" {
+		a.recordThrottledProcess(name)
 	}
 
 	a.mu.Lock()

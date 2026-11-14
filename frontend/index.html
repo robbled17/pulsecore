@@ -128,6 +128,13 @@
                 <div id="hw-cpu-temp-row" class="hidden"><span class="muted" data-i18n="temp">Температура</span><div class="hw-val" id="hw-cpu-temp">-</div><div class="temp-source muted" id="hw-cpu-temp-src"></div></div>
               </div>
               <div id="core-grid" class="core-grid"></div>
+              <div class="hw-procs-section" id="hw-procs-cpu">
+                <div class="hw-procs-header">
+                  <span class="hw-procs-title" data-i18n="hwTopProcessesTitle">Топ процессов по нагрузке</span>
+                  <button type="button" class="btn soft compact btn-freeze-procs" data-target="cpu" data-i18n="freezeProcesses">❄️ Заморозить</button>
+                </div>
+                <div class="hw-procs-list" id="hw-procs-cpu-list"></div>
+              </div>
             </div>
           </div>
 
@@ -146,6 +153,13 @@
                 <div id="hw-gpu-temp-row" class="hidden"><span class="muted" data-i18n="temp">Температура</span><div class="hw-val" id="hw-gpu-temp">-</div></div>
                 <div id="hw-gpu-power-row" class="hidden"><span class="muted" data-i18n="lblPowerW">Мощность</span><div class="hw-val" id="hw-gpu-power">-</div></div>
                 <div id="hw-gpu-clock-row" class="hidden"><span class="muted" data-i18n="lblClocks">Частоты</span><div class="hw-val" id="hw-gpu-clocks">-</div></div>
+              </div>
+              <div class="hw-procs-section" id="hw-procs-gpu">
+                <div class="hw-procs-header">
+                  <span class="hw-procs-title" data-i18n="hwTopProcessesTitle">Топ процессов по нагрузке</span>
+                  <button type="button" class="btn soft compact btn-freeze-procs" data-target="gpu" data-i18n="freezeProcesses">❄️ Заморозить</button>
+                </div>
+                <div class="hw-procs-list" id="hw-procs-gpu-list"></div>
               </div>
             </div>
           </div>
@@ -168,6 +182,13 @@
                   <div class="hw-val" id="hw-ram-channel">-</div>
                   <div class="meta hidden" id="hw-ram-channel-hint"></div>
                 </div>
+              </div>
+              <div class="hw-procs-section" id="hw-procs-ram">
+                <div class="hw-procs-header">
+                  <span class="hw-procs-title" data-i18n="hwTopProcessesTitle">Топ процессов по нагрузке</span>
+                  <button type="button" class="btn soft compact btn-freeze-procs" data-target="ram" data-i18n="freezeProcesses">❄️ Заморозить</button>
+                </div>
+                <div class="hw-procs-list" id="hw-procs-ram-list"></div>
               </div>
             </div>
           </div>

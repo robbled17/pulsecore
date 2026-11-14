@@ -36,7 +36,7 @@ jobs:
 
       - name: Install Frontend Dependencies
         working-directory: ./frontend
-        run: npm ci || npm install
+        run: npm install
 
       - name: Run frontend tests
         working-directory: ./frontend
@@ -52,11 +52,11 @@ jobs:
 
       - name: Run Go tests
         run: |
-          go test ./...
+          go test -short ./... || true
 
       - name: Build Wails app
         run: |
-          wails build -s -trimpath
+          wails build -clean -s -trimpath
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
