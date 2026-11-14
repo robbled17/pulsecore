@@ -3154,24 +3154,28 @@ html.i18n-dev :is(body, #app) {
 }
 .minihud, .mini-hud-capsule {
   display: none;
-  gap: 10px;
-  padding: 6px 14px;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 42px 0 16px !important;
   background: #0f172a !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  border-radius: 9999px;
-  overflow: visible;
+  border: 1px solid #334155 !important;
+  border-radius: 9999px !important;
+  overflow: visible !important;
   box-shadow: none !important;
   width: 100% !important;
   height: 100% !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  position: relative;
+  position: relative !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .minihud.hidden,
 #minihud.hidden,
-body:not(.mini-hud-active) #minihud {
+body:not(.mini-hud-active) #minihud,
+body:not(.mini-hud-active) .minihud,
+body.game-overlay-active #minihud,
+body.game-overlay-active .minihud {
   display: none !important;
 }
 body.mini-hud-active #minihud:not(.hidden) {
@@ -3257,7 +3261,10 @@ body.mini-hud-active #app {
 }
 .gameoverlay.hidden,
 #gameoverlay.hidden,
-body:not(.game-overlay-active) #gameoverlay {
+body:not(.game-overlay-active) #gameoverlay,
+body:not(.game-overlay-active) .gameoverlay,
+body.mini-hud-active #gameoverlay,
+body.mini-hud-active .gameoverlay {
   display: none !important;
 }
 body.game-overlay-active #gameoverlay:not(.hidden) {
@@ -3374,21 +3381,32 @@ body.mini-hud-active .mini-hud-capsule {
   cursor: pointer;
 }
 .mh-expand {
-  flex: 0 0 auto;
-  margin-left: 12px;
-  min-width: 34px;
-  padding: 6px 10px !important;
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
   color: #ffffff !important;
-  opacity: 0.9;
-  cursor: pointer;
-  --wails-draggable: no-drag;
-  -webkit-app-region: no-drag;
-  border: 1px solid rgba(255,255,255,0.2) !important;
-  background: rgba(255,255,255,0.06) !important;
-  border-radius: 10px !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  text-shadow: 0 0 10px rgba(255,255,255,0.35);
+  font-size: 13px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  --wails-draggable: no-drag !important;
+  -webkit-app-region: no-drag !important;
+  box-sizing: border-box !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
 }
 .mh-expand:hover {
   opacity: 1;

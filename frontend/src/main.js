@@ -3157,22 +3157,6 @@ function renderMiniHUD(m) {
   }
   paintTemp('mh-cpu-temp', cpuKnown, cpuT)
   paintTemp('mh-gpu-temp', gpuKnown, gpuT)
-  if (hudEnabled) {
-    const box = $('minihud')
-    if (box && !box.classList.contains('hidden')) {
-      const w = Math.ceil(box.scrollWidth + 24)
-      const h = Math.ceil(box.scrollHeight + 8)
-      if (w > 40 && h > 20) {
-        const prevW = renderMiniHUD._w || 0
-        const prevH = renderMiniHUD._h || 0
-        if (Math.abs(w - prevW) > 2 || Math.abs(h - prevH) > 2) {
-          renderMiniHUD._w = w
-          renderMiniHUD._h = h
-          try { ResizeMiniHUD(w, h) } catch (_) { /* ignore */ }
-        }
-      }
-    }
-  }
 }
 
 function syncSettings(m) {
@@ -3628,29 +3612,33 @@ async function refreshAllDiskSmart(force = false) {
 
 function setHudMode(enabled) {
   hudEnabled = !!enabled
-  if (enabled) setGameOverlayMode(false, true)
-  else {
-    // Allow a fresh measure next time HUD opens (still grow-only while open).
+  if (enabled) {
+    setGameOverlayMode(false, true)
+    document.body.classList.add('mini-hud-active')
+    document.documentElement.classList.add('mini-hud-active')
+    $('minihud')?.classList.remove('hidden')
+    $('gameoverlay')?.classList.add('hidden')
+    const hud = $('minihud')
+    if (hud) {
+      hud.removeAttribute('title')
+      const op = hud.dataset.opacity || '80'
+      hud.dataset.opacity = op
+    }
+    $('shell')?.classList.add('hidden')
+    $('titlebar')?.classList.add('hidden')
+  } else {
     renderMiniHUD._w = 0
     renderMiniHUD._h = 0
-  }
-  document.body.classList.toggle('mini-hud-active', enabled)
-  document.documentElement.classList.toggle('mini-hud-active', enabled)
-  const hud = $('minihud')
-  hud?.classList.toggle('hidden', !enabled)
-  // HUD stays visually dark; do not flip capsule to light theme tokens.
-  if (hud) {
-    hud.removeAttribute('title')
-    const op = hud.dataset.opacity || '80'
-    hud.dataset.opacity = op
-  }
-  if (enabled || gameOverlayOn) {
-    $('shell').classList.add('hidden')
-    $('titlebar').classList.add('hidden')
-  } else {
-    $('shell').classList.remove('hidden')
-    restoreTitlebarDrag()
+    document.body.classList.remove('mini-hud-active')
+    document.documentElement.classList.remove('mini-hud-active')
+    $('minihud')?.classList.add('hidden')
     $('mh-menu')?.classList.add('hidden')
+    if (!gameOverlayOn) {
+      $('shell')?.classList.remove('hidden')
+      $('titlebar')?.classList.remove('hidden')
+      $('gameoverlay')?.classList.add('hidden')
+      restoreTitlebarDrag()
+    }
   }
 }
 
@@ -3669,8 +3657,14 @@ let gameOverlayTimer = null
 function setGameOverlayMode(enabled, skipBackend = false) {
   gameOverlayOn = !!enabled
   if (enabled) {
+    hudEnabled = false
     document.body.classList.remove('mini-hud-active')
-    $('minihud').classList.add('hidden')
+    document.documentElement.classList.remove('mini-hud-active')
+    $('minihud')?.classList.add('hidden')
+    document.body.classList.add('game-overlay-active')
+    $('gameoverlay')?.classList.remove('hidden')
+    $('shell')?.classList.add('hidden')
+    $('titlebar')?.classList.add('hidden')
     if (!gameOverlayTimer) {
       gameOverlayTimer = setInterval(() => {
         if (gameOverlayOn) {
@@ -3683,17 +3677,16 @@ function setGameOverlayMode(enabled, skipBackend = false) {
       clearInterval(gameOverlayTimer)
       gameOverlayTimer = null
     }
+    document.body.classList.remove('game-overlay-active')
+    $('gameoverlay')?.classList.add('hidden')
+    if (!hudEnabled) {
+      $('shell')?.classList.remove('hidden')
+      $('titlebar')?.classList.remove('hidden')
+      $('minihud')?.classList.add('hidden')
+      restoreTitlebarDrag()
+    }
   }
-  document.body.classList.toggle('game-overlay-active', enabled)
-  $('gameoverlay').classList.toggle('hidden', !enabled)
   syncOverlayPill(enabled)
-  if (enabled || hudEnabled) {
-    $('shell').classList.add('hidden')
-    $('titlebar').classList.add('hidden')
-  } else {
-    $('shell').classList.remove('hidden')
-    restoreTitlebarDrag()
-  }
 }
 
 async function enableGameOverlay() {
@@ -4301,11 +4294,17 @@ function getGameInitials(rawTitle) {
 
 const KNOWN_STEAM_APPIDS = {
   'cities: skylines ii': 949230,
+  'cities: skylines 2': 949230,
   'cities2': 949230,
-  'the elder scrolls iv: oblivion remastered': 2623190,
-  'oblivion_remaster': 2623190,
-  'oblivion remastered': 2623190,
+  'citiesskylines2': 949230,
+  'citiesskylinesii': 949230,
+  'the elder scrolls iv: oblivion remastered': 22330,
+  'the elder scrolls iv: oblivion': 22330,
+  'oblivion_remaster': 22330,
+  'oblivion remastered': 22330,
+  'oblivion': 22330,
   "baldur's gate 3": 1086940,
+  'baldurs gate 3': 1086940,
   'bg3': 1086940,
 }
 
@@ -6389,6 +6388,7 @@ function wireUI() {
 
   $('btn-hud-side')?.addEventListener('click', enableHud)
   $('btn-home-hud')?.addEventListener('click', enableHud)
+  $('btn-home-overlay')?.addEventListener('click', enableGameOverlay)
   $('btn-home-cleanup')?.addEventListener('click', () => {
     openDiskCleanupWizard('cache').catch(() => {})
   })

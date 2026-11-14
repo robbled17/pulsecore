@@ -31,10 +31,10 @@ const (
 	defaultPollMS   = 1000
 	mainWindowW     = 1280
 	mainWindowH     = 800
-	miniHUDW        = 460
-	miniHUDH        = 56
+	miniHUDW        = 380
+	miniHUDH        = 44
 	gameOverlayW    = 460
-	gameOverlayH    = 52
+	gameOverlayH    = 44
 	mainMinW        = 760
 	mainMinH        = 560
 	createNoWindow  = 0x08000000 // CREATE_NO_WINDOW
@@ -1020,6 +1020,7 @@ func (a *App) ToggleMiniHUD(enable bool) {
 	a.ClearOverlayWindowRegion()
 	a.restoreMainWindow()
 	runtime.EventsEmit(a.ctx, "ui:minihud", false)
+	runtime.EventsEmit(a.ctx, "ui:gameoverlay", false)
 }
 
 // ToggleGameOverlay switches a compact always-on-top FPS / frametime strip (F12).
@@ -1052,9 +1053,14 @@ func (a *App) ToggleGameOverlay(enable bool) {
 	a.ClearOverlayWindowRegion()
 	a.restoreMainWindow()
 	runtime.EventsEmit(a.ctx, "ui:gameoverlay", false)
+	runtime.EventsEmit(a.ctx, "ui:minihud", false)
 }
 
 func (a *App) restoreMainWindow() {
+	a.mu.Lock()
+	a.miniHUD = false
+	a.gameOverlay = false
+	a.mu.Unlock()
 	a.ClearOverlayWindowRegion()
 	runtime.WindowSetMaxSize(a.ctx, 0, 0)
 	runtime.WindowSetMinSize(a.ctx, mainMinW, mainMinH)
@@ -1190,29 +1196,16 @@ func (a *App) SetMiniHUDOpacity(percent int) {
 	_ = a.savePrefs(p)
 }
 
-// ResizeMiniHUD autosizes the frameless overlay via Wails runtime only
-// (never Win32 SetWindowPos/MoveWindow on an unverified HWND).
+// ResizeMiniHUD ensures deterministic dimensions for the floating capsule.
 func (a *App) ResizeMiniHUD(width, height int) {
 	if a.ctx == nil || !a.IsMiniHUD() {
 		return
 	}
-	if width < 160 {
-		width = 160
-	}
-	if width > 760 {
-		width = 760
-	}
-	if height < 40 {
-		height = 40
-	}
-	if height > 120 {
-		height = 120
-	}
-	// Strict Wails APIs bound to this app's window context.
+	width = miniHUDW
+	height = miniHUDH
 	runtime.WindowSetMinSize(a.ctx, width, height)
 	runtime.WindowSetMaxSize(a.ctx, width, height)
 	runtime.WindowSetSize(a.ctx, width, height)
-	// Region clip only on our own HWND (PID-checked).
 	a.ApplyOverlayWindowRegion(width, height, height/2)
 }
 

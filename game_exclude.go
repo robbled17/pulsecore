@@ -182,6 +182,13 @@ func (a *App) GetUserHiddenGames() []HiddenGamePref {
 				item.PosterURL = resolved.PosterURL
 			} else if resolved.HeaderURL != "" {
 				item.PosterURL = resolved.HeaderURL
+			} else if item.Name != "" {
+				resolvedByName := resolveGame(item.Name)
+				if resolvedByName.PosterURL != "" {
+					item.PosterURL = resolvedByName.PosterURL
+				} else if resolvedByName.HeaderURL != "" {
+					item.PosterURL = resolvedByName.HeaderURL
+				}
 			}
 			if item.Year <= 0 && resolved.Year > 0 {
 				item.Year = resolved.Year

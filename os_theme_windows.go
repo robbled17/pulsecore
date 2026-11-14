@@ -57,24 +57,34 @@ func (a *App) IsWindows11() bool {
 	return isWindows11()
 }
 
-// applyWindowDwmPolicy configures DWM corner preference on Win11 and strips shadows on Win10.
+// applyWindowDwmPolicy configures DWM corner preference and shadow policies on Win10 and Win11.
 func applyWindowDwmPolicy(hwnd windows.HWND, isOverlay bool) {
 	if hwnd == 0 {
 		return
 	}
-	if isWindows11() {
-		if isOverlay {
-			corner := uint32(dwmwcpRoundOS)
-			_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaWindowCornerPreferenceOS), uintptr(unsafe.Pointer(&corner)), 4)
-		}
-	} else {
-		// Windows 10: disable non-client rendering shadow
+	if isOverlay {
+		// Both Win10 and Win11: completely disable DWM non-client drop shadow for overlay capsules
 		policy := uint32(dwmncrpDisabledOS)
 		_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaNCRenderingPolicyOS), uintptr(unsafe.Pointer(&policy)), 4)
 
-		// Strip CS_DROPSHADOW
+		if isWindows11() {
+			// Tell DWM not to apply rectangular or small rounded borders on top of our capsule
+			doNotRound := uint32(dwmwcpDoNotRoundOS) // DWMWCP_DONOTROUND = 1
+			_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaWindowCornerPreferenceOS), uintptr(unsafe.Pointer(&doNotRound)), 4)
+		}
+
+		// Strip CS_DROPSHADOW from window class so Win32 GDI never renders an underlay shadow
 		if style, _, _ := procGetClassLongPtr.Call(uintptr(hwnd), gclStyleOS); style != 0 && (style&csDropShadowOS) != 0 {
 			_, _, _ = procSetClassLongPtr.Call(uintptr(hwnd), gclStyleOS, style&^csDropShadowOS)
+		}
+	} else {
+		// Restoring main window
+		policy := uint32(0) // DWMNCRP_USEWINDOWSTYLE
+		_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaNCRenderingPolicyOS), uintptr(unsafe.Pointer(&policy)), 4)
+
+		if isWindows11() {
+			corner := uint32(dwmwcpRoundOS) // DWMWCP_ROUND (2)
+			_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaWindowCornerPreferenceOS), uintptr(unsafe.Pointer(&corner)), 4)
 		}
 	}
 }
