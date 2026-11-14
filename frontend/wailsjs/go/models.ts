@@ -1299,6 +1299,32 @@ export namespace main {
 	    }
 	}
 	
+	export class GameHardwareReq {
+	    minCpu: string;
+	    recCpu: string;
+	    minGpu: string;
+	    recGpu: string;
+	    minRam: number;
+	    recRam: number;
+	    minVram: number;
+	    recVram: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GameHardwareReq(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.minCpu = source["minCpu"];
+	        this.recCpu = source["recCpu"];
+	        this.minGpu = source["minGpu"];
+	        this.recGpu = source["recGpu"];
+	        this.minRam = source["minRam"];
+	        this.recRam = source["recRam"];
+	        this.minVram = source["minVram"];
+	        this.recVram = source["recVram"];
+	    }
+	}
 	export class GameInfo {
 	    id: string;
 	    name: string;
@@ -1442,6 +1468,38 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class HardwareCompatibilityVerdict {
+	    verdict: string;
+	    verdictCode: string;
+	    color: string;
+	    gpuScore: number;
+	    cpuScore: number;
+	    minGpuScore: number;
+	    recGpuScore: number;
+	    minCpuScore: number;
+	    recCpuScore: number;
+	    bottleneck: string;
+	    details: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HardwareCompatibilityVerdict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.verdict = source["verdict"];
+	        this.verdictCode = source["verdictCode"];
+	        this.color = source["color"];
+	        this.gpuScore = source["gpuScore"];
+	        this.cpuScore = source["cpuScore"];
+	        this.minGpuScore = source["minGpuScore"];
+	        this.recGpuScore = source["recGpuScore"];
+	        this.minCpuScore = source["minCpuScore"];
+	        this.recCpuScore = source["recCpuScore"];
+	        this.bottleneck = source["bottleneck"];
+	        this.details = source["details"];
+	    }
 	}
 	export class MotherboardDeepInfo {
 	    manufacturer: string;
@@ -2905,6 +2963,32 @@ export namespace main {
 	        this.freeRAMMB = source["freeRAMMB"];
 	        this.diskReadMBps = source["diskReadMBps"];
 	        this.diskWriteMBps = source["diskWriteMBps"];
+	    }
+	}
+	export class SystemHardwareInput {
+	    cpuName: string;
+	    cpuCores: number;
+	    cpuThreads: number;
+	    cpuFreqMHz: number;
+	    gpuName: string;
+	    gpuVramGB: number;
+	    isIntegrated: boolean;
+	    systemRamGB: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SystemHardwareInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cpuName = source["cpuName"];
+	        this.cpuCores = source["cpuCores"];
+	        this.cpuThreads = source["cpuThreads"];
+	        this.cpuFreqMHz = source["cpuFreqMHz"];
+	        this.gpuName = source["gpuName"];
+	        this.gpuVramGB = source["gpuVramGB"];
+	        this.isIntegrated = source["isIntegrated"];
+	        this.systemRamGB = source["systemRamGB"];
 	    }
 	}
 	export class SystemHealthReport {

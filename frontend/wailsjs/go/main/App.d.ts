@@ -73,6 +73,8 @@ export function EnableAdvancedMode(arg1:boolean):Promise<main.AdvancedModeAction
 
 export function EnableHibernation():Promise<main.DeepCleanupResult>;
 
+export function EvaluateHardwareCompatibility(arg1:main.SystemHardwareInput,arg2:main.GameHardwareReq):Promise<main.HardwareCompatibilityVerdict>;
+
 export function ExportDiagnosticReport(arg1:string):Promise<main.DiagnosticExport>;
 
 export function FreezeProcess(arg1:number):Promise<void>;
@@ -174,6 +176,8 @@ export function IsElevated():Promise<boolean>;
 export function IsFullscreen():Promise<boolean>;
 
 export function IsMiniHUD():Promise<boolean>;
+
+export function IsWindows11():Promise<boolean>;
 
 export function KillProcess(arg1:number):Promise<void>;
 

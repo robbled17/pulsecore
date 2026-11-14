@@ -3153,28 +3153,35 @@ html.i18n-dev :is(body, #app) {
   user-select: none;
 }
 .minihud, .mini-hud-capsule {
+  display: none;
   gap: 10px;
-  padding: 8px 14px;
-  /* HUD stays dark in both app themes; opacity via data-opacity. */
-  background: rgba(15, 23, 42, 0.80);
+  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border-radius: 9999px;
   overflow: visible;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
-  display: inline-flex;
-  width: fit-content;
-  height: auto;
-  max-width: none;
-  box-sizing: border-box;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
   position: relative;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.minihud.hidden,
+#minihud.hidden,
+body:not(.mini-hud-active) #minihud {
+  display: none !important;
+}
+body.mini-hud-active #minihud:not(.hidden) {
+  display: inline-flex !important;
 }
 .minihud[data-opacity="60"] { background: rgba(15, 23, 42, 0.60); }
 .minihud[data-opacity="80"] { background: rgba(15, 23, 42, 0.80); }
 .minihud[data-opacity="100"] { background: rgba(15, 23, 42, 1); }
 /* Acrylic off by default (Win10 drag jank); opt-in only. */
-.minihud.acrylic {
+body.win11 .minihud.acrylic {
   backdrop-filter: blur(12px) saturate(140%);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
@@ -3234,18 +3241,27 @@ body.mini-hud-active #app {
   -webkit-app-region: no-drag;
 }
 .gameoverlay {
-  display: inline-flex !important;
+  display: none;
   align-items: center !important;
-  width: max-content !important;
-  max-width: fit-content !important;
-  height: 40px !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
   gap: 12px !important;
-  padding: 4px 12px 4px 16px !important;
+  padding: 4px 14px !important;
   background: #0f172a !important;
   border-radius: 9999px !important;
   border: 1px solid rgba(56, 189, 248, 0.25) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
   font-family: 'Segoe UI', Inter, -apple-system, sans-serif !important;
+}
+.gameoverlay.hidden,
+#gameoverlay.hidden,
+body:not(.game-overlay-active) #gameoverlay {
+  display: none !important;
+}
+body.game-overlay-active #gameoverlay:not(.hidden) {
+  display: inline-flex !important;
 }
 .gameoverlay-metrics {
   display: flex !important;
@@ -4994,4 +5010,50 @@ select option,
 .ctx-menu-item:hover {
   background: #1e293b;
   color: #38bdf8;
+}
+
+/* Windows 10 vs 11 Overlays Adaptation */
+body.win10 .minihud,
+body.win10 .mini-hud-capsule,
+body.win10 .gameoverlay {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.win11 .minihud,
+body.win11 .mini-hud-capsule {
+  background: rgba(15, 23, 42, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+body.win11 .gameoverlay {
+  background: rgba(15, 23, 42, 0.88) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Hidden Games Modal Real Posters */
+.hidden-game-cover {
+  width: 48px !important;
+  height: 64px !important;
+  border-radius: 8px !important;
+  object-fit: cover !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+  background: #1e293b;
+}
+
+.hidden-game-thumb.fallback-icon {
+  width: 48px !important;
+  height: 64px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #1e293b !important;
+  font-size: 24px;
 }

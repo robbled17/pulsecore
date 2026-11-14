@@ -142,6 +142,10 @@ export function EnableHibernation() {
   return window['go']['main']['App']['EnableHibernation']();
 }
 
+export function EvaluateHardwareCompatibility(arg1, arg2) {
+  return window['go']['main']['App']['EvaluateHardwareCompatibility'](arg1, arg2);
+}
+
 export function ExportDiagnosticReport(arg1) {
   return window['go']['main']['App']['ExportDiagnosticReport'](arg1);
 }
@@ -344,6 +348,10 @@ export function IsFullscreen() {
 
 export function IsMiniHUD() {
   return window['go']['main']['App']['IsMiniHUD']();
+}
+
+export function IsWindows11() {
+  return window['go']['main']['App']['IsWindows11']();
 }
 
 export function KillProcess(arg1) {

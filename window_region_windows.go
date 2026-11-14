@@ -3,8 +3,6 @@
 package main
 
 import (
-	"unsafe"
-
 	"golang.org/x/sys/windows"
 )
 
@@ -35,14 +33,7 @@ func (a *App) ApplyOverlayWindowRegion(width, height, radius int) {
 	if hwnd == 0 || !hwndBelongsToUs(hwnd) || width <= 0 || height <= 0 {
 		return
 	}
-	// On Windows 10: disable DWM non-client rendering policy to remove outer window shadow completely
-	policy := uint32(dwmncrpDisabled)
-	_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaNCRenderingPolicy), uintptr(unsafe.Pointer(&policy)), 4)
-
-	// Strip CS_DROPSHADOW to eliminate dark gray rectangular border artifacts on Win10
-	if style, _, _ := procGetClassLongPtr.Call(uintptr(hwnd), gclStyleCW); style != 0 && (style&csDropShadowCW) != 0 {
-		_, _, _ = procSetClassLongPtr.Call(uintptr(hwnd), gclStyleCW, style&^csDropShadowCW)
-	}
+	applyWindowDwmPolicy(hwnd, true)
 
 	// Create capsule rounded region
 	rgn, _, _ := procCreateRoundRect.Call(0, 0, uintptr(width), uintptr(height), uintptr(height), uintptr(height))
@@ -59,7 +50,6 @@ func (a *App) ClearOverlayWindowRegion() {
 	if hwnd == 0 || !hwndBelongsToUs(hwnd) {
 		return
 	}
-	policy := uint32(dwmncrpUseWindowStyle)
-	_, _, _ = procDwmSetWindowAttribute.Call(uintptr(hwnd), uintptr(dwmwaNCRenderingPolicy), uintptr(unsafe.Pointer(&policy)), 4)
+	applyWindowDwmPolicy(hwnd, false)
 	_, _, _ = procSetWindowRgn.Call(uintptr(hwnd), 0, 1)
 }

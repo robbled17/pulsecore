@@ -116,6 +116,7 @@
   RestartProcess,
   RestartProcessByName,
   ResolveGameCover,
+  IsWindows11,
   CheckForUpdates,
   DownloadAndInstallUpdate,
 } from '../wailsjs/go/main/App.js'
@@ -4298,6 +4299,27 @@ function getGameInitials(rawTitle) {
   return (words[0][0] + words[1][0] + words[2][0]).toUpperCase()
 }
 
+const KNOWN_STEAM_APPIDS = {
+  'cities: skylines ii': 949230,
+  'cities2': 949230,
+  'the elder scrolls iv: oblivion remastered': 2623190,
+  'oblivion_remaster': 2623190,
+  'oblivion remastered': 2623190,
+  "baldur's gate 3": 1086940,
+  'bg3': 1086940,
+}
+
+function resolveGameSteamAppId(h) {
+  if (h?.steamAppId && Number(h.steamAppId) > 0) return Number(h.steamAppId)
+  const normId = String(h?.id || '').toLowerCase().trim()
+  const normTitle = String(h?.name || h?.title || '').toLowerCase().trim()
+  if (KNOWN_STEAM_APPIDS[normId]) return KNOWN_STEAM_APPIDS[normId]
+  if (KNOWN_STEAM_APPIDS[normTitle]) return KNOWN_STEAM_APPIDS[normTitle]
+  const match = lookupCatalogGame(h?.id) || (Array.isArray(gameCatalogFull) && gameCatalogFull.find((g) => g.id === h?.id || String(g.name).toLowerCase() === normTitle))
+  if (match?.steamAppId && Number(match.steamAppId) > 0) return Number(match.steamAppId)
+  return 0
+}
+
 function openHiddenGamesModal() {
   const modal = $('hidden-games-modal')
   const list = $('hidden-games-list')
@@ -4309,15 +4331,19 @@ function openHiddenGamesModal() {
   list.innerHTML = hiddenGamesMeta.map((h) => {
     const title = gameDisplayName(h)
     const year = Number(h.year) > 0 ? String(h.year) : ''
-    let poster = h.posterUrl || h.headerUrl || ''
-    if (!poster) {
-      const match = lookupCatalogGame(h.id) || (Array.isArray(gameCatalogFull) && gameCatalogFull.find((g) => g.id === h.id || g.name === h.name))
-      if (match) poster = match.posterUrl || match.headerUrl || ''
+    const appid = resolveGameSteamAppId(h)
+    let primary = h.cover_url || h.posterUrl || ''
+    if (!primary && appid > 0) {
+      primary = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`
     }
-    const initials = getGameInitials(title)
-    const thumbHTML = poster
-      ? `<div class="hidden-game-thumb"><img src="${escapeHtml(poster)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'hidden-game-initials\\'>${escapeHtml(initials)}</span>'" /></div>`
-      : `<div class="hidden-game-thumb"><span class="hidden-game-initials">${escapeHtml(initials)}</span></div>`
+    const secondary = appid > 0 ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg` : ''
+
+    const thumbHTML = primary
+      ? `<img class="hidden-game-cover" src="${escapeHtml(primary)}" alt="${escapeHtml(title)}" loading="lazy" data-fallback="${escapeHtml(secondary)}" onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}else{this.onerror=null;this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))}" />`
+      : (secondary
+          ? `<img class="hidden-game-cover" src="${escapeHtml(secondary)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))" />`
+          : `<div class="hidden-game-thumb fallback-icon">🎮</div>`)
+
     return `
     <div class="hidden-game-row" data-hidden-id="${escapeHtml(h.id)}">
       ${thumbHTML}
@@ -4331,16 +4357,15 @@ function openHiddenGamesModal() {
   modal.classList.remove('hidden')
 
   hiddenGamesMeta.forEach((h) => {
-    if (!h.posterUrl && !h.headerUrl && typeof ResolveGameCover === 'function') {
+    const appid = resolveGameSteamAppId(h)
+    if (!h.posterUrl && !h.headerUrl && !h.cover_url && appid <= 0 && typeof ResolveGameCover === 'function') {
       const title = gameDisplayName(h)
       ResolveGameCover(title).then((cover) => {
         if (cover) {
           h.posterUrl = cover
           const row = list.querySelector(`.hidden-game-row[data-hidden-id="${escapeHtml(h.id)}"]`)
-          const thumb = row?.querySelector('.hidden-game-thumb')
-          if (thumb) {
-            thumb.innerHTML = `<img src="${escapeHtml(cover)}" alt="${escapeHtml(title)}" loading="lazy" />`
-          }
+          const img = row?.querySelector('.hidden-game-cover')
+          if (img) img.src = cover
         }
       }).catch(() => {})
     }
@@ -6363,7 +6388,6 @@ function wireUI() {
   }
 
   $('btn-hud-side')?.addEventListener('click', enableHud)
-  $('btn-home-hud')?.addEventListener('click', enableHud)
   $('btn-home-cleanup')?.addEventListener('click', () => {
     openDiskCleanupWizard('cache').catch(() => {})
   })
@@ -7315,11 +7339,11 @@ function initKeyboardNavigation() {
   function getScope() {
     const openModal = document.querySelector('.modal:not(.hidden), .dialog-overlay:not(.hidden), .hud-overlay:not(.hidden)')
     if (openModal) return openModal
-    return document.body
+    return null
   }
 
-  function getFocusableElements() {
-    const scope = getScope()
+  function getFocusableElementsIn(container) {
+    if (!container) return []
     const selector = [
       'button:not([disabled])',
       'a[href]',
@@ -7331,9 +7355,10 @@ function initKeyboardNavigation() {
       '.home-tile-toggle',
       '.tab-btn',
       '.clean-item-check',
-      '.clean-card-btn'
+      '.clean-card-btn',
+      '.hw-proc-btn'
     ].join(', ')
-    const candidates = Array.from(scope.querySelectorAll(selector))
+    const candidates = Array.from(container.querySelectorAll(selector))
     return candidates.filter((el) => {
       if (el.disabled || el.getAttribute('aria-hidden') === 'true') return false
       const style = window.getComputedStyle(el)
@@ -7354,16 +7379,45 @@ function initKeyboardNavigation() {
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
   }
 
+  function getActiveSidebarItem() {
+    return document.querySelector('.sidebar .nav-item.active') || document.querySelector('.sidebar .nav-item')
+  }
+
+  function getSidebarItems() {
+    return Array.from(document.querySelectorAll('.sidebar .nav-item:not([disabled])')).filter((el) => {
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+  }
+
+  function getContentFocusables() {
+    const activePane = document.querySelector('.content .tab-pane.active') || document.querySelector('.content')
+    return getFocusableElementsIn(activePane)
+  }
+
   document.addEventListener('keydown', (ev) => {
     const active = document.activeElement
     const isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active.type !== 'checkbox' && active.type !== 'radio'
 
+    const modalScope = getScope()
+
     if (ev.code === 'Escape' || ev.key === 'Escape') {
-      const openModalClose = document.querySelector('.modal:not(.hidden) .modal-close, .modal:not(.hidden) [id$="-close"]')
-      if (openModalClose) {
-        ev.preventDefault()
-        openModalClose.click()
+      if (modalScope) {
+        const openModalClose = modalScope.querySelector('.modal-close, [id$="-close"]')
+        if (openModalClose) {
+          ev.preventDefault()
+          openModalClose.click()
+          clearKbdFocus()
+          return
+        }
         clearKbdFocus()
+        return
+      }
+      // If in content zone, return to sidebar
+      const activeNav = getActiveSidebarItem()
+      if (activeNav) {
+        ev.preventDefault()
+        setFocus(activeNav)
         return
       }
       clearKbdFocus()
@@ -7380,22 +7434,101 @@ function initKeyboardNavigation() {
     const isRight = ev.code === 'KeyD' || ev.code === 'ArrowRight' || ev.key === 'ArrowRight'
     const isAction = ev.code === 'Space' || ev.code === 'Enter' || ev.key === 'Enter' || ev.key === ' '
 
+    // Modal navigation
+    if (modalScope) {
+      const modalItems = getFocusableElementsIn(modalScope)
+      if (modalItems.length === 0) return
+      if (isAction && currentFocused) {
+        ev.preventDefault()
+        currentFocused.click()
+        return
+      }
+      if (isUp || isDown || isLeft || isRight) {
+        ev.preventDefault()
+        if (!currentFocused || !modalItems.includes(currentFocused)) {
+          setFocus(modalItems[0])
+          return
+        }
+        const currIdx = modalItems.indexOf(currentFocused)
+        const nextIdx = (isDown || isRight)
+          ? (currIdx + 1) % modalItems.length
+          : (currIdx - 1 + modalItems.length) % modalItems.length
+        setFocus(modalItems[nextIdx])
+        return
+      }
+      return
+    }
+
+    // 2-zone Matrix navigation (Sidebar <-> Content)
+    const inSidebar = currentFocused && !!currentFocused.closest('.sidebar')
+    const sidebarItems = getSidebarItems()
+
     if (isAction) {
       if (currentFocused) {
         ev.preventDefault()
+        if (inSidebar && (ev.code === 'Enter' || ev.key === 'Enter')) {
+          // Enter in sidebar: switch tab and jump to content
+          currentFocused.click()
+          const contentItems = getContentFocusables()
+          if (contentItems.length > 0) {
+            setFocus(contentItems[0])
+            return
+          }
+        }
         currentFocused.click()
         return
       }
     }
 
     if (isUp || isDown || isLeft || isRight) {
-      const items = getFocusableElements()
-      if (items.length === 0) return
-
       ev.preventDefault()
 
-      if (!currentFocused || !items.includes(currentFocused)) {
-        setFocus(items[0])
+      // If nothing is focused yet, start at active sidebar tab
+      if (!currentFocused) {
+        const startNav = getActiveSidebarItem()
+        if (startNav) setFocus(startNav)
+        return
+      }
+
+      // Zone 1: SIDEBAR
+      if (inSidebar) {
+        const currIdx = sidebarItems.indexOf(currentFocused)
+        if (isDown) {
+          const nextIdx = (currIdx + 1) % sidebarItems.length
+          setFocus(sidebarItems[nextIdx])
+          sidebarItems[nextIdx].click()
+          return
+        }
+        if (isUp) {
+          const prevIdx = (currIdx - 1 + sidebarItems.length) % sidebarItems.length
+          setFocus(sidebarItems[prevIdx])
+          sidebarItems[prevIdx].click()
+          return
+        }
+        if (isRight) {
+          // Move from sidebar into content zone
+          const contentItems = getContentFocusables()
+          if (contentItems.length > 0) {
+            setFocus(contentItems[0])
+          }
+          return
+        }
+        // Left in sidebar stays in sidebar
+        return
+      }
+
+      // Zone 2: CONTENT
+      const contentItems = getContentFocusables()
+      if (contentItems.length === 0) {
+        if (isLeft) {
+          const activeNav = getActiveSidebarItem()
+          if (activeNav) setFocus(activeNav)
+        }
+        return
+      }
+
+      if (!contentItems.includes(currentFocused)) {
+        setFocus(contentItems[0])
         return
       }
 
@@ -7406,7 +7539,7 @@ function initKeyboardNavigation() {
       let bestEl = null
       let bestDist = Infinity
 
-      for (const el of items) {
+      for (const el of contentItems) {
         if (el === currentFocused) continue
         const r = el.getBoundingClientRect()
         const cx = r.left + r.width / 2
@@ -7419,16 +7552,16 @@ function initKeyboardNavigation() {
 
         if (isRight && dx > 8) {
           valid = true
-          dist = Math.abs(dx) + Math.abs(dy) * 2.5
+          dist = Math.abs(dx) + Math.abs(dy) * 2.0
         } else if (isLeft && dx < -8) {
           valid = true
-          dist = Math.abs(dx) + Math.abs(dy) * 2.5
+          dist = Math.abs(dx) + Math.abs(dy) * 2.0
         } else if (isDown && dy > 8) {
           valid = true
-          dist = Math.abs(dy) + Math.abs(dx) * 2.5
+          dist = Math.abs(dy) + Math.abs(dx) * 1.5
         } else if (isUp && dy < -8) {
           valid = true
-          dist = Math.abs(dy) + Math.abs(dx) * 2.5
+          dist = Math.abs(dy) + Math.abs(dx) * 1.5
         }
 
         if (valid && dist < bestDist) {
@@ -7437,19 +7570,26 @@ function initKeyboardNavigation() {
         }
       }
 
-      if (!bestEl) {
-        const currIdx = items.indexOf(currentFocused)
-        if (isRight || isDown) {
-          bestEl = items[(currIdx + 1) % items.length]
-        } else {
-          bestEl = items[(currIdx - 1 + items.length) % items.length]
+      // If moving Left and no element to the left within content, return to sidebar!
+      if (isLeft && !bestEl) {
+        const activeNav = getActiveSidebarItem()
+        if (activeNav) {
+          setFocus(activeNav)
+          return
         }
       }
 
       if (bestEl) {
         setFocus(bestEl)
+      } else {
+        // Fallback cyclic order for Up/Down within content
+        const currIdx = contentItems.indexOf(currentFocused)
+        if (isDown) {
+          setFocus(contentItems[(currIdx + 1) % contentItems.length])
+        } else if (isUp) {
+          setFocus(contentItems[(currIdx - 1 + contentItems.length) % contentItems.length])
+        }
       }
-      return
     }
   })
 }
@@ -7522,6 +7662,14 @@ function wireContextMenu() {
 
 function boot() {
   applyTheme(localStorage.getItem(THEME_KEY) || 'dark')
+  if (typeof IsWindows11 === 'function') {
+    IsWindows11().then((w11) => {
+      document.body.classList.toggle('win11', !!w11)
+      document.body.classList.toggle('win10', !w11)
+    }).catch(() => {
+      document.body.classList.add('win10')
+    })
+  }
   applyI18n()
   wireUI()
   wireContextMenu()

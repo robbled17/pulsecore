@@ -212,13 +212,59 @@ func searchWikipediaCover(title string) string {
 	return ""
 }
 
+var (
+	coverLinksLock sync.RWMutex
+	coverLinksMap  map[string]string
+)
+
+func coverLinksFilePath() string {
+	base := os.Getenv("LOCALAPPDATA")
+	if base == "" {
+		base, _ = os.UserCacheDir()
+	}
+	dir := filepath.Join(base, "PulseCore")
+	_ = os.MkdirAll(dir, 0o755)
+	return filepath.Join(dir, "cover_links.json")
+}
+
+func loadCoverLinks() map[string]string {
+	coverLinksLock.Lock()
+	defer coverLinksLock.Unlock()
+	if coverLinksMap != nil {
+		return coverLinksMap
+	}
+	coverLinksMap = make(map[string]string)
+	p := coverLinksFilePath()
+	data, err := os.ReadFile(p)
+	if err == nil {
+		_ = json.Unmarshal(data, &coverLinksMap)
+	}
+	return coverLinksMap
+}
+
+func saveCoverLink(key, urlStr string) {
+	if key == "" || urlStr == "" {
+		return
+	}
+	coverLinksLock.Lock()
+	defer coverLinksLock.Unlock()
+	if coverLinksMap == nil {
+		coverLinksMap = make(map[string]string)
+	}
+	coverLinksMap[key] = urlStr
+	p := coverLinksFilePath()
+	if data, err := json.MarshalIndent(coverLinksMap, "", "  "); err == nil {
+		_ = os.WriteFile(p, data, 0o644)
+	}
+}
+
 // ResolveGameCover performs a multi-stage lookup for a game poster:
-// 1. Check local disk cover cache (%LOCALAPPDATA%\PulseCore\cache\covers\)
+// 1. Check local links cache (%LOCALAPPDATA%\PulseCore\cover_links.json)
 // 2. Local database
 // 3. Steam Store Search API
 // 4. CheapShark API (covers Tarkov, EA, Epic, Ubisoft, etc.)
 // 5. Wikipedia API
-// Caches any found remote image to disk and returns a file:// or remote URL.
+// Returns direct HTTPS URL with zero disk footprint.
 func (a *App) ResolveGameCover(query string) string {
 	q := strings.TrimSpace(query)
 	if q == "" {
@@ -227,45 +273,48 @@ func (a *App) ResolveGameCover(query string) string {
 	if title, ok := canonicalFolderTitle(q); ok {
 		q = title
 	}
-	// 1. Check local disk cache
-	if dir, err := coversCacheDir(); err == nil {
-		key := coverCacheKey(q)
-		for _, ext := range []string{".jpg", ".png", ".webp"} {
-			p := filepath.Join(dir, key+ext)
-			if st, err := os.Stat(p); err == nil && st.Size() > 512 {
-				return coverFileURL(p)
-			}
-		}
+	key := coverCacheKey(q)
+
+	// 1. Check cover_links.json
+	links := loadCoverLinks()
+	coverLinksLock.RLock()
+	cachedURL, found := links[key]
+	coverLinksLock.RUnlock()
+	if found && cachedURL != "" {
+		return cachedURL
 	}
 
 	// 2. Local database
-	if e := findLocalGameEntry(q); e != nil {
-		if e.Cover != "" {
-			return EnsureCoverCached(q, e.Cover)
-		}
+	if e := findLocalGameEntry(q); e != nil && e.Cover != "" {
+		saveCoverLink(key, e.Cover)
+		return e.Cover
 	}
 
 	// 3. Steam Store Search
 	hits := searchSteamStore(q)
 	for _, h := range hits {
 		if namesMatchStrict(q, h.Name) || len(hits) == 1 {
-			if h.PosterURL != "" {
-				return EnsureCoverCached(q, h.PosterURL)
+			targetURL := h.PosterURL
+			if targetURL == "" {
+				targetURL = h.HeaderURL
 			}
-			if h.HeaderURL != "" {
-				return EnsureCoverCached(q, h.HeaderURL)
+			if targetURL != "" {
+				saveCoverLink(key, targetURL)
+				return targetURL
 			}
 		}
 	}
 
 	// 4. CheapShark API
 	if thumb := searchCheapSharkCover(q); thumb != "" {
-		return EnsureCoverCached(q, thumb)
+		saveCoverLink(key, thumb)
+		return thumb
 	}
 
 	// 5. Wikipedia API
 	if thumb := searchWikipediaCover(q); thumb != "" {
-		return EnsureCoverCached(q, thumb)
+		saveCoverLink(key, thumb)
+		return thumb
 	}
 
 	return ""
@@ -350,63 +399,15 @@ func coverFileURL(absPath string) string {
 	return "file://" + p
 }
 
-// EnsureCoverCached downloads a poster once into %LOCALAPPDATA%\PulseCore\cache\covers\.
-// Returns a file:// URL on success, or the original remote URL on failure.
+// EnsureCoverCached stores direct HTTPS URL in %LOCALAPPDATA%\PulseCore\cover_links.json without saving image files to disk.
 func EnsureCoverCached(title, remoteURL string) string {
 	remoteURL = strings.TrimSpace(remoteURL)
 	if remoteURL == "" {
 		return ""
 	}
-	if strings.HasPrefix(strings.ToLower(remoteURL), "file:") {
-		return remoteURL
-	}
-	dir, err := coversCacheDir()
-	if err != nil {
-		return remoteURL
-	}
-	ext := ".jpg"
-	lower := strings.ToLower(remoteURL)
-	switch {
-	case strings.Contains(lower, ".png"):
-		ext = ".png"
-	case strings.Contains(lower, ".webp"):
-		ext = ".webp"
-	}
-	name := coverCacheKeyFor(title, remoteURL) + ext
-	dest := filepath.Join(dir, name)
-	if st, err := os.Stat(dest); err == nil && st.Size() > 512 {
-		return coverFileURL(dest)
-	}
-	client := &http.Client{Timeout: 8 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, remoteURL, nil)
-	if err != nil {
-		return remoteURL
-	}
-	req.Header.Set("User-Agent", "PulseCore/1.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return remoteURL
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return remoteURL
-	}
-	tmp := dest + ".tmp"
-	f, err := os.Create(tmp)
-	if err != nil {
-		return remoteURL
-	}
-	_, copyErr := io.Copy(f, io.LimitReader(resp.Body, 8<<20))
-	_ = f.Close()
-	if copyErr != nil {
-		_ = os.Remove(tmp)
-		return remoteURL
-	}
-	if err := os.Rename(tmp, dest); err != nil {
-		_ = os.Remove(tmp)
-		return remoteURL
-	}
-	return coverFileURL(dest)
+	key := coverCacheKeyFor(title, remoteURL)
+	saveCoverLink(key, remoteURL)
+	return remoteURL
 }
 
 type rawgSearchResp struct {
