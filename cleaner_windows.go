@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -18,6 +19,10 @@ const (
 	sherbNoProgressUI     = 0x00000002
 	sherbNoSound          = 0x00000004
 	seeMaskNoCloseProcess = 0x00000040
+
+	findExInfoBasic       = 1
+	findExSearchNameMatch = 0
+	findFirstExLargeFetch = 2
 )
 
 var (
@@ -25,7 +30,103 @@ var (
 	procSHEmptyRecycleBinW = modShell32.NewProc("SHEmptyRecycleBinW")
 	procSHQueryRecycleBinW = modShell32.NewProc("SHQueryRecycleBinW")
 	procShellExecuteExW    = modShell32.NewProc("ShellExecuteExW")
+
+	modKernel32Cleaner   = windows.NewLazySystemDLL("kernel32.dll")
+	procFindFirstFileExW = modKernel32Cleaner.NewProc("FindFirstFileExW")
+	procFindNextFileW    = modKernel32Cleaner.NewProc("FindNextFileW")
+	procFindClose        = modKernel32Cleaner.NewProc("FindClose")
 )
+
+var (
+	fastSizeCacheMu sync.RWMutex
+	fastSizeCache   = make(map[string]cachedDirSize)
+)
+
+type cachedDirSize struct {
+	size int64
+	at   time.Time
+}
+
+func getCachedDirSize(path string) (int64, bool) {
+	fastSizeCacheMu.RLock()
+	defer fastSizeCacheMu.RUnlock()
+	entry, ok := fastSizeCache[path]
+	if ok && time.Since(entry.at) < 5*time.Minute {
+		return entry.size, true
+	}
+	return 0, false
+}
+
+func setCachedDirSize(path string, size int64) {
+	fastSizeCacheMu.Lock()
+	defer fastSizeCacheMu.Unlock()
+	fastSizeCache[path] = cachedDirSize{size: size, at: time.Now()}
+}
+
+// fastDirSizeWin32 traverses root using Win32 FindFirstFileExW with FindExInfoBasic and FIND_FIRST_EX_LARGE_FETCH.
+func fastDirSizeWin32(root string, deadline time.Time, maxDepth int) int64 {
+	root = strings.TrimRight(root, `\/`)
+	if root == "" {
+		return 0
+	}
+	if sz, ok := getCachedDirSize(root); ok {
+		return sz
+	}
+
+	var total int64
+	var walk func(dir string, depth int)
+	walk = func(dir string, depth int) {
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return
+		}
+		if maxDepth >= 0 && depth > maxDepth {
+			return
+		}
+		pattern := dir + `\*`
+		patternPtr, err := windows.UTF16PtrFromString(pattern)
+		if err != nil {
+			return
+		}
+
+		var data windows.Win32finddata
+		h, _, _ := procFindFirstFileExW.Call(
+			uintptr(unsafe.Pointer(patternPtr)),
+			uintptr(findExInfoBasic),
+			uintptr(unsafe.Pointer(&data)),
+			uintptr(findExSearchNameMatch),
+			0,
+			uintptr(findFirstExLargeFetch),
+		)
+		if h == 0 || h == uintptr(windows.InvalidHandle) {
+			return
+		}
+		defer procFindClose.Call(h)
+
+		for {
+			name := windows.UTF16ToString(data.FileName[:])
+			if name != "." && name != ".." {
+				if data.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0 {
+					// Skip reparse points / junctions to avoid loops and slow symlink traversals
+					if data.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+						walk(dir+`\`+name, depth+1)
+					}
+				} else {
+					sz := (int64(data.FileSizeHigh) << 32) | int64(data.FileSizeLow)
+					total += sz
+				}
+			}
+
+			r, _, _ := procFindNextFileW.Call(h, uintptr(unsafe.Pointer(&data)))
+			if r == 0 {
+				break
+			}
+		}
+	}
+
+	walk(root, 0)
+	setCachedDirSize(root, total)
+	return total
+}
 
 type shellExecuteInfoW struct {
 	cbSize       uint32

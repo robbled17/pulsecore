@@ -45,8 +45,24 @@ var (
 	procGetDiskFreeSpaceExW = modKernel32Deep.NewProc("GetDiskFreeSpaceExW")
 )
 
+func invalidateSystemCache() {
+	driveScanCacheMu.Lock()
+	if c, ok := driveScanCaches["C"]; ok && c != nil {
+		c.SystemLoaded = false
+	}
+	driveScanCacheMu.Unlock()
+}
+
 // PreviewDeepCleanup measures hibernation / VSS / Delivery Optimization.
 func (a *App) PreviewDeepCleanup() DeepCleanupPreview {
+	driveScanCacheMu.RLock()
+	if c, ok := driveScanCaches["C"]; ok && c != nil && c.SystemLoaded {
+		res := c.System
+		driveScanCacheMu.RUnlock()
+		return res
+	}
+	driveScanCacheMu.RUnlock()
+
 	hibOn, hibBytes := hibernationStatus()
 	shadow := estimateShadowStorageBytes()
 	delivery := deliveryOptimizationSize()
@@ -65,15 +81,24 @@ func (a *App) PreviewDeepCleanup() DeepCleanupPreview {
 			NeedsAdmin: true, Irreversible: false, Enabled: delivery > 0,
 		},
 	}
-	return DeepCleanupPreview{
+	res := DeepCleanupPreview{
 		Items: items, HibernationOn: hibOn, HibernationBytes: hibBytes,
 		ShadowBytes: shadow, DeliveryOptBytes: delivery,
 		SystemDriveUsedPct: usedPct, SystemDriveFreeGB: freeGB,
 	}
+
+	driveScanCacheMu.Lock()
+	c := getDriveCacheLocked("C")
+	c.System = res
+	c.SystemLoaded = true
+	driveScanCacheMu.Unlock()
+
+	return res
 }
 
 // EnableHibernation runs `powercfg -h on` and refreshes disk metrics.
 func (a *App) EnableHibernation() DeepCleanupResult {
+	invalidateSystemCache()
 	_, rec := a.MeasureAndRecordClean("C:", "HibernationOn", func() int64 {
 		_ = runHiddenCommand("powercfg", "-h", "on")
 		time.Sleep(500 * time.Millisecond)
@@ -89,6 +114,7 @@ func (a *App) EnableHibernation() DeepCleanupResult {
 
 // DisableHibernation runs `powercfg -h off` and refreshes disk metrics.
 func (a *App) DisableHibernation() DeepCleanupResult {
+	invalidateSystemCache()
 	beforeOn, beforeBytes := hibernationStatus()
 	if sz := hiberfilSize(); sz > beforeBytes {
 		beforeBytes = sz
@@ -125,6 +151,7 @@ func (a *App) DisableHibernation() DeepCleanupResult {
 
 // CleanOldestShadow deletes the oldest VSS shadow on C: (keeps newer points).
 func (a *App) CleanOldestShadow() DeepCleanupResult {
+	invalidateSystemCache()
 	before := estimateShadowStorageBytes()
 	var reported int64
 	_, rec := a.MeasureAndRecordClean("C:", "VSS", func() int64 {
@@ -232,6 +259,7 @@ Checkpoint-Computer -Description "PulseCore Backup" -RestorePointType "MODIFY_SE
 
 // CleanDeliveryOptimization clears SoftwareDistribution\DeliveryOptimization cache.
 func (a *App) CleanDeliveryOptimization() DeepCleanupResult {
+	invalidateSystemCache()
 	dir := `C:\Windows\SoftwareDistribution\DeliveryOptimization`
 	before := dirSizeBudget(dir, time.Now().Add(1200*time.Millisecond), 5)
 	var reported int64

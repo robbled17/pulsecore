@@ -9,6 +9,8 @@ export function AddIntelligenceExclusion(arg1:string):Promise<void>;
 
 export function ApplyDiskCleanup(arg1:Array<string>):Promise<main.CleanupResult>;
 
+export function ApplyDiskCleanupForDrive(arg1:string,arg2:Array<string>):Promise<main.CleanupResult>;
+
 export function ApplyEcoPIDWithFeedback(arg1:number):Promise<main.EcoApplyResult>;
 
 export function ApplyEcoWithFeedback(arg1:string):Promise<main.EcoApplyResult>;
@@ -97,6 +99,8 @@ export function GetConnectedPeripherals():Promise<Array<main.PeripheralItem>>;
 
 export function GetDiskWatchInfo(arg1:string):Promise<main.DiskWatchInfo>;
 
+export function GetDriveScanCache(arg1:string):Promise<main.DriveScanCache>;
+
 export function GetEcoHistory():Promise<Array<main.ecoHistoryEntry>>;
 
 export function GetEcoLimitedGroups():Promise<Array<main.EcoLimitedGroup>>;
@@ -171,6 +175,8 @@ export function HideUserGame(arg1:string,arg2:string):Promise<boolean>;
 
 export function HideUserGameMeta(arg1:string,arg2:string,arg3:string,arg4:number):Promise<boolean>;
 
+export function InvalidateDriveScanCache(arg1:string):Promise<void>;
+
 export function IsConflictWatcherEnabled():Promise<boolean>;
 
 export function IsDiskWatching(arg1:string):Promise<boolean>;
@@ -195,9 +201,13 @@ export function ListGames():Promise<Array<main.GameInfo>>;
 
 export function ListInstalledApps():Promise<Array<main.InstalledApp>>;
 
+export function ListInstalledAppsForDrive(arg1:string):Promise<Array<main.InstalledApp>>;
+
 export function ListMonitors():Promise<Array<main.DisplayInfo>>;
 
 export function ListOrphanLeftovers():Promise<Array<main.OrphanLeftover>>;
+
+export function ListOrphanLeftoversForDrive(arg1:string):Promise<Array<main.OrphanLeftover>>;
 
 export function ListPnPDeviceErrors():Promise<Array<main.PnPDeviceError>>;
 
@@ -231,6 +241,8 @@ export function PreviewDiagnosticReport():Promise<main.DiagnosticReportPreview>;
 
 export function PreviewDiskCleanup():Promise<Array<main.CleanupCat>>;
 
+export function PreviewDiskCleanupForDrive(arg1:string):Promise<Array<main.CleanupCat>>;
+
 export function QuitApp():Promise<void>;
 
 export function RebootSystemNow():Promise<void>;
@@ -244,6 +256,8 @@ export function RefreshAllDiskHealth(arg1:Array<string>):Promise<Array<main.Disk
 export function RefreshDiskMetrics():Promise<Array<main.DiskMetrics>>;
 
 export function RefreshDiskMetricsEx():Promise<Array<main.DiskMetrics>>;
+
+export function RefreshDriveScan(arg1:string):Promise<void>;
 
 export function RemoveAppLeftovers(arg1:Array<string>):Promise<main.UninstallAppResult>;
 

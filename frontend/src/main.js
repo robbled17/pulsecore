@@ -5193,7 +5193,12 @@ async function renderDiskCleanDrives() {
       if (drv && drv !== selectedCleanerDrive) {
         selectedCleanerDrive = drv
         selectedCleanDrive = drv
-        await renderDiskCleanDrives()
+        container.querySelectorAll('.cleaner-drive-pill').forEach((c) => {
+          const isActive = c.getAttribute('data-drive') === drv
+          c.classList.toggle('active', isActive)
+          c.setAttribute('aria-selected', isActive ? 'true' : 'false')
+        })
+        updateDiskCleanTitle()
         await renderDiskCleanBody()
       }
     })
@@ -5332,112 +5337,7 @@ function formatAppSize(bytes, label) {
   return formatCleanupSize(bytes)
 }
 
-async function renderDiskCleanApps(body) {
-  const currentRev = ++scanRevision
-  let apps = []
-  try { apps = await ListInstalledApps() } catch (err) {
-    if (currentRev !== scanRevision) return
-    body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
-    return
-  }
-  if (currentRev !== scanRevision) return
-  diskCleanAppsCache = Array.isArray(apps) ? apps : []
-
-  const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
-  const driveFiltered = diskCleanAppsCache.filter((a) => {
-    const appDrive = (a.driveLetter || '').toUpperCase()
-    if (!appDrive) {
-      return targetDrive === 'C'
-    }
-    return appDrive === targetDrive
-  })
-
-  const candidatesCount = driveFiltered.filter((a) => a.candidateCleanup).length
-
-  const candidateFiltered = diskCleanFilterCandidates
-    ? driveFiltered.filter((a) => a.candidateCleanup)
-    : driveFiltered
-
-  const q = (body.querySelector('#dc-app-search')?.value || '').trim().toLowerCase()
-  const finalFiltered = candidateFiltered.filter((a) => {
-    if (!q) return true
-    const hay = `${a.displayName || ''} ${a.publisher || ''}`.toLowerCase()
-    return hay.includes(q)
-  })
-
-  const rows = finalFiltered.slice(0, 100).map((a) => {
-    const size = formatAppSize(a.sizeBytes, a.sizeLabel)
-    const disabled = a.canUninstall ? '' : 'disabled'
-    const loc = String(a.installLocation || '').trim()
-    const openBtn = loc
-      ? `<button type="button" class="btn soft compact dc-open-folder" data-path="${escapeHtml(loc)}" title="${escapeHtml(t('diskCleanOpenFolder'))}">📁</button>`
-      : ''
-    const candidateBadge = (a.candidateCleanup || a.candidateBadgeRu || a.candidateBadgeEn)
-      ? `<div class="dc-candidate-badge">${escapeHtml(lang === 'en' ? (a.candidateBadgeEn || a.candidateBadgeRu) : (a.candidateBadgeRu || a.candidateBadgeEn))}</div>`
-      : ''
-    return `<div class="dc-app-row" data-app-id="${escapeHtml(a.id)}">
-      <div class="dc-app-main">
-        <div class="dc-app-name">${escapeHtml(a.displayName || '')}</div>
-        <div class="dc-app-meta">${escapeHtml(a.publisher || '')}${a.displayVersion ? ' · ' + escapeHtml(a.displayVersion) : ''}</div>
-        ${candidateBadge}
-      </div>
-      <div class="dc-app-size">${escapeHtml(size)}</div>
-      <div class="dc-app-actions">
-        ${openBtn}
-        <button type="button" class="btn soft compact dc-uninstall" data-app-id="${escapeHtml(a.id)}" ${disabled}>${t('diskCleanUninstall')}</button>
-      </div>
-      <div class="dc-row-loader hidden" aria-hidden="true"></div>
-    </div>`
-  }).join('')
-
-  if (!body.querySelector('#dc-app-search')) {
-    body.innerHTML = `
-    <div class="dc-pane">
-      <div id="dc-stats-slot"></div>
-      <div class="dc-filter-toolbar">
-        <div class="dc-filter-pills">
-          <button type="button" class="btn compact dc-filter-btn ${!diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-all">${t('diskCleanAllApps')}</button>
-          <button type="button" class="btn compact dc-filter-btn ${diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-candidates">${t('diskCleanCandidates')} (${candidatesCount})</button>
-        </div>
-        <input type="search" id="dc-app-search" class="dc-search" placeholder="${escapeHtml(t('diskCleanSearch'))}" autocomplete="off" />
-      </div>
-      <div id="cleaner-list-body" class="dc-app-list"></div>
-      <div id="dc-app-status" class="dc-status hidden"></div>
-    </div>`
-
-    const search = body.querySelector('#dc-app-search')
-    let searchTimer = null
-    search?.addEventListener('input', () => {
-      clearTimeout(searchTimer)
-      searchTimer = setTimeout(() => renderDiskCleanApps(body).catch(() => {}), 160)
-    })
-
-    body.querySelector('#dc-filter-all')?.addEventListener('click', () => {
-      if (diskCleanFilterCandidates) {
-        diskCleanFilterCandidates = false
-        renderDiskCleanApps(body).catch(() => {})
-      }
-    })
-
-    body.querySelector('#dc-filter-candidates')?.addEventListener('click', () => {
-      if (!diskCleanFilterCandidates) {
-        diskCleanFilterCandidates = true
-        renderDiskCleanApps(body).catch(() => {})
-      }
-    })
-  } else {
-    const btnAll = body.querySelector('#dc-filter-all')
-    const btnCand = body.querySelector('#dc-filter-candidates')
-    if (btnAll) btnAll.classList.toggle('active', !diskCleanFilterCandidates)
-    if (btnCand) {
-      btnCand.classList.toggle('active', diskCleanFilterCandidates)
-      btnCand.textContent = `${t('diskCleanCandidates')} (${candidatesCount})`
-    }
-  }
-
-  const listHost = body.querySelector('#cleaner-list-body')
-  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`
-  await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
+function bindDiskCleanAppActions(body) {
   body.querySelectorAll('.dc-open-folder').forEach((btn) => {
     btn.addEventListener('click', async (ev) => {
       ev.preventDefault()
@@ -5495,24 +5395,182 @@ async function renderDiskCleanApps(body) {
   })
 }
 
-let lastTrashedLeftover = null
+function renderDiskCleanAppsList(body) {
+  const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
+  const driveFiltered = diskCleanAppsCache.filter((a) => {
+    const appDrive = (a.driveLetter || '').toUpperCase()
+    if (!appDrive) {
+      return targetDrive === 'C'
+    }
+    return appDrive === targetDrive
+  })
 
-async function renderDiskCleanLeftovers(body) {
+  const candidatesCount = driveFiltered.filter((a) => a.candidateCleanup).length
+
+  const candidateFiltered = diskCleanFilterCandidates
+    ? driveFiltered.filter((a) => a.candidateCleanup)
+    : driveFiltered
+
+  const q = (body.querySelector('#dc-app-search')?.value || '').trim().toLowerCase()
+  const finalFiltered = candidateFiltered.filter((a) => {
+    if (!q) return true
+    const hay = `${a.displayName || ''} ${a.publisher || ''}`.toLowerCase()
+    return hay.includes(q)
+  })
+
+  const rows = finalFiltered.slice(0, 100).map((a) => {
+    const size = formatAppSize(a.sizeBytes, a.sizeLabel)
+    const disabled = a.canUninstall ? '' : 'disabled'
+    const loc = String(a.installLocation || '').trim()
+    const openBtn = loc
+      ? `<button type="button" class="btn soft compact dc-open-folder" data-path="${escapeHtml(loc)}" title="${escapeHtml(t('diskCleanOpenFolder'))}">📁</button>`
+      : ''
+    const candidateBadge = (a.candidateCleanup || a.candidateBadgeRu || a.candidateBadgeEn)
+      ? `<div class="dc-candidate-badge">${escapeHtml(lang === 'en' ? (a.candidateBadgeEn || a.candidateBadgeRu) : (a.candidateBadgeRu || a.candidateBadgeEn))}</div>`
+      : ''
+    return `<div class="dc-app-row" data-app-id="${escapeHtml(a.id)}">
+      <div class="dc-app-main">
+        <div class="dc-app-name">${escapeHtml(a.displayName || '')}</div>
+        <div class="dc-app-meta">${escapeHtml(a.publisher || '')}${a.displayVersion ? ' · ' + escapeHtml(a.displayVersion) : ''}</div>
+        ${candidateBadge}
+      </div>
+      <div class="dc-app-size">${escapeHtml(size)}</div>
+      <div class="dc-app-actions">
+        ${openBtn}
+        <button type="button" class="btn soft compact dc-uninstall" data-app-id="${escapeHtml(a.id)}" ${disabled}>${t('diskCleanUninstall')}</button>
+      </div>
+      <div class="dc-row-loader hidden" aria-hidden="true"></div>
+    </div>`
+  }).join('')
+
+  const btnCand = body.querySelector('#dc-filter-candidates')
+  if (btnCand) {
+    btnCand.textContent = `${t('diskCleanCandidates')} (${candidatesCount})`
+  }
+
+  const listHost = body.querySelector('#cleaner-list-body')
+  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`
+  bindDiskCleanAppActions(body)
+}
+
+async function renderDiskCleanApps(body) {
   const currentRev = ++scanRevision
-  let items = []
-  try { items = await ListOrphanLeftovers() } catch (err) {
+  const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
+  let apps = []
+  try {
+    if (window.go?.main?.App?.ListInstalledAppsForDrive) {
+      apps = await window.go.main.App.ListInstalledAppsForDrive(targetDrive)
+    } else {
+      apps = await ListInstalledApps()
+    }
+  } catch (err) {
     if (currentRev !== scanRevision) return
     body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
     return
   }
   if (currentRev !== scanRevision) return
-  let binBytes = 0
-  try {
-    const bin = await GetRecycleBinInfo()
-    binBytes = Number(bin?.bytes) || 0
-  } catch (_) { binBytes = 0 }
+  diskCleanAppsCache = Array.isArray(apps) ? apps : []
+
+  const driveFiltered = diskCleanAppsCache.filter((a) => {
+    const appDrive = (a.driveLetter || '').toUpperCase()
+    if (!appDrive) {
+      return targetDrive === 'C'
+    }
+    return appDrive === targetDrive
+  })
+  const candidatesCount = driveFiltered.filter((a) => a.candidateCleanup).length
+
+  if (!body.querySelector('#dc-app-search')) {
+    body.innerHTML = `
+    <div class="dc-pane">
+      <div id="dc-stats-slot"></div>
+      <div class="dc-filter-toolbar">
+        <div class="dc-filter-pills">
+          <button type="button" class="btn compact dc-filter-btn ${!diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-all">${t('diskCleanAllApps')}</button>
+          <button type="button" class="btn compact dc-filter-btn ${diskCleanFilterCandidates ? 'active' : ''}" id="dc-filter-candidates">${t('diskCleanCandidates')} (${candidatesCount})</button>
+        </div>
+        <input type="search" id="dc-app-search" class="dc-search" placeholder="${escapeHtml(t('diskCleanSearch'))}" autocomplete="off" />
+      </div>
+      <div id="cleaner-list-body" class="dc-app-list"></div>
+      <div id="dc-app-status" class="dc-status hidden"></div>
+    </div>`
+
+    const search = body.querySelector('#dc-app-search')
+    let searchTimer = null
+    search?.addEventListener('input', () => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(() => {
+        renderDiskCleanAppsList(body)
+      }, 120)
+    })
+
+    body.querySelector('#dc-filter-all')?.addEventListener('click', () => {
+      if (diskCleanFilterCandidates) {
+        diskCleanFilterCandidates = false
+        body.querySelector('#dc-filter-all')?.classList.add('active')
+        body.querySelector('#dc-filter-candidates')?.classList.remove('active')
+        renderDiskCleanAppsList(body)
+      }
+    })
+
+    body.querySelector('#dc-filter-candidates')?.addEventListener('click', () => {
+      if (!diskCleanFilterCandidates) {
+        diskCleanFilterCandidates = true
+        body.querySelector('#dc-filter-all')?.classList.remove('active')
+        body.querySelector('#dc-filter-candidates')?.classList.add('active')
+        renderDiskCleanAppsList(body)
+      }
+    })
+  } else {
+    const btnAll = body.querySelector('#dc-filter-all')
+    const btnCand = body.querySelector('#dc-filter-candidates')
+    if (btnAll) btnAll.classList.toggle('active', !diskCleanFilterCandidates)
+    if (btnCand) {
+      btnCand.classList.toggle('active', diskCleanFilterCandidates)
+      btnCand.textContent = `${t('diskCleanCandidates')} (${candidatesCount})`
+    }
+  }
+
+  renderDiskCleanAppsList(body)
+  await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
+}
+
+let lastTrashedLeftover = null
+let diskCleanLeftoversCache = []
+
+function bindDiskCleanLeftoverActions(body) {
+  body.querySelectorAll('.dc-orphan-del').forEach((btn) => {
+    btn.addEventListener('click', async (ev) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+      const path = btn.getAttribute('data-path') || ''
+      const name = btn.getAttribute('data-name') || path
+      if (!path) return
+      const row = btn.closest('.dc-app-row')
+      btn.disabled = true
+      openDeleteProgress(name)
+      window.__dcRefreshAfterDelete = async () => {
+        if (row) {
+          row.classList.add('fade-out')
+          setTimeout(() => row.remove(), 250)
+        }
+        lastTrashedLeftover = { name, path }
+        renderDiskCleanDrives().catch(() => {})
+        await renderDiskCleanLeftovers(body)
+      }
+      try {
+        await StartRemoveOrphanLeftover(path)
+      } catch (err) {
+        updateDeleteProgress({ phase: 'error', message: String(err) })
+        btn.disabled = false
+      }
+    })
+  })
+}
+
+function renderDiskCleanLeftoversList(body) {
   const q = (body.querySelector('#dc-left-search')?.value || '').trim().toLowerCase()
-  const filtered = (Array.isArray(items) ? items : []).filter((it) => {
+  const filtered = (Array.isArray(diskCleanLeftoversCache) ? diskCleanLeftoversCache : []).filter((it) => {
     if (!q) return true
     return `${it.name || ''} ${it.path || ''}`.toLowerCase().includes(q)
   })
@@ -5531,6 +5589,35 @@ async function renderDiskCleanLeftovers(body) {
       <button type="button" class="btn soft compact dc-orphan-del" data-path="${escapeHtml(it.path)}" data-name="${escapeHtml(it.name || '')}">${t('diskCleanDeleteLeftover')}</button>
     </div>`
   }).join('')
+
+  const listHost = body.querySelector('#cleaner-list-body')
+  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`
+  bindDiskCleanLeftoverActions(body)
+}
+
+async function renderDiskCleanLeftovers(body) {
+  const currentRev = ++scanRevision
+  const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
+  let items = []
+  try {
+    if (window.go?.main?.App?.ListOrphanLeftoversForDrive) {
+      items = await window.go.main.App.ListOrphanLeftoversForDrive(targetDrive)
+    } else {
+      items = await ListOrphanLeftovers()
+    }
+  } catch (err) {
+    if (currentRev !== scanRevision) return
+    body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
+    return
+  }
+  if (currentRev !== scanRevision) return
+  diskCleanLeftoversCache = Array.isArray(items) ? items : []
+
+  let binBytes = 0
+  try {
+    const bin = await GetRecycleBinInfo()
+    binBytes = Number(bin?.bytes) || 0
+  } catch (_) { binBytes = 0 }
 
   if (!body.querySelector('#dc-left-search')) {
     body.innerHTML = `
@@ -5566,7 +5653,9 @@ async function renderDiskCleanLeftovers(body) {
     let searchTimer = null
     search?.addEventListener('input', () => {
       clearTimeout(searchTimer)
-      searchTimer = setTimeout(() => renderDiskCleanLeftovers(body).catch(() => {}), 160)
+      searchTimer = setTimeout(() => {
+        renderDiskCleanLeftoversList(body)
+      }, 120)
     })
     body.querySelector('#dc-empty-recycle')?.addEventListener('click', async () => {
       const btn = body.querySelector('#dc-empty-recycle')
@@ -5608,7 +5697,7 @@ async function renderDiskCleanLeftovers(body) {
           showToast(res?.message || t('dcUndoFailed'), false)
           if (btn) {
             btn.disabled = false
-          btn.textContent = t('dcUndoRestoreBtn')
+            btn.textContent = t('dcUndoRestoreBtn')
           }
         }
       } catch (err) {
@@ -5633,49 +5722,32 @@ async function renderDiskCleanLeftovers(body) {
   if (sizeEl) sizeEl.textContent = binBytes > 0 ? formatBytesSmart(binBytes) : t('recycleBinEmptyStatus')
   const emptyBtn = body.querySelector('#dc-empty-recycle')
   if (emptyBtn) emptyBtn.disabled = binBytes <= 0
-  const listHost = body.querySelector('#cleaner-list-body')
-  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`
-  await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
 
-  body.querySelectorAll('.dc-orphan-del').forEach((btn) => {
-    btn.addEventListener('click', async (ev) => {
-      ev.preventDefault()
-      ev.stopPropagation()
-      const path = btn.getAttribute('data-path') || ''
-      const name = btn.getAttribute('data-name') || path
-      if (!path) return
-      const row = btn.closest('.dc-app-row')
-      btn.disabled = true
-      openDeleteProgress(name)
-      window.__dcRefreshAfterDelete = async () => {
-        if (row) {
-          row.classList.add('fade-out')
-          setTimeout(() => row.remove(), 250)
-        }
-        lastTrashedLeftover = { name, path }
-        renderDiskCleanDrives().catch(() => {})
-        await renderDiskCleanLeftovers(body)
-      }
-      try {
-        await StartRemoveOrphanLeftover(path)
-      } catch (err) {
-        updateDeleteProgress({ phase: 'error', message: String(err) })
-        btn.disabled = false
-      }
-    })
-  })
+  renderDiskCleanLeftoversList(body)
+  await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
 }
 
-async function renderDiskCleanCache(body) {
+async function renderDiskCleanCache(body, cachedCats = null) {
   const currentRev = ++scanRevision
   let cats = []
-  try { cats = await PreviewDiskCleanup() } catch (err) {
-    if (currentRev !== scanRevision) return
-    body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
-    return
+  if (cachedCats && Array.isArray(cachedCats)) {
+    cats = cachedCats
+  } else {
+    try {
+      const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
+      if (window.go?.main?.App?.PreviewDiskCleanupForDrive) {
+        cats = await window.go.main.App.PreviewDiskCleanupForDrive(targetDrive)
+      } else {
+        cats = await PreviewDiskCleanup()
+      }
+    } catch (err) {
+      if (currentRev !== scanRevision) return
+      body.innerHTML = `<div class="sf-loading">${escapeHtml(String(err))}</div>`
+      return
+    }
   }
   if (currentRev !== scanRevision) return
-  const list = (Array.isArray(cats) ? cats : []).filter((c) => Number(c.sizeBytes) > 0 || c.id === 'recycle')
+  const list = (Array.isArray(cats) ? cats : []).filter((c) => Number(c.sizeBytes) > 0 || c.id === 'recycle' || c.cleaned)
   body.innerHTML = `
     <div class="dc-pane">
       <div id="dc-stats-slot"></div>
@@ -5683,11 +5755,32 @@ async function renderDiskCleanCache(body) {
       <div class="sf-glass-block">
         <div class="sf-block-title">${t('diskCleanTabCache')}</div>
         <div class="sf-cleanup-list">${list.map((c) => {
-          const isRecycleEmpty = c.id === 'recycle' && (!c.sizeBytes || Number(c.sizeBytes) <= 0)
-          const checked = c.selected !== false && !c.needsAdmin && !isRecycleEmpty ? 'checked' : ''
-          const disabled = c.needsAdmin ? 'disabled' : ''
-          const badges = c.irreversible ? `<span class="sf-badge irr">${t('smartFixIrreversible')}</span>` : ''
-          const sizeDisplay = isRecycleEmpty ? t('recycleBinEmptyStatus') : formatCleanupSize(c.sizeBytes)
+          const isRecycleEmpty = c.id === 'recycle' && (!c.sizeBytes || Number(c.sizeBytes) <= 0) && !c.cleaned
+          const isFullyCleaned = c.cleaned && (Number(c.remainingBytes || 0) === 0 || Number(c.sizeBytes || 0) === 0)
+          const isLocked = c.lockedByRunningApp || (c.cleaned && Number(c.remainingBytes || 0) > 0)
+
+          let sizeDisplay = ''
+          let statusBadge = ''
+          let checked = ''
+          let disabled = c.needsAdmin ? 'disabled' : ''
+
+          if (isFullyCleaned) {
+            sizeDisplay = `✓ ${t('cleanCategoryCleaned')}`
+            checked = ''
+          } else if (isLocked) {
+            const rem = Number(c.remainingBytes || c.sizeBytes || 0)
+            sizeDisplay = formatCleanupSize(rem)
+            statusBadge = `<span class="sf-badge locked" title="${escapeHtml(t('cleanLockedByApp'))}">⚠️ ${t('cleanLockedByApp')}</span>`
+            checked = ''
+          } else if (isRecycleEmpty) {
+            sizeDisplay = t('recycleBinEmptyStatus')
+            checked = ''
+          } else {
+            sizeDisplay = formatCleanupSize(c.sizeBytes)
+            checked = c.selected !== false && !c.needsAdmin ? 'checked' : ''
+          }
+
+          const badges = (c.irreversible ? `<span class="sf-badge irr">${t('smartFixIrreversible')}</span>` : '') + statusBadge
           return `<label class="sf-cleanup-row">
             <input type="checkbox" data-dc-cat="${escapeHtml(c.id)}" ${checked} ${disabled} />
             <span class="sf-cat-name">${escapeHtml(cleanupCatLabel(c.id))}</span>
@@ -5701,19 +5794,67 @@ async function renderDiskCleanCache(body) {
       </div>
       <div id="dc-cache-status" class="dc-status hidden"></div>
     </div>`
+
+  const updateCleanBtn = () => {
+    const btn = body.querySelector('#dc-clean-selected')
+    if (!btn) return
+    const checkedBoxes = [...body.querySelectorAll('input[data-dc-cat]:checked')]
+    let totalBytesToClean = 0
+    checkedBoxes.forEach((cb) => {
+      const catId = cb.getAttribute('data-dc-cat')
+      const catObj = list.find((x) => x.id === catId)
+      if (catObj) {
+        totalBytesToClean += Number(catObj.remainingBytes || catObj.sizeBytes || 0)
+      }
+    })
+    const canClean = checkedBoxes.length > 0 && (totalBytesToClean > 0 || checkedBoxes.some((cb) => cb.getAttribute('data-dc-cat') === 'recycle'))
+    if (!canClean) {
+      btn.disabled = true
+      btn.classList.add('btn-dimmed')
+      btn.textContent = t('cleanNothingToClean')
+    } else {
+      btn.disabled = false
+      btn.classList.remove('btn-dimmed')
+      btn.textContent = t('diskCleanApplyCache')
+    }
+  }
+
+  body.querySelectorAll('input[data-dc-cat]').forEach((cb) => {
+    cb.addEventListener('change', updateCleanBtn)
+  })
+  updateCleanBtn()
+
   await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
+
   body.querySelector('#dc-clean-selected')?.addEventListener('click', async () => {
     const selected = [...body.querySelectorAll('input[data-dc-cat]:checked')].map((el) => el.getAttribute('data-dc-cat')).filter(Boolean)
+    const btn = body.querySelector('#dc-clean-selected')
+    if (btn) {
+      btn.disabled = true
+      btn.classList.add('btn-dimmed')
+    }
     const status = body.querySelector('#dc-cache-status')
     if (status) {
       status.classList.remove('hidden')
       status.textContent = t('diskCleanWorking')
     }
     let res
-    try { res = await ApplyDiskCleanup(selected) } catch (err) {
+    try {
+      const targetDrive = (selectedCleanerDrive || selectedCleanDrive || 'C').toUpperCase()
+      if (window.go?.main?.App?.ApplyDiskCleanupForDrive) {
+        res = await window.go.main.App.ApplyDiskCleanupForDrive(targetDrive, selected)
+      } else {
+        res = await ApplyDiskCleanup(selected)
+      }
+    } catch (err) {
       if (status) status.textContent = String(err)
+      if (btn) {
+        btn.disabled = false
+        btn.classList.remove('btn-dimmed')
+      }
       return
     }
+
     renderDiskCleanDrives().catch(() => {})
     try { await RefreshDiskMetricsEx() } catch (_) {}
     window.__lastCleanCompare = {
@@ -5721,15 +5862,19 @@ async function renderDiskCleanCache(body) {
       usedAfter: res?.usedAfter || 0,
       freed: res?.actualCleanedBytes || res?.freedBytes || 0,
     }
-    if (status) {
-      status.innerHTML = cleanCompareCardHTML(
+
+    await renderDiskCleanCache(body, res?.updatedCats)
+
+    const updatedStatus = body.querySelector('#dc-cache-status')
+    if (updatedStatus) {
+      updatedStatus.classList.remove('hidden')
+      updatedStatus.innerHTML = cleanCompareCardHTML(
         window.__lastCleanCompare.usedBefore,
         window.__lastCleanCompare.usedAfter,
         window.__lastCleanCompare.freed,
       ) || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesSmart(window.__lastCleanCompare.freed, true) })}</div>`
     }
     renderHome().catch(() => {})
-    await renderCleanStatsBanner(body.querySelector('#dc-stats-slot'))
   })
 }
 

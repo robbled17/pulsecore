@@ -53,3 +53,56 @@ func TestBlockedFolderNames(t *testing.T) {
 		t.Fatal("personal folders must be blocked from large-folder list")
 	}
 }
+
+func TestDriveScanCachePerDrive(t *testing.T) {
+	a := &App{}
+	a.InvalidateDriveScanCache("")
+
+	// Initially nil
+	cached := a.GetDriveScanCache("C")
+	if cached != nil {
+		t.Fatalf("expected nil cache after full invalidation, got %v", cached)
+	}
+
+	// Preview populates cache
+	cats := a.PreviewDiskCleanupForDrive("C")
+	if len(cats) == 0 {
+		t.Fatal("expected non-empty categories")
+	}
+
+	cached = a.GetDriveScanCache("C")
+	if cached == nil || !cached.CacheLoaded {
+		t.Fatalf("expected cache to be loaded for drive C")
+	}
+	if len(cached.Cache) != len(cats) {
+		t.Fatalf("expected %d cached categories, got %d", len(cats), len(cached.Cache))
+	}
+
+	// Invalidate single drive
+	a.InvalidateDriveScanCache("C")
+	cached = a.GetDriveScanCache("C")
+	if cached != nil {
+		t.Fatalf("expected nil cache after C invalidation")
+	}
+}
+
+func TestApplyDiskCleanupResultShape(t *testing.T) {
+	a := &App{}
+	// Empty slice applies selected non-admin cats
+	res := a.ApplyDiskCleanup([]string{"wer_reports"})
+	if len(res.UpdatedCats) == 0 {
+		t.Fatal("expected UpdatedCats to be populated")
+	}
+	found := false
+	for _, c := range res.UpdatedCats {
+		if c.ID == "wer_reports" {
+			found = true
+			if !c.Cleaned {
+				t.Fatalf("expected wer_reports to be marked Cleaned")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected wer_reports in UpdatedCats")
+	}
+}

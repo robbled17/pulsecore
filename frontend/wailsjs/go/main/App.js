@@ -14,6 +14,10 @@ export function ApplyDiskCleanup(arg1) {
   return window['go']['main']['App']['ApplyDiskCleanup'](arg1);
 }
 
+export function ApplyDiskCleanupForDrive(arg1, arg2) {
+  return window['go']['main']['App']['ApplyDiskCleanupForDrive'](arg1, arg2);
+}
+
 export function ApplyEcoPIDWithFeedback(arg1) {
   return window['go']['main']['App']['ApplyEcoPIDWithFeedback'](arg1);
 }
@@ -190,6 +194,10 @@ export function GetDiskWatchInfo(arg1) {
   return window['go']['main']['App']['GetDiskWatchInfo'](arg1);
 }
 
+export function GetDriveScanCache(arg1) {
+  return window['go']['main']['App']['GetDriveScanCache'](arg1);
+}
+
 export function GetEcoHistory() {
   return window['go']['main']['App']['GetEcoHistory']();
 }
@@ -338,6 +346,10 @@ export function HideUserGameMeta(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['HideUserGameMeta'](arg1, arg2, arg3, arg4);
 }
 
+export function InvalidateDriveScanCache(arg1) {
+  return window['go']['main']['App']['InvalidateDriveScanCache'](arg1);
+}
+
 export function IsConflictWatcherEnabled() {
   return window['go']['main']['App']['IsConflictWatcherEnabled']();
 }
@@ -386,12 +398,20 @@ export function ListInstalledApps() {
   return window['go']['main']['App']['ListInstalledApps']();
 }
 
+export function ListInstalledAppsForDrive(arg1) {
+  return window['go']['main']['App']['ListInstalledAppsForDrive'](arg1);
+}
+
 export function ListMonitors() {
   return window['go']['main']['App']['ListMonitors']();
 }
 
 export function ListOrphanLeftovers() {
   return window['go']['main']['App']['ListOrphanLeftovers']();
+}
+
+export function ListOrphanLeftoversForDrive(arg1) {
+  return window['go']['main']['App']['ListOrphanLeftoversForDrive'](arg1);
 }
 
 export function ListPnPDeviceErrors() {
@@ -458,6 +478,10 @@ export function PreviewDiskCleanup() {
   return window['go']['main']['App']['PreviewDiskCleanup']();
 }
 
+export function PreviewDiskCleanupForDrive(arg1) {
+  return window['go']['main']['App']['PreviewDiskCleanupForDrive'](arg1);
+}
+
 export function QuitApp() {
   return window['go']['main']['App']['QuitApp']();
 }
@@ -484,6 +508,10 @@ export function RefreshDiskMetrics() {
 
 export function RefreshDiskMetricsEx() {
   return window['go']['main']['App']['RefreshDiskMetricsEx']();
+}
+
+export function RefreshDriveScan(arg1) {
+  return window['go']['main']['App']['RefreshDriveScan'](arg1);
 }
 
 export function RemoveAppLeftovers(arg1) {

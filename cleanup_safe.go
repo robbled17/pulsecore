@@ -5,30 +5,38 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 // CleanupCat is one safe cleanup category with measured size.
 type CleanupCat struct {
-	ID           string `json:"id"`
-	SizeBytes    int64  `json:"sizeBytes"`
-	NeedsAdmin   bool   `json:"needsAdmin"`
-	Irreversible bool   `json:"irreversible"`
-	Available    bool   `json:"available"`
-	Selected     bool   `json:"selected"`
+	ID                 string `json:"id"`
+	SizeBytes          int64  `json:"sizeBytes"`
+	RemainingBytes     int64  `json:"remainingBytes"`
+	FreedBytes         int64  `json:"freedBytes"`
+	LockedBytes        int64  `json:"lockedBytes"`
+	NeedsAdmin         bool   `json:"needsAdmin"`
+	Irreversible       bool   `json:"irreversible"`
+	Available          bool   `json:"available"`
+	Selected           bool   `json:"selected"`
+	Cleaned            bool   `json:"cleaned"`
+	LockedByRunningApp bool   `json:"lockedByRunningApp"`
 }
 
 // CleanupResult is the outcome of ApplyDiskCleanup.
 type CleanupResult struct {
-	OK                 bool     `json:"ok"`
-	FreedBytes         int64    `json:"freedBytes"`
-	ActualCleanedBytes int64    `json:"actualCleanedBytes"`
-	Categories         []string `json:"categories"`
-	UsedBefore         uint64   `json:"usedBefore"`
-	UsedAfter          uint64   `json:"usedAfter"`
-	FreeBefore         uint64   `json:"freeBefore"`
-	FreeAfter          uint64   `json:"freeAfter"`
-	TotalBytes         uint64   `json:"totalBytes"`
+	OK                 bool         `json:"ok"`
+	FreedBytes         int64        `json:"freedBytes"`
+	ActualCleanedBytes int64        `json:"actualCleanedBytes"`
+	LockedBytes        int64        `json:"lockedBytes"`
+	Categories         []string     `json:"categories"`
+	UpdatedCats        []CleanupCat `json:"updatedCats"`
+	UsedBefore         uint64       `json:"usedBefore"`
+	UsedAfter          uint64       `json:"usedAfter"`
+	FreeBefore         uint64       `json:"freeBefore"`
+	FreeAfter          uint64       `json:"freeAfter"`
+	TotalBytes         uint64       `json:"totalBytes"`
 }
 
 // LargeFolder kept for API compat (UI now opens Storage Sense).
@@ -49,51 +57,122 @@ var cleanupSafeIDs = []string{
 	"package_cache",
 }
 
+// PreviewDiskCleanupForDrive measures safe categories for a drive with per-drive cache.
+func (a *App) PreviewDiskCleanupForDrive(drive string) []CleanupCat {
+	d := normalizeDriveLetter(drive)
+	if d == "" {
+		d = "C"
+	}
+	driveScanCacheMu.RLock()
+	if c, ok := driveScanCaches[d]; ok && c != nil && c.CacheLoaded {
+		res := append([]CleanupCat(nil), c.Cache...)
+		driveScanCacheMu.RUnlock()
+		return res
+	}
+	driveScanCacheMu.RUnlock()
+
+	return a.scanAndCachePreviewCleanup(d)
+}
+
 // PreviewDiskCleanup measures safe categories (no deletion).
 func (a *App) PreviewDiskCleanup() []CleanupCat {
-	out := make([]CleanupCat, 0, len(cleanupSafeIDs))
-	for _, id := range cleanupSafeIDs {
-		cat := CleanupCat{ID: id, Available: true, Selected: true}
-		switch id {
-		case "shader_cache":
-			cat.SizeBytes = dirSizeLimited(shaderCacheDirs(), 4, time.Time{})
-		case "recycle":
-			cat.Irreversible = true
-			rbBytes, _, _ := queryRecycleBinInfo()
-			if rbBytes < 0 {
-				rbBytes = recycleBinSizeApprox()
+	return a.PreviewDiskCleanupForDrive("C")
+}
+
+func (a *App) scanAndCachePreviewCleanup(drive string) []CleanupCat {
+	isSystemDrive := strings.EqualFold(drive, "C")
+	out := make([]CleanupCat, len(cleanupSafeIDs))
+
+	var wg sync.WaitGroup
+	for idx, id := range cleanupSafeIDs {
+		wg.Add(1)
+		go func(i int, catID string) {
+			defer wg.Done()
+			cat := CleanupCat{ID: catID, Available: true, Selected: true}
+			switch catID {
+			case "shader_cache":
+				if isSystemDrive {
+					cat.SizeBytes = dirSizeLimited(shaderCacheDirs(), 4, time.Time{})
+				} else {
+					cat.SizeBytes = dirSizeLimited(steamShaderCacheDirsForDrive(drive), 4, time.Time{})
+				}
+			case "recycle":
+				cat.Irreversible = true
+				rbBytes, _, _ := queryRecycleBinInfo()
+				if rbBytes < 0 {
+					rbBytes = recycleBinSizeApprox()
+				}
+				if rbBytes < 0 {
+					rbBytes = 0
+				}
+				cat.SizeBytes = rbBytes
+			case "app_cache":
+				if isSystemDrive {
+					cat.SizeBytes = dirSizeLimited(appCacheDirs(), 4, time.Time{})
+				}
+			case "user_temp":
+				if isSystemDrive {
+					cat.SizeBytes = userTempCleanableSize()
+				}
+			case "browser_cache":
+				if isSystemDrive {
+					cat.SizeBytes = browserCacheSize()
+				}
+			case "thumbnails":
+				if isSystemDrive {
+					cat.SizeBytes = thumbcacheSize()
+				}
+			case "wer_reports":
+				if isSystemDrive {
+					cat.SizeBytes = dirSizeLimited(werDirs(), 4, time.Time{})
+				}
+			case "package_cache":
+				if isSystemDrive {
+					cat.SizeBytes = dirSizeLimited(packageCacheDirs(), 3, time.Time{})
+				}
 			}
-			if rbBytes < 0 {
-				rbBytes = 0
+			// Hide empty categories from default selection noise, but still list them.
+			if cat.SizeBytes <= 0 && cat.ID != "recycle" {
+				cat.Selected = false
 			}
-			cat.SizeBytes = rbBytes
-		case "app_cache":
-			cat.SizeBytes = dirSizeLimited(appCacheDirs(), 4, time.Time{})
-		case "user_temp":
-			cat.SizeBytes = userTempCleanableSize()
-		case "browser_cache":
-			cat.SizeBytes = browserCacheSize()
-		case "thumbnails":
-			cat.SizeBytes = thumbcacheSize()
-		case "wer_reports":
-			cat.SizeBytes = dirSizeLimited(werDirs(), 4, time.Time{})
-		case "package_cache":
-			cat.SizeBytes = dirSizeLimited(packageCacheDirs(), 3, time.Time{})
-		}
-		// Hide empty categories from default selection noise, but still list them.
-		if cat.SizeBytes <= 0 {
-			cat.Selected = false
-		}
-		out = append(out, cat)
+			out[i] = cat
+		}(idx, id)
 	}
+	wg.Wait()
+
+	driveScanCacheMu.Lock()
+	c := getDriveCacheLocked(drive)
+	c.Cache = append([]CleanupCat(nil), out...)
+	c.CacheLoaded = true
+	driveScanCacheMu.Unlock()
+
 	return out
 }
 
-// ApplyDiskCleanup deletes selected safe categories. Empty cats → all selected-by-default non-admin.
-func (a *App) ApplyDiskCleanup(cats []string) CleanupResult {
+func steamShaderCacheDirsForDrive(drive string) []string {
+	if drive == "" {
+		return nil
+	}
+	d := drive + `:\`
+	dirs := []string{
+		filepath.Join(d, "SteamLibrary", "steamapps", "shadercache"),
+		filepath.Join(d, "SteamLibrary", "steamapps", "downloading"),
+		filepath.Join(d, "Games", "SteamLibrary", "steamapps", "shadercache"),
+	}
+	return uniqueStrings(dirs)
+}
+
+// ApplyDiskCleanupForDrive deletes selected safe categories for the specified drive.
+func (a *App) ApplyDiskCleanupForDrive(drive string, cats []string) CleanupResult {
+	d := normalizeDriveLetter(drive)
+	if d == "" {
+		d = "C"
+	}
+	driveWithColon := d + ":"
+
 	allowed := map[string]bool{}
 	if len(cats) == 0 {
-		for _, c := range a.PreviewDiskCleanup() {
+		for _, c := range a.PreviewDiskCleanupForDrive(d) {
 			if c.Selected && !c.NeedsAdmin {
 				allowed[c.ID] = true
 			}
@@ -114,78 +193,67 @@ func (a *App) ApplyDiskCleanup(cats []string) CleanupResult {
 
 	category := cleanupCategoryLabel(allowed)
 	var done []string
-	var freed int64
-	var rec CleanRecord
-	if a != nil {
-		freed, rec = a.MeasureAndRecordClean("C:", category, func() int64 {
-			var n int64
-			done = done[:0]
-			for _, id := range cleanupSafeIDs {
-				if !allowed[id] {
-					continue
-				}
-				var part int64
-				switch id {
-				case "shader_cache":
-					part = cleanDirsAll(shaderCacheDirs(), 5)
-				case "recycle":
-					part = emptyRecycleBin()
-				case "app_cache":
-					part = cleanDirsAll(appCacheDirs(), 5)
-				case "user_temp":
-					part = cleanUserTemp()
-				case "browser_cache":
-					part = cleanBrowserCaches()
-				case "thumbnails":
-					part = cleanThumbcaches()
-				case "wer_reports":
-					part = cleanDirsAll(werDirs(), 4)
-				case "package_cache":
-					part = cleanDirsAll(packageCacheDirs(), 4)
-				}
-				if part > 0 {
-					n += part
-					done = append(done, id)
-				}
-			}
-			return n
-		})
-		a.RefreshDiskMetricsEx()
-	} else {
+	var freedTotal int64
+	var lockedTotal int64
+	catStats := make(map[string]cleanStats)
+
+	cleanFn := func() int64 {
+		var n int64
 		for _, id := range cleanupSafeIDs {
 			if !allowed[id] {
 				continue
 			}
-			var part int64
-			switch id {
-			case "shader_cache":
-				part = cleanDirsAll(shaderCacheDirs(), 5)
-			case "recycle":
-				part = emptyRecycleBin()
-			case "app_cache":
-				part = cleanDirsAll(appCacheDirs(), 5)
-			case "user_temp":
-				part = cleanUserTemp()
-			case "browser_cache":
-				part = cleanBrowserCaches()
-			case "thumbnails":
-				part = cleanThumbcaches()
-			case "wer_reports":
-				part = cleanDirsAll(werDirs(), 4)
-			case "package_cache":
-				part = cleanDirsAll(packageCacheDirs(), 4)
-			}
-			if part > 0 {
-				freed += part
+			st := cleanOneCategoryFileByFile(id)
+			catStats[id] = st
+			if st.freed > 0 {
+				n += st.freed
 				done = append(done, id)
 			}
+			freedTotal += st.freed
+			lockedTotal += st.locked
 		}
+		return n
 	}
 
-	actual := freed
+	var rec CleanRecord
+	if a != nil {
+		_, rec = a.MeasureAndRecordClean(driveWithColon, category, cleanFn)
+		a.RefreshDiskMetricsEx()
+	} else {
+		cleanFn()
+	}
+
+	actual := freedTotal
 	if rec.BytesFreed > 0 {
 		actual = int64(rec.BytesFreed)
 	}
+
+	// Build updated categories snapshot
+	existingCats := a.PreviewDiskCleanupForDrive(d)
+	updatedCats := make([]CleanupCat, len(existingCats))
+	for i, c := range existingCats {
+		cat := c
+		if st, ok := catStats[c.ID]; ok {
+			cat.Cleaned = true
+			cat.FreedBytes = st.freed
+			cat.LockedBytes = st.locked
+			cat.RemainingBytes = st.locked
+			cat.SizeBytes = st.locked
+			cat.LockedByRunningApp = st.locked > 0
+			if cat.RemainingBytes == 0 {
+				cat.Selected = false
+			}
+		}
+		updatedCats[i] = cat
+	}
+
+	// Update in-memory per-drive cache with the fresh cleanup result
+	driveScanCacheMu.Lock()
+	cached := getDriveCacheLocked(d)
+	cached.Cache = append([]CleanupCat(nil), updatedCats...)
+	cached.CacheLoaded = true
+	driveScanCacheMu.Unlock()
+
 	usedBefore, usedAfter := uint64(0), uint64(0)
 	if rec.TotalBytes > rec.BytesBefore {
 		usedBefore = rec.TotalBytes - rec.BytesBefore
@@ -193,17 +261,25 @@ func (a *App) ApplyDiskCleanup(cats []string) CleanupResult {
 	if rec.TotalBytes > rec.BytesAfter {
 		usedAfter = rec.TotalBytes - rec.BytesAfter
 	}
+
 	return CleanupResult{
 		OK:                 actual > 0 || len(done) > 0,
 		FreedBytes:         actual,
 		ActualCleanedBytes: actual,
+		LockedBytes:        lockedTotal,
 		Categories:         done,
+		UpdatedCats:        updatedCats,
 		UsedBefore:         usedBefore,
 		UsedAfter:          usedAfter,
 		FreeBefore:         rec.BytesBefore,
 		FreeAfter:          rec.BytesAfter,
 		TotalBytes:         rec.TotalBytes,
 	}
+}
+
+// ApplyDiskCleanup deletes selected safe categories. Empty cats → all selected-by-default non-admin.
+func (a *App) ApplyDiskCleanup(cats []string) CleanupResult {
+	return a.ApplyDiskCleanupForDrive("C", cats)
 }
 
 func cleanupCategoryLabel(allowed map[string]bool) string {
@@ -465,6 +541,139 @@ func isSafeCleanupPath(p string) bool {
 		return IsSafeBrowserCachePath(p)
 	}
 	return true
+}
+
+type cleanStats struct {
+	freed  int64
+	locked int64
+}
+
+func cleanOneCategoryFileByFile(id string) cleanStats {
+	switch id {
+	case "shader_cache":
+		return cleanDirsFileByFile(shaderCacheDirs(), 5)
+	case "recycle":
+		return cleanStats{freed: emptyRecycleBin()}
+	case "app_cache":
+		return cleanDirsFileByFile(appCacheDirs(), 5)
+	case "user_temp":
+		return cleanUserTempFileByFile()
+	case "browser_cache":
+		return cleanBrowserCachesFileByFile()
+	case "thumbnails":
+		return cleanThumbcachesFileByFile()
+	case "wer_reports":
+		return cleanDirsFileByFile(werDirs(), 4)
+	case "package_cache":
+		return cleanDirsFileByFile(packageCacheDirs(), 4)
+	default:
+		return cleanStats{}
+	}
+}
+
+func walkCleanFileByFile(root string, maxDepth int, olderThan time.Time, filter func(string, os.FileInfo) bool) cleanStats {
+	if root == "" {
+		return cleanStats{}
+	}
+	var stats cleanStats
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			if maxDepth >= 0 && path != root {
+				rel, _ := filepath.Rel(root, path)
+				depth := strings.Count(rel, string(os.PathSeparator)) + 1
+				if depth > maxDepth {
+					return fs.SkipDir
+				}
+			}
+			return nil
+		}
+		if !isSafeCleanupPath(path) {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		if !olderThan.IsZero() && info.ModTime().After(olderThan) {
+			return nil
+		}
+		if filter != nil && !filter(path, info) {
+			return nil
+		}
+		sz := info.Size()
+		if err := os.Remove(path); err == nil {
+			stats.freed += sz
+		} else {
+			// Locked by running application or access restricted
+			stats.locked += sz
+		}
+		return nil
+	})
+	return stats
+}
+
+func cleanDirsFileByFile(roots []string, maxDepth int) cleanStats {
+	var total cleanStats
+	for _, r := range roots {
+		st := walkCleanFileByFile(r, maxDepth, time.Time{}, nil)
+		total.freed += st.freed
+		total.locked += st.locked
+	}
+	return total
+}
+
+func cleanUserTempFileByFile() cleanStats {
+	var total cleanStats
+	for _, root := range userTempDirs() {
+		st := walkCleanFileByFile(root, 2, time.Time{}, isTempCleanCandidate)
+		total.freed += st.freed
+		total.locked += st.locked
+	}
+	return total
+}
+
+func cleanBrowserCachesFileByFile() cleanStats {
+	return cleanDirsFileByFile(browserCacheDirs(), 4)
+}
+
+func cleanThumbcachesFileByFile() cleanStats {
+	la := os.Getenv("LOCALAPPDATA")
+	if la == "" {
+		return cleanStats{}
+	}
+	dir := filepath.Join(la, "Microsoft", "Windows", "Explorer")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return cleanStats{}
+	}
+	var total cleanStats
+	for _, e := range entries {
+		name := strings.ToLower(e.Name())
+		if !strings.HasPrefix(name, "thumbcache_") || !strings.HasSuffix(name, ".db") {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		if !isSafeCleanupPath(p) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		sz := info.Size()
+		if err := os.Remove(p); err == nil {
+			total.freed += sz
+		} else {
+			total.locked += sz
+		}
+	}
+	return total
 }
 
 func dirSizeLimited(roots []string, maxDepth int, olderThan time.Time) int64 {

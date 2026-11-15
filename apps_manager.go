@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/windows/registry"
@@ -64,6 +65,52 @@ var uninstallHives = []uninstallHive{
 
 // ListInstalledApps scans Uninstall registry keys, heaviest first.
 func (a *App) ListInstalledApps() []InstalledApp {
+	driveScanCacheMu.RLock()
+	cacheC := driveScanCaches["C"]
+	if cacheC != nil && cacheC.AppsLoaded {
+		var combined []InstalledApp
+		for _, c := range driveScanCaches {
+			if c != nil && c.AppsLoaded {
+				combined = append(combined, c.Apps...)
+			}
+		}
+		if len(combined) > 0 {
+			driveScanCacheMu.RUnlock()
+			sortAppsBySize(combined)
+			return combined
+		}
+	}
+	driveScanCacheMu.RUnlock()
+
+	return a.scanAndCacheInstalledApps()
+}
+
+// ListInstalledAppsForDrive returns installed apps located on the specified drive from cache (or scans if not cached).
+func (a *App) ListInstalledAppsForDrive(drive string) []InstalledApp {
+	d := normalizeDriveLetter(drive)
+	driveScanCacheMu.RLock()
+	cache := driveScanCaches[d]
+	if cache != nil && cache.AppsLoaded {
+		apps := make([]InstalledApp, len(cache.Apps))
+		copy(apps, cache.Apps)
+		driveScanCacheMu.RUnlock()
+		return apps
+	}
+	driveScanCacheMu.RUnlock()
+
+	a.scanAndCacheInstalledApps()
+
+	driveScanCacheMu.RLock()
+	defer driveScanCacheMu.RUnlock()
+	if c := driveScanCaches[d]; c != nil && c.AppsLoaded {
+		apps := make([]InstalledApp, len(c.Apps))
+		copy(apps, c.Apps)
+		return apps
+	}
+	return nil
+}
+
+func (a *App) scanAndCacheInstalledApps() []InstalledApp {
 	seen := map[string]bool{}
 	out := make([]InstalledApp, 0, 128)
 
@@ -71,16 +118,80 @@ func (a *App) ListInstalledApps() []InstalledApp {
 	userAssistMap := scanUserAssistLaunchTimes()
 	prefetchMap := scanPrefetchLaunchTimes()
 
+	// Registry scan is fast (< 15ms) as folder sizing is deferred
 	for _, h := range uninstallHives {
 		out = append(out, scanUninstallHive(h, seen, bamMap, userAssistMap, prefetchMap)...)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].SizeBytes == out[j].SizeBytes {
-			return strings.ToLower(out[i].DisplayName) < strings.ToLower(out[j].DisplayName)
+
+	// Sizing pool in parallel (up to 8 goroutines) using fast Win32 FindFirstFileExW
+	var needsSizing []*InstalledApp
+	for i := range out {
+		if out[i].SizeBytes <= 0 {
+			cleanLoc := strings.Trim(strings.TrimSpace(out[i].InstallLocation), `"'`)
+			if cleanLoc != "" && filepath.IsAbs(cleanLoc) {
+				needsSizing = append(needsSizing, &out[i])
+			}
 		}
-		return out[i].SizeBytes > out[j].SizeBytes
-	})
+	}
+
+	if len(needsSizing) > 0 {
+		workers := 8
+		if len(needsSizing) < workers {
+			workers = len(needsSizing)
+		}
+		ch := make(chan *InstalledApp, len(needsSizing))
+		for _, app := range needsSizing {
+			ch <- app
+		}
+		close(ch)
+
+		var wg sync.WaitGroup
+		for w := 0; w < workers; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for app := range ch {
+					cleanLoc := strings.Trim(strings.TrimSpace(app.InstallLocation), `"'`)
+					sz := fastDirSizeWin32(cleanLoc, time.Now().Add(180*time.Millisecond), 3)
+					if sz > 0 {
+						app.SizeBytes = sz
+					}
+				}
+			}()
+		}
+		wg.Wait()
+	}
+
+	for i := range out {
+		out[i].SizeLabel = formatSizeLabel(out[i].SizeBytes)
+	}
+
+	driveScanCacheMu.Lock()
+	for _, c := range driveScanCaches {
+		c.Apps = nil
+		c.AppsLoaded = false
+	}
+	for _, app := range out {
+		c := getDriveCacheLocked(app.DriveLetter)
+		c.Apps = append(c.Apps, app)
+	}
+	for _, c := range driveScanCaches {
+		sortAppsBySize(c.Apps)
+		c.AppsLoaded = true
+	}
+	driveScanCacheMu.Unlock()
+
+	sortAppsBySize(out)
 	return out
+}
+
+func sortAppsBySize(apps []InstalledApp) {
+	sort.Slice(apps, func(i, j int) bool {
+		if apps[i].SizeBytes == apps[j].SizeBytes {
+			return strings.ToLower(apps[i].DisplayName) < strings.ToLower(apps[j].DisplayName)
+		}
+		return apps[i].SizeBytes > apps[j].SizeBytes
+	})
 }
 
 func scanUninstallHive(h uninstallHive, seen map[string]bool, bamMap, userAssistMap, prefetchMap map[string]time.Time) []InstalledApp {
@@ -155,13 +266,7 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string, bamMap, u
 
 	cleanLoc := strings.Trim(strings.TrimSpace(app.InstallLocation), `"'`)
 	if cleanLoc != "" && filepath.IsAbs(cleanLoc) {
-		if info, err := os.Stat(cleanLoc); err == nil && info.IsDir() {
-			realSize := dirSizeBudget(cleanLoc, time.Now().Add(800*time.Millisecond), 4)
-			if realSize > 0 {
-				app.SizeBytes = realSize
-			}
-		} else if err != nil && os.IsNotExist(err) {
-			// InstallLocation was deleted externally: verify if uninstaller still exists
+		if _, err := os.Stat(cleanLoc); err != nil && os.IsNotExist(err) {
 			if !appHasExistingFiles(app.UninstallString, app.QuietUninstall) {
 				return InstalledApp{}, false
 			}
@@ -174,12 +279,6 @@ func readInstalledApp(k registry.Key, h uninstallHive, subName string, bamMap, u
 			}
 		}
 	}
-	if app.SizeBytes <= 0 && cleanLoc != "" {
-		if info, err := os.Stat(cleanLoc); err == nil && info.IsDir() {
-			app.SizeBytes = dirSizeBudget(cleanLoc, time.Now().Add(800*time.Millisecond), 4)
-		}
-	}
-	app.SizeLabel = formatSizeLabel(app.SizeBytes)
 
 	// Determine drive letter
 	loc := strings.TrimSpace(app.InstallLocation)
