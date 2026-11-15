@@ -55,12 +55,17 @@ func (a *App) ApplyOverlayWindowRegion(width, height, radius int) {
 		updateLayeredCapsule(hwnd, physW, physH, isWindows11())
 	}
 
-	// Create capsule rounded region using exact physical dimensions
-	rgn, _, _ := procCreateRoundRect.Call(0, 0, uintptr(physW+1), uintptr(physH+1), uintptr(physH), uintptr(physH))
-	if rgn == 0 {
-		return
+	// On Windows 11: DO NOT set a legacy window region!
+	// Calling SetWindowRgn forces DWM to draw an ugly dark boundary/shadow and breaks per-pixel alpha antialiasing.
+	// On Windows 10: Create capsule rounded region using exact physical dimensions (without +1 overflow).
+	if isWindows11() {
+		_, _, _ = procSetWindowRgn.Call(uintptr(hwnd), 0, 1)
+	} else {
+		rgn, _, _ := procCreateRoundRect.Call(0, 0, uintptr(physW), uintptr(physH), uintptr(physH), uintptr(physH))
+		if rgn != 0 {
+			_, _, _ = procSetWindowRgn.Call(uintptr(hwnd), rgn, 1)
+		}
 	}
-	_, _, _ = procSetWindowRgn.Call(uintptr(hwnd), rgn, 1)
 }
 
 // ClearOverlayWindowRegion restores a rectangular window region and removes layered style.

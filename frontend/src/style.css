@@ -3141,7 +3141,7 @@ html.i18n-dev :is(body, #app) {
 }
 .fps-rec, .fps-hero { display: none !important; }
 
-.minihud, .gameoverlay, .mini-hud-capsule {
+.minihud, .mini-hud-capsule {
   height: 100%;
   width: 100%;
   display: flex;
@@ -3247,7 +3247,7 @@ body.mini-hud-active #app {
   -webkit-app-region: no-drag;
 }
 .gameoverlay {
-  display: none;
+  display: none !important;
   align-items: center !important;
   width: 100% !important;
   height: 100% !important;
@@ -3260,6 +3260,12 @@ body.mini-hud-active #app {
   border: 1px solid rgba(56, 189, 248, 0.35) !important;
   box-shadow: none !important;
   font-family: 'Segoe UI', Inter, -apple-system, sans-serif !important;
+  --wails-draggable: drag;
+  --wails-drop-target: drag;
+  -webkit-app-region: drag;
+  user-select: none;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .gameoverlay.hidden,
 #gameoverlay.hidden,
@@ -3269,7 +3275,7 @@ body.mini-hud-active #gameoverlay,
 body.mini-hud-active .gameoverlay {
   display: none !important;
 }
-body.game-overlay-active #gameoverlay:not(.hidden) {
+body.game-overlay-active:not(.mini-hud-active) #gameoverlay:not(.hidden) {
   display: inline-flex !important;
 }
 .gameoverlay-metrics {
@@ -3439,8 +3445,8 @@ html:has(body.game-overlay-active) {
 }
 body.mini-hud-active .titlebar, body.mini-hud-active .shell,
 body.game-overlay-active .titlebar, body.game-overlay-active .shell { display: none !important; }
-body.mini-hud-active .minihud { display: inline-flex !important; }
-body.game-overlay-active .gameoverlay { display: flex !important; }
+body.mini-hud-active:not(.game-overlay-active) .minihud { display: inline-flex !important; }
+body.game-overlay-active:not(.mini-hud-active) .gameoverlay { display: inline-flex !important; }
 
 .modal {
   position: fixed;

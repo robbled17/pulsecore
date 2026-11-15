@@ -23,8 +23,6 @@ var (
 
 	modKernel32UL                    = windows.NewLazySystemDLL("kernel32.dll")
 	procULQueryFullProcessImageNameW = modKernel32UL.NewProc("QueryFullProcessImageNameW")
-	procULGetFileType                = modKernel32UL.NewProc("GetFileType")
-	procULGetFinalPathNameByHandleW  = modKernel32UL.NewProc("GetFinalPathNameByHandleW")
 )
 
 type rmUniqueProcess struct {
@@ -295,152 +293,8 @@ func findLockingViaModules(targetPath string) []LockProcessInfo {
 	return out
 }
 
-const (
-	systemExtendedHandleInformationClass = 64
-	statusInfoLengthMismatch             = 0xC0000004
-)
-
-type systemHandleTableEntryInfoEx struct {
-	Object                uintptr
-	UniqueProcessId       uintptr
-	HandleValue           uintptr
-	GrantedAccess         uint32
-	CreatorBackTraceIndex uint16
-	ObjectTypeIndex       uint16
-	HandleAttributes      uint32
-	Reserved              uint32
-}
-
-func findLockingViaSystemHandles(targetPath string, seen map[uint32]bool) []LockProcessInfo {
-	if procNtQuerySystemInformation.Find() != nil {
-		return nil
-	}
-
-	var size uint32 = 4 * 1024 * 1024 // 4 MB buffer
-	buf := make([]byte, size)
-	var retLen uint32
-
-	for {
-		r, _, _ := procNtQuerySystemInformation.Call(
-			uintptr(systemExtendedHandleInformationClass),
-			uintptr(unsafe.Pointer(&buf[0])),
-			uintptr(size),
-			uintptr(unsafe.Pointer(&retLen)),
-		)
-		if r == 0 {
-			break
-		}
-		if r != statusInfoLengthMismatch || retLen == 0 {
-			return nil
-		}
-		size = retLen + 256*1024
-		if size > 64*1024*1024 { // Cap at 64MB
-			return nil
-		}
-		buf = make([]byte, size)
-	}
-
-	numHandles := *(*uintptr)(unsafe.Pointer(&buf[0]))
-	if numHandles == 0 {
-		return nil
-	}
-
-	entrySize := unsafe.Sizeof(systemHandleTableEntryInfoEx{})
-	headerSize := unsafe.Sizeof(uintptr(0)) * 2
-	if uintptr(len(buf)) < headerSize+uintptr(numHandles)*entrySize {
-		maxPossible := (uintptr(len(buf)) - headerSize) / entrySize
-		if maxPossible < uintptr(numHandles) {
-			numHandles = maxPossible
-		}
-	}
-
-	entries := unsafe.Slice((*systemHandleTableEntryInfoEx)(unsafe.Pointer(&buf[headerSize])), int(numHandles))
-	myPID := uint32(os.Getpid())
-
-	procCache := map[uint32]windows.Handle{}
-	defer func() {
-		for _, h := range procCache {
-			if h != 0 {
-				_ = windows.CloseHandle(h)
-			}
-		}
-	}()
-
-	var out []LockProcessInfo
-	currProcess := windows.CurrentProcess()
-
-	for i := 0; i < len(entries); i++ {
-		e := &entries[i]
-		pid := uint32(e.UniqueProcessId)
-		if pid <= 4 || pid == myPID || seen[pid] {
-			continue
-		}
-
-		hProc, cached := procCache[pid]
-		if !cached {
-			var err error
-			hProc, err = windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, pid)
-			if err != nil {
-				procCache[pid] = 0
-				continue
-			}
-			procCache[pid] = hProc
-		}
-		if hProc == 0 {
-			continue
-		}
-
-		var dupHandle windows.Handle
-		err := windows.DuplicateHandle(
-			hProc,
-			windows.Handle(e.HandleValue),
-			currProcess,
-			&dupHandle,
-			0,
-			false,
-			windows.DUPLICATE_SAME_ACCESS,
-		)
-		if err != nil || dupHandle == 0 {
-			continue
-		}
-
-		ft, _, _ := procULGetFileType.Call(uintptr(dupHandle))
-		if ft != 1 { // FILE_TYPE_DISK only (prevents hanging on pipes/sockets)
-			_ = windows.CloseHandle(dupHandle)
-			continue
-		}
-
-		var pathBuf [1024]uint16
-		n, _, _ := procULGetFinalPathNameByHandleW.Call(
-			uintptr(dupHandle),
-			uintptr(unsafe.Pointer(&pathBuf[0])),
-			uintptr(len(pathBuf)),
-			0, // FILE_NAME_NORMALIZED
-		)
-		_ = windows.CloseHandle(dupHandle)
-
-		if n > 0 && n < uintptr(len(pathBuf)) {
-			hPath := windows.UTF16ToString(pathBuf[:n])
-			hPath = strings.TrimPrefix(hPath, `\\?\`)
-			if isPathUnderTarget(hPath, targetPath) {
-				exePath, procName := getProcessNameAndPath(pid)
-				if procName != "" && !isProtectedSystemProcess(procName, pid) {
-					seen[pid] = true
-					out = append(out, LockProcessInfo{
-						PID:         pid,
-						AppName:     procName,
-						ProcessName: procName,
-						ExePath:     exePath,
-					})
-				}
-			}
-		}
-	}
-
-	return out
-}
-
-// Level 3: CWD and Open Handles scan
+// Level 3: Process CWD, ExePath, and CommandLine inspection
+// Uses benign standard APIs (process snapshot / gopsutil) that never trigger AV handle-manipulation heuristics.
 func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
 	targetPath = filepath.Clean(strings.TrimSpace(targetPath))
 	if targetPath == "" {
@@ -451,7 +305,7 @@ func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
 	seen := map[uint32]bool{}
 	myPID := uint32(os.Getpid())
 
-	// 1. CWD check using gopsutil processes
+	// Inspect active processes for CWD, Exe, or command line arguments referencing targetPath
 	if procs, err := process.Processes(); err == nil {
 		for _, p := range procs {
 			pid := uint32(p.Pid)
@@ -462,8 +316,35 @@ func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
 			if err != nil || pName == "" || isProtectedSystemProcess(pName, pid) {
 				continue
 			}
-			cwd, err := p.Cwd()
-			if err == nil && isPathUnderTarget(cwd, targetPath) {
+
+			matched := false
+
+			// 1. Check process executable path
+			if exePath, err := p.Exe(); err == nil && exePath != "" {
+				if isPathUnderTarget(exePath, targetPath) {
+					matched = true
+				}
+			}
+
+			// 2. Check process current working directory
+			if !matched {
+				if cwd, err := p.Cwd(); err == nil && cwd != "" {
+					if isPathUnderTarget(cwd, targetPath) {
+						matched = true
+					}
+				}
+			}
+
+			// 3. Check process command line arguments
+			if !matched {
+				if cmdline, err := p.Cmdline(); err == nil && cmdline != "" {
+					if strings.Contains(strings.ToLower(cmdline), strings.ToLower(targetPath)) {
+						matched = true
+					}
+				}
+			}
+
+			if matched {
 				seen[pid] = true
 				exePath, _ := p.Exe()
 				out = append(out, LockProcessInfo{
@@ -473,15 +354,6 @@ func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
 					ExePath:     exePath,
 				})
 			}
-		}
-	}
-
-	// 2. Open handles check via NtQuerySystemInformation
-	handleProcs := findLockingViaSystemHandles(targetPath, seen)
-	for _, p := range handleProcs {
-		if !seen[p.PID] {
-			seen[p.PID] = true
-			out = append(out, p)
 		}
 	}
 

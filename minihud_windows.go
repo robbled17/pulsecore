@@ -224,15 +224,13 @@ func updateLayeredCapsuleInternal(hwnd windows.HWND, width, height int, isWin11 
 		pixelSlice[i] = 0
 	}
 
-	// Step 2: Draw capsule with exact 1.5px margin from bitmap edges (x=1.5, y=1.5, w=width-3, h=height-3, r=h/2)
+	// Step 2: Draw full capsule without inner inset to match physical window bounds
 	widthF := float64(width)
 	heightF := float64(height)
-	inset := 1.5
-	capsuleH := heightF - 2.0*inset
-	radius := capsuleH / 2.0
+	radius := heightF / 2.0
 	cy := heightF / 2.0
-	leftCenter := inset + radius
-	rightCenter := widthF - inset - radius
+	leftCenter := radius
+	rightCenter := widthF - radius
 	if rightCenter < leftCenter {
 		rightCenter = leftCenter
 	}

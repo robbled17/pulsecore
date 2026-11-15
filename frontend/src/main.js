@@ -3653,11 +3653,20 @@ function setHudMode(enabled) {
 
 function syncOverlayPill(enabled) {
   const btn = $('btn-toggle-overlay')
-  if (!btn) return
-  btn.classList.toggle('active', !!enabled)
-  const label = btn.querySelector('[data-i18n="overlayPill"]') || btn.querySelector('span')
-  if (label) {
-    label.textContent = enabled ? t('overlayPillOn') : t('overlayPill')
+  if (btn) {
+    btn.classList.toggle('active', !!enabled)
+    const label = btn.querySelector('[data-i18n="overlayPill"]') || btn.querySelector('span')
+    if (label) {
+      label.textContent = enabled ? t('overlayPillOn') : t('overlayPill')
+    }
+  }
+  const homeBtn = $('btn-home-overlay')
+  if (homeBtn) {
+    homeBtn.classList.toggle('active', !!enabled)
+    const label = homeBtn.querySelector('[data-i18n="overlayPill"]') || homeBtn.querySelector('span')
+    if (label) {
+      label.textContent = enabled ? t('overlayPillOn') : t('overlayPill')
+    }
   }
 }
 
@@ -4340,7 +4349,14 @@ function openHiddenGamesModal() {
     const title = gameDisplayName(h)
     const year = Number(h.year) > 0 ? String(h.year) : ''
     const appid = resolveGameSteamAppId(h)
-    let primary = h.cover_url || h.posterUrl || ''
+    let primary = h.cover_url || h.posterUrl || h.PosterURL || ''
+    if (!primary) {
+      const match = lookupCatalogGame(h.id) || lookupCatalogGame(h.name) || lookupCatalogGame(title)
+      if (match) {
+        primary = match.posterUrl || match.headerUrl || match.cover_url || ''
+        if (!year && match.year) year = String(match.year)
+      }
+    }
     if (!primary && appid > 0) {
       primary = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`
     }
@@ -4638,11 +4654,15 @@ function formatFitDownload(fit) {
 }
 
 function lookupCatalogGame(id) {
-  const want = String(id || '')
+  const want = String(id || '').toLowerCase().trim()
+  if (!want) return null
   const pools = [gameCatalog, gameCatalogFull]
   for (const list of pools) {
     for (const g of list || []) {
-      if (g && String(g.id) === want) return g
+      if (!g) continue
+      const gid = String(g.id || '').toLowerCase().trim()
+      const gname = String(g.name || '').toLowerCase().trim()
+      if (gid === want || gname === want) return g
     }
   }
   return null
@@ -6408,7 +6428,7 @@ function wireUI() {
 
   $('btn-hud-side')?.addEventListener('click', enableHud)
   $('btn-home-hud')?.addEventListener('click', enableHud)
-  $('btn-home-overlay')?.addEventListener('click', enableGameOverlay)
+  $('btn-home-overlay')?.addEventListener('click', toggleGameOverlayPill)
   $('btn-home-cleanup')?.addEventListener('click', () => {
     openDiskCleanupWizard('cache').catch(() => {})
   })

@@ -167,10 +167,11 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 		return fmt.Errorf("cannot resolve executable path: %w", err)
 	}
 
-	newPath := exePath + ".new"
+	// Download to a temporary file in OS temp folder to avoid triggering in-place executable dropper heuristics
+	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("pulsecore-upd-%d.tmp", time.Now().UnixNano()))
 	oldPath := exePath + ".old"
 
-	_ = os.Remove(newPath)
+	_ = os.Remove(tmpPath)
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 	req, err := http.NewRequestWithContext(a.ctx, "GET", downloadURL, nil)
@@ -189,7 +190,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 		return fmt.Errorf("download server returned %d", resp.StatusCode)
 	}
 
-	outFile, err := os.OpenFile(newPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	outFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		return fmt.Errorf("cannot create temp file: %w", checkAVError(err))
 	}
@@ -206,7 +207,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 		if n > 0 {
 			if _, wErr := outFile.Write(buf[:n]); wErr != nil {
 				_ = outFile.Close()
-				_ = os.Remove(newPath)
+				_ = os.Remove(tmpPath)
 				return fmt.Errorf("error writing update: %w", wErr)
 			}
 			downloaded += int64(n)
@@ -226,7 +227,7 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 				break
 			}
 			_ = outFile.Close()
-			_ = os.Remove(newPath)
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("download stream interrupted: %w", rErr)
 		}
 	}
@@ -235,13 +236,13 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 
 	// Verify SHA-256 digest if provided
 	if expectedDigest != "" {
-		hash, err := fileSHA256(newPath)
+		hash, err := fileSHA256(tmpPath)
 		if err != nil {
-			_ = os.Remove(newPath)
+			_ = os.Remove(tmpPath)
 			return checkAVError(err)
 		}
 		if !strings.EqualFold(hash, expectedDigest) {
-			_ = os.Remove(newPath)
+			_ = os.Remove(tmpPath)
 			return fmt.Errorf("integrity check failed: expected %s, got %s", expectedDigest, hash)
 		}
 	}
@@ -254,15 +255,19 @@ func (a *App) DownloadAndInstallUpdate(downloadURL string, expectedDigest string
 
 	// 2. Rename running binary to .old
 	if err := os.Rename(exePath, oldPath); err != nil {
-		_ = os.Remove(newPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename current binary: %w", checkAVError(err))
 	}
 
-	// 3. Rename .new to exePath
-	if err := os.Rename(newPath, exePath); err != nil {
-		_ = os.Rename(oldPath, exePath)
-		_ = os.Remove(newPath)
-		return fmt.Errorf("failed to place new binary: %w", checkAVError(err))
+	// 3. Move verified tmpPath to exePath
+	if err := os.Rename(tmpPath, exePath); err != nil {
+		// Fallback to copy if cross-volume or rename failed
+		if cpErr := copyFile(tmpPath, exePath); cpErr != nil {
+			_ = os.Rename(oldPath, exePath)
+			_ = os.Remove(tmpPath)
+			return fmt.Errorf("failed to place new binary: %w", checkAVError(cpErr))
+		}
+		_ = os.Remove(tmpPath)
 	}
 
 	// 4. Launch new binary as detached process
