@@ -110,6 +110,10 @@ export function DisableAdvancedMode() {
   return window['go']['main']['App']['DisableAdvancedMode']();
 }
 
+export function DisableFastStartup() {
+  return window['go']['main']['App']['DisableFastStartup']();
+}
+
 export function DisableHibernation() {
   return window['go']['main']['App']['DisableHibernation']();
 }
@@ -164,6 +168,10 @@ export function GetAdvancedModeState() {
 
 export function GetBehaviorSettings() {
   return window['go']['main']['App']['GetBehaviorSettings']();
+}
+
+export function GetBootDiagnostics() {
+  return window['go']['main']['App']['GetBootDiagnostics']();
 }
 
 export function GetCleanStats() {
@@ -454,6 +462,10 @@ export function QuitApp() {
   return window['go']['main']['App']['QuitApp']();
 }
 
+export function RebootSystemNow() {
+  return window['go']['main']['App']['RebootSystemNow']();
+}
+
 export function RecordCleanEvent(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RecordCleanEvent'](arg1, arg2, arg3, arg4, arg5);
 }
@@ -624,6 +636,10 @@ export function SetPowerProfile(arg1) {
 
 export function SetStartupItemEnabled(arg1, arg2) {
   return window['go']['main']['App']['SetStartupItemEnabled'](arg1, arg2);
+}
+
+export function SetStartupItemMode(arg1, arg2) {
+  return window['go']['main']['App']['SetStartupItemMode'](arg1, arg2);
 }
 
 export function ShowWindow() {

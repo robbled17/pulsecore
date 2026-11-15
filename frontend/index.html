@@ -41,7 +41,7 @@
   <div id="gameoverlay" class="gameoverlay hidden">
     <div class="gameoverlay-metrics">
       <span class="ov-badge ov-fps" data-i18n-title="overlayFpsTip" title="Текущая частота кадров в секунду"><span data-i18n="overlayFps">Кадры/с</span> <span class="ov-info">(i)</span> <b id="go-fps">--</b></span>
-      <span class="ov-badge ov-low" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров — показатель плавности и отсутствия микрофризов"><span data-i18n="overlayLow">1% Редкие</span> <span class="ov-info">(i)</span> <b id="go-low">--</b></span>
+      <span class="ov-badge ov-low" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров — показатель плавности и отсутствия микрофризов"><span data-i18n="overlayLow">1% Редкие</span> <span class="info-tip" tabindex="0" data-tooltip-key="low1PercentTip">i</span> <b id="go-low">--</b></span>
       <span class="ov-badge ov-ft" data-i18n-title="overlayFtTip" title="Время отрисовки одного кадра в миллисекундах"><span data-i18n="overlayFt">Время кадра</span> <span class="ov-info">(i)</span> <b id="go-ft">--</b></span>
     </div>
     <button type="button" id="go-close" class="ov-close hud-nodrag" data-i18n-title="overlayClose" title="Закрыть">✕</button>
@@ -325,6 +325,77 @@
             <div id="timeline-legend" class="meta"></div>
           </div>
         </div>
+
+        <!-- Boot Diagnostics Card -->
+        <div class="panel boot-diag-card" id="boot-diag-card">
+          <div class="panel-title-row boot-diag-header" id="boot-diag-header" role="button" tabindex="0" aria-expanded="true">
+            <div class="boot-diag-title-wrap">
+              <span class="panel-title" data-i18n="bootDiagTitle">Почему долго загружается Windows?</span>
+              <span class="info-tip" tabindex="0" data-tooltip-key="bootDiagGeneralTip">i</span>
+            </div>
+            <div class="boot-diag-header-actions">
+              <span class="boot-rating-badge" id="boot-rating-badge">--</span>
+              <span class="boot-diag-chevron" id="boot-diag-chevron" aria-hidden="true">▾</span>
+            </div>
+          </div>
+
+          <div class="boot-diag-body" id="boot-diag-body">
+            <!-- Timeline & Stages bar -->
+            <div class="boot-breakdown-section" id="boot-breakdown-section">
+              <div class="boot-breakdown-meta">
+                <span class="boot-stage-label">
+                  <span class="stage-dot kernel-dot"></span>
+                  <span data-i18n="bootStageKernel">Ядро и драйверы Windows</span>
+                  <span class="info-tip" tabindex="0" data-tooltip-key="bootStageKernelTip">i</span>
+                  <b id="boot-kernel-time">-- с</b>
+                </span>
+                <span class="boot-stage-label">
+                  <span class="stage-dot desktop-dot"></span>
+                  <span data-i18n="bootStageDesktop">Рабочий стол и программы</span>
+                  <span class="info-tip" tabindex="0" data-tooltip-key="bootStageDesktopTip">i</span>
+                  <b id="boot-desktop-time">-- с</b>
+                </span>
+              </div>
+              <div class="boot-progress-bar" id="boot-progress-bar">
+                <div class="boot-progress-segment kernel-seg" id="boot-kernel-seg" style="width: 40%"></div>
+                <div class="boot-progress-segment desktop-seg" id="boot-desktop-seg" style="width: 60%"></div>
+              </div>
+            </div>
+
+            <!-- Event log unavailable fallback message -->
+            <div class="boot-log-unavailable hidden" id="boot-log-unavailable">
+              <span data-i18n="bootLogDisabledNote">Журнал диагностики Windows отключён, но аудит автозагрузки ниже полностью активен.</span>
+            </div>
+
+            <!-- Fast Startup Warning Banner -->
+            <div class="boot-faststartup-banner hidden" id="boot-faststartup-banner">
+              <div class="boot-faststartup-info">
+                <span class="banner-icon">⚠️</span>
+                <div class="banner-text">
+                  <div class="banner-title">
+                    <span data-i18n="fastStartupWarnTitle">Быстрый запуск (Fast Startup) замедляет систему</span>
+                    <span class="info-tip" tabindex="0" data-tooltip-key="fastStartupTip">i</span>
+                  </div>
+                  <div class="banner-desc" id="fast-startup-desc">Ядро Windows не перезагружалось 3 дн. из-за «Быстрого запуска» — накопился кэш драйверов.</div>
+                </div>
+              </div>
+              <div class="banner-actions">
+                <button type="button" class="btn compact" id="btn-reboot-now" data-i18n="bootRebootNow">Перезагрузить</button>
+                <button type="button" class="btn compact ghost" id="btn-disable-faststartup" data-i18n="bootDisableFastStartup">Отключить Быстрый запуск</button>
+              </div>
+            </div>
+
+            <!-- Startup & Degraders List -->
+            <div class="boot-items-header">
+              <span class="boot-items-title" data-i18n="bootStartupListTitle">Программы при старте и автозагрузка</span>
+              <span class="meta" id="boot-items-count">0</span>
+            </div>
+            <div class="boot-items-list" id="boot-items-list">
+              <div class="muted boot-loading-placeholder">⏳ Загрузка диагностики запуска…</div>
+            </div>
+          </div>
+        </div>
+
         <div id="eco-limited-panel" class="panel eco-limited-panel hidden">
           <div class="panel-title row-between">
             <span data-i18n="ecoLimitedTitle">Ограничено PulseCore</span>
@@ -749,6 +820,24 @@
       </div>
     </div>
   </div>
+
+  <div id="reboot-confirm-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card modal-content">
+      <div class="modal-head">
+        <h2 data-i18n="bootRebootConfirmTitle">Перезагрузить компьютер сейчас?</h2>
+        <button type="button" class="win-btn" id="reboot-modal-cancel-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p data-i18n="bootRebootConfirmBody">Все несохранённые данные будут закрыты, и система выполнит чистую перезагрузку ядра.</p>
+        <div class="btn-row" style="margin-top:16px;gap:10px">
+          <button type="button" class="btn danger" id="reboot-confirm-proceed-btn" data-i18n="bootRebootNow">Перезагрузить</button>
+          <button type="button" class="btn soft compact" id="reboot-confirm-cancel-action" data-i18n="commonCancel">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="info-tip-popup" class="info-tip-popup hidden" role="tooltip"></div>
 
   <div id="tip-float" class="tip-float hidden"></div>
 

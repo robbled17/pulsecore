@@ -57,6 +57,8 @@ export function DiagnoseLagOrigin():Promise<main.LagDiagnosis>;
 
 export function DisableAdvancedMode():Promise<main.AdvancedModeActionResult>;
 
+export function DisableFastStartup():Promise<void>;
+
 export function DisableHibernation():Promise<main.DeepCleanupResult>;
 
 export function DiskWatchPrior(arg1:string,arg2:number):Promise<number>;
@@ -84,6 +86,8 @@ export function GetActiveGameStatus():Promise<main.ActiveGameStatus>;
 export function GetAdvancedModeState():Promise<main.AdvancedModeState>;
 
 export function GetBehaviorSettings():Promise<main.appPrefs>;
+
+export function GetBootDiagnostics():Promise<main.BootDiagnostics>;
 
 export function GetCleanStats():Promise<main.CleanStats>;
 
@@ -229,6 +233,8 @@ export function PreviewDiskCleanup():Promise<Array<main.CleanupCat>>;
 
 export function QuitApp():Promise<void>;
 
+export function RebootSystemNow():Promise<void>;
+
 export function RecordCleanEvent(arg1:string,arg2:string,arg3:number,arg4:number,arg5:number):Promise<main.CleanRecord>;
 
 export function RecordDiskWatchSample(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:number):Promise<void>;
@@ -314,6 +320,8 @@ export function SetPollInterval(arg1:number):Promise<void>;
 export function SetPowerProfile(arg1:string):Promise<void>;
 
 export function SetStartupItemEnabled(arg1:string,arg2:boolean):Promise<main.StartupDisableResult>;
+
+export function SetStartupItemMode(arg1:string,arg2:string):Promise<void>;
 
 export function ShowWindow():Promise<void>;
 

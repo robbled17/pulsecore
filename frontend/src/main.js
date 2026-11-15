@@ -119,6 +119,10 @@
   IsWindows11,
   CheckForUpdates,
   DownloadAndInstallUpdate,
+  GetBootDiagnostics,
+  SetStartupItemMode,
+  DisableFastStartup,
+  RebootSystemNow,
 } from '../wailsjs/go/main/App.js'
 import { EventsOn, WindowMinimise, BrowserOpenURL, WindowIsMaximised } from '../wailsjs/runtime/runtime.js'
 
@@ -991,6 +995,9 @@ function setActiveTab(name) {
   if (target === 'startup') {
     renderStartupList().catch(() => {})
   }
+  if (target === 'lag') {
+    loadBootDiagnostics().catch(() => {})
+  }
   if (target === 'settings') {
     /* startup moved out */
   }
@@ -1104,6 +1111,7 @@ async function renderHome() {
           <button type="button" class="btn primary home-prepare-btn" data-home-action="prepare_game">
             <span class="home-prepare-bolt" aria-hidden="true">⚡</span>
             <span class="home-prepare-label">${t('homePrepare')}</span>
+            <span class="info-tip" tabindex="0" data-tooltip-key="prepareGameTip">i</span>
           </button>
           <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>`
       }
@@ -2420,7 +2428,7 @@ async function renderRadarPanel() {
           </div>
           ${proc ? `
             <div class="row-actions">
-              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}</button>
+              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}<span class="info-tip" tabindex="0" data-tooltip-key="ecoModeTip">i</span></button>
               <button type="button" class="btn soft compact btn-radar-restart" data-proc="${escapeHtml(proc)}">${t('procActionRestart')}</button>
             </div>
           ` : ''}
@@ -2440,7 +2448,7 @@ async function renderRadarPanel() {
           </div>
           ${proc ? `
             <div class="row-actions">
-              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}</button>
+              <button type="button" class="btn soft compact btn-radar-eco" data-proc="${escapeHtml(proc)}">${t('procActionEco')}<span class="info-tip" tabindex="0" data-tooltip-key="ecoModeTip">i</span></button>
               <button type="button" class="btn soft compact btn-radar-restart" data-proc="${escapeHtml(proc)}">${t('procActionRestart')}</button>
             </div>
           ` : ''}
@@ -2489,6 +2497,7 @@ function renderLag(m) {
   renderLagIncidents().catch(() => {})
   renderEcoLimitedPanel().catch(() => {})
   renderRadarPanel().catch(() => {})
+  loadBootDiagnostics().catch(() => {})
 
   const lags = m.lagEvents || []
   const lagBox = $('lag-log')
@@ -2528,7 +2537,171 @@ function renderLag(m) {
             <button type="button" class="btn compact ghost vamp-ignore" data-vamp-ignore="${escapeHtml(v.name)}" title="${escapeHtml(t('vampIgnore'))}" aria-label="${escapeHtml(t('vampIgnore'))}">👁</button>
             <button type="button" class="btn compact ${isEco ? 'eco-on' : 'danger'}" data-vamp-eco="${escapeHtml(v.name)}" data-act="${isEco ? 'resume' : 'freeze'}" data-pid="${v.pid}">
               ${isEco ? t('ecoLimited') : (count > 1 ? t('ecoAll') : t('freeze'))}
+              <span class="info-tip" tabindex="0" data-tooltip-key="ecoModeTip">i</span>
             </button>
+          </div>
+        </div>
+      `
+    }).join('')
+  }
+}
+
+let bootDiagData = null
+let bootDiagLoading = false
+
+async function loadBootDiagnostics(force = false) {
+  if (bootDiagLoading) return
+  if (bootDiagData && !force) {
+    renderBootDiagnostics(bootDiagData)
+    return
+  }
+  bootDiagLoading = true
+  try {
+    const data = await GetBootDiagnostics()
+    bootDiagData = data
+    renderBootDiagnostics(data)
+  } catch (err) {
+    console.error('[PulseCore] loadBootDiagnostics', err)
+  } finally {
+    bootDiagLoading = false
+  }
+}
+
+function renderBootDiagnostics(data) {
+  if (!data) return
+  const card = $('boot-diag-card')
+  if (!card) return
+
+  // Badge
+  const badge = $('boot-rating-badge')
+  if (badge) {
+    const rating = data.bootRating || 'moderate'
+    badge.className = 'boot-rating-badge ' + rating
+    const secStr = fmt(data.bootTimeSec, 1)
+    if (rating === 'fast') {
+      badge.textContent = t('bootRatingFast', { sec: secStr })
+    } else if (rating === 'slow') {
+      badge.textContent = t('bootRatingSlow', { sec: secStr })
+      // Auto expand on slow boot
+      card.classList.remove('collapsed')
+      $('boot-diag-header')?.setAttribute('aria-expanded', 'true')
+    } else {
+      badge.textContent = t('bootRatingModerate', { sec: secStr })
+    }
+  }
+
+  // Breakdown bar
+  const breakdownSec = $('boot-breakdown-section')
+  const logDisabled = $('boot-log-unavailable')
+  if (!data.eventLogAvailable) {
+    breakdownSec?.classList.add('hidden')
+    logDisabled?.classList.remove('hidden')
+  } else {
+    breakdownSec?.classList.remove('hidden')
+    logDisabled?.classList.add('hidden')
+
+    const kEl = $('boot-kernel-time')
+    const dEl = $('boot-desktop-time')
+    const secUnit = t('bootUnitSec') || 's'
+    if (kEl) kEl.textContent = `${fmt(data.kernelSec, 1)} ${secUnit}`
+    if (dEl) dEl.textContent = `${fmt(data.desktopSec, 1)} ${secUnit}`
+
+    const total = (data.kernelSec + data.desktopSec) || data.bootTimeSec || 1
+    const kPct = Math.max(10, Math.min(90, Math.round((data.kernelSec / total) * 100)))
+    const dPct = 100 - kPct
+
+    const kSeg = $('boot-kernel-seg')
+    const dSeg = $('boot-desktop-seg')
+    if (kSeg) kSeg.style.width = kPct + '%'
+    if (dSeg) {
+      dSeg.style.width = dPct + '%'
+      dSeg.className = 'boot-progress-segment desktop-seg' + (data.bootRating === 'slow' ? ' slow' : '')
+    }
+  }
+
+  // Fast Startup Warning
+  const fsBanner = $('boot-faststartup-banner')
+  if (fsBanner) {
+    if (data.fastStartupWarning) {
+      fsBanner.classList.remove('hidden')
+      const desc = $('fast-startup-desc')
+      if (desc) {
+        desc.textContent = t('fastStartupWarnDesc', { days: data.fastStartupDays })
+      }
+    } else {
+      fsBanner.classList.add('hidden')
+    }
+  }
+
+  // Startup items
+  const list = $('boot-items-list')
+  const countEl = $('boot-items-count')
+  const items = data.startupItems || []
+  if (countEl) countEl.textContent = String(items.length)
+
+  if (list) {
+    if (!items.length) {
+      list.innerHTML = `<div class="empty">${t('empty')}</div>`
+      return
+    }
+
+    list.innerHTML = items.map((item) => {
+      const name = item.name || 'Startup Item'
+      const initials = (name.slice(0, 2)).toUpperCase()
+      const isDelayed = item.status === 'delayed'
+      const isDisabled = item.status === 'disabled'
+
+      const statusPillClass = 'boot-status-pill ' + (item.status || 'enabled')
+      let statusPillText = t('bootEnabledPill')
+      if (isDelayed) statusPillText = t('bootDelayedPill')
+      else if (isDisabled) statusPillText = t('bootDisabledPill')
+
+      const degradeBadge = item.degradeSec > 0
+        ? `<span class="boot-degrade-badge">${t('bootDegradeBadge', { sec: fmt(item.degradeSec, 1) })}</span>`
+        : ''
+
+      let locationLabel = ''
+      if (item.location === 'task_scheduler') locationLabel = t('bootLocTask')
+      else if (item.location === 'startup_folder') locationLabel = t('bootLocFolder')
+      else locationLabel = t('bootLocRegistry')
+
+      const actionsHTML = item.isProtected
+        ? `<span class="boot-protected-tag">🔒 ${t('bootSystemProtected')}</span>`
+        : `
+          ${!isDelayed ? `
+            <button type="button" class="btn soft compact btn-boot-delay" data-boot-id="${escapeHtml(item.id)}">
+              ${t('bootDelay60s')}
+              <span class="info-tip" tabindex="0" data-tooltip-key="bootDelayBtnTip">i</span>
+            </button>
+          ` : ''}
+          ${isDisabled ? `
+            <button type="button" class="btn soft compact btn-boot-enable" data-boot-id="${escapeHtml(item.id)}">
+              ${t('bootEnableBtn')}
+            </button>
+          ` : `
+            <button type="button" class="btn soft compact btn-boot-disable" data-boot-id="${escapeHtml(item.id)}">
+              ${t('bootDisableBtn')}
+              <span class="info-tip" tabindex="0" data-tooltip-key="bootDisableBtnTip">i</span>
+            </button>
+          `}
+        `
+
+      return `
+        <div class="boot-item-row" data-boot-id="${escapeHtml(item.id)}">
+          <div class="boot-item-main">
+            <div class="boot-item-icon">${escapeHtml(initials)}</div>
+            <div class="boot-item-meta">
+              <div class="boot-item-title-row">
+                <span class="boot-item-name">${escapeHtml(name)}</span>
+                ${degradeBadge}
+                <span class="boot-source-badge">${escapeHtml(locationLabel)}</span>
+                <span class="${statusPillClass}">${escapeHtml(statusPillText)}</span>
+              </div>
+              <div class="boot-item-cmd" title="${escapeHtml(item.command || '')}">${escapeHtml(item.command || '')}</div>
+            </div>
+          </div>
+          <div class="boot-item-actions">
+            ${actionsHTML}
           </div>
         </div>
       `
@@ -6293,6 +6466,7 @@ function wireUI() {
     renderRadarPanel().catch(() => {})
   })
   $('radar-panel')?.addEventListener('click', async (ev) => {
+    if (ev.target.closest('.info-tip')) return
     const ecoBtn = ev.target.closest('.btn-radar-eco')
     if (ecoBtn) {
       const proc = ecoBtn.getAttribute('data-proc') || ''
@@ -6354,6 +6528,97 @@ function wireUI() {
       showToast(String(err), false, { holdMs: 5000 })
     }
     renderStartupList().catch(() => {})
+  })
+
+  $('boot-diag-header')?.addEventListener('click', () => {
+    const card = $('boot-diag-card')
+    const hdr = $('boot-diag-header')
+    if (!card || !hdr) return
+    const isCollapsed = card.classList.toggle('collapsed')
+    hdr.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
+  })
+
+  $('boot-items-list')?.addEventListener('click', async (ev) => {
+    if (ev.target.closest('.info-tip')) return
+
+    const delayBtn = ev.target.closest('.btn-boot-delay')
+    if (delayBtn) {
+      const id = delayBtn.getAttribute('data-boot-id')
+      if (!id) return
+      delayBtn.disabled = true
+      try {
+        const res = await SetStartupItemMode(id, 'delayed')
+        showToast(resultMsg(res) || t('bootDelayedSuccess'), !!res?.ok, { holdMs: 3000 })
+        await loadBootDiagnostics(true)
+      } catch (err) {
+        showToast(String(err), false, { holdMs: 4000 })
+        delayBtn.disabled = false
+      }
+      return
+    }
+
+    const disableBtn = ev.target.closest('.btn-boot-disable')
+    if (disableBtn) {
+      const id = disableBtn.getAttribute('data-boot-id')
+      if (!id) return
+      disableBtn.disabled = true
+      try {
+        const res = await SetStartupItemMode(id, 'disabled')
+        showToast(resultMsg(res) || t('bootDisabledSuccess'), !!res?.ok, { holdMs: 3000 })
+        await loadBootDiagnostics(true)
+      } catch (err) {
+        showToast(String(err), false, { holdMs: 4000 })
+        disableBtn.disabled = false
+      }
+      return
+    }
+
+    const enableBtn = ev.target.closest('.btn-boot-enable')
+    if (enableBtn) {
+      const id = enableBtn.getAttribute('data-boot-id')
+      if (!id) return
+      enableBtn.disabled = true
+      try {
+        const res = await SetStartupItemMode(id, 'enabled')
+        showToast(resultMsg(res) || t('bootEnabledSuccess'), !!res?.ok, { holdMs: 3000 })
+        await loadBootDiagnostics(true)
+      } catch (err) {
+        showToast(String(err), false, { holdMs: 4000 })
+        enableBtn.disabled = false
+      }
+      return
+    }
+  })
+
+  $('btn-reboot-now')?.addEventListener('click', () => {
+    $('reboot-confirm-modal')?.classList.remove('hidden')
+  })
+  $('reboot-modal-cancel-btn')?.addEventListener('click', () => {
+    $('reboot-confirm-modal')?.classList.add('hidden')
+  })
+  $('reboot-confirm-cancel-action')?.addEventListener('click', () => {
+    $('reboot-confirm-modal')?.classList.add('hidden')
+  })
+  $('reboot-confirm-proceed-btn')?.addEventListener('click', async () => {
+    $('reboot-confirm-modal')?.classList.add('hidden')
+    try {
+      await RebootSystemNow()
+    } catch (err) {
+      showToast(String(err), false, { holdMs: 4000 })
+    }
+  })
+
+  $('btn-disable-faststartup')?.addEventListener('click', async () => {
+    const btn = $('btn-disable-faststartup')
+    if (btn) btn.disabled = true
+    try {
+      const res = await DisableFastStartup()
+      showToast(resultMsg(res) || t('bootFastStartupDisabled'), !!res?.ok, { holdMs: 4000 })
+      await loadBootDiagnostics(true)
+    } catch (err) {
+      showToast(String(err), false, { holdMs: 4000 })
+      if (btn) btn.disabled = false
+    }
   })
   $('btn-eco-revert-all')?.addEventListener('click', async () => {
     let res
@@ -6596,6 +6861,7 @@ function wireUI() {
       }
       return
     }
+    if (ev.target.closest('.info-tip')) return
     const btn = ev.target.closest('[data-home-action]')
     if (!btn || btn.disabled) return
     const action = btn.getAttribute('data-home-action') || ''
@@ -6649,6 +6915,7 @@ function wireUI() {
           <button type="button" class="btn primary home-prepare-btn" data-home-action="prepare_game">
             <span class="home-prepare-bolt" aria-hidden="true">⚡</span>
             <span class="home-prepare-label">${t('homePrepare')}</span>
+            <span class="info-tip" tabindex="0" data-tooltip-key="prepareGameTip">i</span>
           </button>
           <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>
         </div>`
@@ -7095,6 +7362,7 @@ function wireUI() {
   })
 
   $('vampire-list')?.addEventListener('click', async (ev) => {
+    if (ev.target.closest('.info-tip')) return
     const ignoreBtn = ev.target.closest('[data-vamp-ignore]')
     if (ignoreBtn) {
       ev.preventDefault()
@@ -7156,6 +7424,8 @@ function wireUI() {
 
 function wireTooltips() {
   const floatEl = $('tip-float')
+  const popupEl = $('info-tip-popup')
+
   const place = (tip) => {
     const text = tip.getAttribute('data-tip') || ''
     if (!text || !floatEl) return
@@ -7179,16 +7449,83 @@ function wireTooltips() {
     })
   }
 
+  const showInfoPopup = (infoEl) => {
+    if (!popupEl) return
+    const key = infoEl.getAttribute('data-tooltip-key')
+    const text = (key ? t(key) : '') || infoEl.getAttribute('data-tip') || infoEl.getAttribute('title') || ''
+    if (!text) return
+    popupEl.textContent = text
+    popupEl.classList.remove('hidden')
+
+    const rect = infoEl.getBoundingClientRect()
+    const maxW = Math.min(300, window.innerWidth - 24)
+    popupEl.style.maxWidth = `${maxW}px`
+
+    requestAnimationFrame(() => {
+      const popW = popupEl.offsetWidth || 220
+      const popH = popupEl.offsetHeight || 44
+      let left = rect.left + (rect.width / 2) - (popW / 2)
+      if (left < 12) left = 12
+      if (left + popW > window.innerWidth - 12) left = window.innerWidth - popW - 12
+
+      // Auto-flip: prefer top, flip to bottom if top clipped
+      let top = rect.top - popH - 8
+      if (top < 8) {
+        top = rect.bottom + 8
+      }
+
+      popupEl.style.left = `${left}px`
+      popupEl.style.top = `${top}px`
+    })
+  }
+
+  const hideInfoPopup = () => {
+    popupEl?.classList.add('hidden')
+  }
+
   document.addEventListener('mouseover', (ev) => {
     const tip = ev.target.closest('.tip')
-    if (!tip) return
-    place(tip)
+    if (tip) place(tip)
+
+    const infoEl = ev.target.closest('.info-tip')
+    if (infoEl) showInfoPopup(infoEl)
   })
+
   document.addEventListener('mouseout', (ev) => {
     const tip = ev.target.closest('.tip')
-    if (!tip) return
-    if (ev.relatedTarget && tip.contains(ev.relatedTarget)) return
-    floatEl?.classList.add('hidden')
+    if (tip) {
+      if (ev.relatedTarget && tip.contains(ev.relatedTarget)) return
+      floatEl?.classList.add('hidden')
+    }
+
+    const infoEl = ev.target.closest('.info-tip')
+    if (infoEl) {
+      if (ev.relatedTarget && infoEl.contains(ev.relatedTarget)) return
+      hideInfoPopup()
+    }
+  })
+
+  document.addEventListener('focusin', (ev) => {
+    const infoEl = ev.target.closest('.info-tip')
+    if (infoEl) showInfoPopup(infoEl)
+  })
+
+  document.addEventListener('focusout', (ev) => {
+    const infoEl = ev.target.closest('.info-tip')
+    if (infoEl) hideInfoPopup()
+  })
+
+  document.addEventListener('click', (ev) => {
+    const infoEl = ev.target.closest('.info-tip')
+    if (infoEl) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      if (popupEl && !popupEl.classList.contains('hidden')) {
+        hideInfoPopup()
+      } else {
+        showInfoPopup(infoEl)
+      }
+    }
   })
 }
 
