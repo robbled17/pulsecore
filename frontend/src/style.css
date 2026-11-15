@@ -187,6 +187,7 @@ body {
   height: 100%;
   overflow: hidden;
   overflow-x: hidden !important;
+  transform: translateZ(0);
   box-sizing: border-box;
 }
 .tab-pane,
@@ -203,6 +204,8 @@ body {
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
+  will-change: scroll-position;
+  transform: translateZ(0);
   padding: 20px 28px 20px 28px;
   padding-right: max(28px, 16px);
   box-sizing: border-box;
@@ -210,6 +213,9 @@ body {
 }
 .modal-body,
 .sf-scroll-pane {
+  overflow-y: auto;
+  will-change: scroll-position;
+  transform: translateZ(0);
   scrollbar-gutter: stable;
 }
 /* Maximised: drop reserved scrollbar gutter */
@@ -1340,7 +1346,10 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 .sf-badge.admin { color: var(--text-muted); }
-.sf-cleanup-list { display: flex; flex-direction: column; gap: 8px; }
+.sf-cleanup-list, .cleanup-list {
+  display: flex; flex-direction: column; gap: 8px;
+  will-change: scroll-position; transform: translateZ(0);
+}
 .sf-cleanup-row {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -1348,8 +1357,6 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid var(--border-glass);
-  content-visibility: auto;
-  contain-intrinsic-size: 44px;
 }
 .sf-cleanup-row:last-child { border-bottom: 0; }
 .sf-cat-name {
@@ -1406,6 +1413,8 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
 #diskclean-modal .modal-body {
   overflow-y: auto;
   overflow-x: hidden;
+  will-change: scroll-position;
+  transform: translateZ(0);
   scrollbar-gutter: stable;
   flex: 1;
   max-height: min(68vh, 640px);
@@ -1432,7 +1441,10 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   background: #0f172a;
   color: var(--text-primary); font-size: 13.5px;
 }
-.dc-app-list { display: flex; flex-direction: column; gap: 8px; }
+.dc-app-list {
+  display: flex; flex-direction: column; gap: 8px;
+  will-change: scroll-position; transform: translateZ(0);
+}
 .dc-app-row {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -1442,9 +1454,7 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   background: #0f172a;
   border: 1px solid #334155;
   position: relative;
-  content-visibility: auto;
-  contain-intrinsic-size: 64px;
-  transition: opacity .28s ease, transform .28s ease, max-height .28s ease, margin .28s ease, padding .28s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, opacity 0.2s ease;
 }
 .dc-app-actions { display: flex; gap: 6px; align-items: center; }
 .dc-open-folder { min-width: 36px; padding-left: 8px; padding-right: 8px; }
@@ -2589,7 +2599,9 @@ html.i18n-dev :is(body, #app) {
   max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
-  scroll-behavior: smooth;
+  will-change: scroll-position;
+  transform: translateZ(0);
+  scroll-behavior: auto;
   margin-bottom: 0;
   position: relative;
   padding: 12px;
@@ -2652,10 +2664,8 @@ html.i18n-dev :is(body, #app) {
   color: inherit;
   font: inherit;
   overflow: hidden;
-  content-visibility: auto;
-  contain-intrinsic-size: 240px 340px;
-  contain: paint layout;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 .game-card:hover { border-color: var(--line-soft); transform: translateY(-1px); }
 .game-card.active,
@@ -4289,6 +4299,9 @@ body.game-overlay-active #gameoverlay {
   max-height: none !important;
   overflow-x: hidden;
   overflow-y: auto;
+  will-change: scroll-position;
+  transform: translateZ(0);
+  scroll-behavior: auto;
   padding: 12px;
   white-space: normal;
   margin: 0;

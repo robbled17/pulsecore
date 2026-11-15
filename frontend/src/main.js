@@ -3633,6 +3633,23 @@ async function copySummaryPng() {
   }
 }
 
+let isUserScrolling = false
+let scrollResetTimer = null
+let pendingMetricsDuringScroll = null
+
+window.addEventListener('scroll', () => {
+  isUserScrolling = true
+  clearTimeout(scrollResetTimer)
+  scrollResetTimer = setTimeout(() => {
+    isUserScrolling = false
+    if (pendingMetricsDuringScroll) {
+      const m = pendingMetricsDuringScroll
+      pendingMetricsDuringScroll = null
+      applyMetricsDOM(m)
+    }
+  }, 180)
+}, { passive: true, capture: true })
+
 function applyMetrics(m) {
   if (!m) return
   lastMetrics = m
@@ -3644,6 +3661,17 @@ function applyMetrics(m) {
   pushSample('gpu', m.gpuPercent || 0)
   pushSample('ram', m.ramPercent || 0)
   pushSample('battery', batterySeriesValue(m))
+
+  if (isUserScrolling) {
+    pendingMetricsDuringScroll = m
+    return
+  }
+
+  applyMetricsDOM(m)
+}
+
+function applyMetricsDOM(m) {
+  if (!m) return
   try { renderOverview(m) } catch (err) { console.error('[PulseCore] renderOverview', err) }
   try { renderLag(m) } catch (err) { console.error('[PulseCore] renderLag', err) }
   const activeTab = document.querySelector('.nav-item.active')?.dataset?.tab
@@ -4369,7 +4397,7 @@ function gamePosterHTML(g) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name: game.name || 'Game', year, genre, cls: 'game-poster' })
-  return `<img class="game-poster" src="${src}" alt="${name}" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-poster" src="${src}" alt="${name}" width="200" height="300" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function compactCoverHTML(p, opts = {}) {
@@ -4383,7 +4411,7 @@ function compactCoverHTML(p, opts = {}) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name, year, genre, cls: 'game-cover', hideTitle })
-  return `<img class="game-cover" src="${src}" alt="" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-cover" src="${src}" alt="" width="200" height="300" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function genreBucket(g) {
@@ -4621,9 +4649,9 @@ function openHiddenGamesModal() {
     const secondary = appid > 0 ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg` : ''
 
     const thumbHTML = primary
-      ? `<img class="hidden-game-cover" src="${escapeHtml(primary)}" alt="${escapeHtml(title)}" loading="lazy" data-fallback="${escapeHtml(secondary)}" onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}else{this.onerror=null;this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))}" />`
+      ? `<img class="hidden-game-cover" src="${escapeHtml(primary)}" alt="${escapeHtml(title)}" width="200" height="300" decoding="async" data-fallback="${escapeHtml(secondary)}" onerror="if(this.dataset.fallback && this.src!==this.dataset.fallback){this.src=this.dataset.fallback;}else{this.onerror=null;this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))}" />`
       : (secondary
-          ? `<img class="hidden-game-cover" src="${escapeHtml(secondary)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))" />`
+          ? `<img class="hidden-game-cover" src="${escapeHtml(secondary)}" alt="${escapeHtml(title)}" width="200" height="300" decoding="async" onerror="this.replaceWith(document.createRange().createContextualFragment('<div class=\\'hidden-game-thumb fallback-icon\\'>🎮</div>'))" />`
           : `<div class="hidden-game-thumb fallback-icon">🎮</div>`)
 
     return `
@@ -5133,6 +5161,8 @@ function openModal(html) {
 let diskCleanTab = 'apps'
 let diskCleanAppsCache = []
 let diskCleanLastLeftovers = []
+let diskCleanAppsLimit = 60
+let diskCleanLeftoversLimit = 60
 let scanRevision = 0
 
 function openDiskCleanModal() {
@@ -5193,6 +5223,8 @@ async function renderDiskCleanDrives() {
       if (drv && drv !== selectedCleanerDrive) {
         selectedCleanerDrive = drv
         selectedCleanDrive = drv
+        diskCleanAppsLimit = 60
+        diskCleanLeftoversLimit = 60
         container.querySelectorAll('.cleaner-drive-pill').forEach((c) => {
           const isActive = c.getAttribute('data-drive') === drv
           c.classList.toggle('active', isActive)
@@ -5418,7 +5450,8 @@ function renderDiskCleanAppsList(body) {
     return hay.includes(q)
   })
 
-  const rows = finalFiltered.slice(0, 100).map((a) => {
+  const displayed = finalFiltered.slice(0, diskCleanAppsLimit)
+  const rows = displayed.map((a) => {
     const size = formatAppSize(a.sizeBytes, a.sizeLabel)
     const disabled = a.canUninstall ? '' : 'disabled'
     const loc = String(a.installLocation || '').trim()
@@ -5443,14 +5476,31 @@ function renderDiskCleanAppsList(body) {
     </div>`
   }).join('')
 
+  const remaining = finalFiltered.length - displayed.length
+  const moreBtn = remaining > 0
+    ? `<div class="dc-show-more-wrap" style="text-align:center; padding:12px 0;">
+        <button type="button" class="btn soft compact dc-show-more" id="dc-apps-show-more">
+          ${escapeHtml(t('diskCleanShowMore'))} (+${Math.min(60, remaining)})
+        </button>
+      </div>`
+    : ''
+
   const btnCand = body.querySelector('#dc-filter-candidates')
   if (btnCand) {
     btnCand.textContent = `${t('diskCleanCandidates')} (${candidatesCount})`
   }
 
   const listHost = body.querySelector('#cleaner-list-body')
-  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`
+  if (listHost) {
+    listHost.innerHTML = rows ? (rows + moreBtn) : `<div class="sf-empty">${t('diskCleanAppsEmpty')}</div>`
+  }
   bindDiskCleanAppActions(body)
+
+  body.querySelector('#dc-apps-show-more')?.addEventListener('click', (ev) => {
+    ev.preventDefault()
+    diskCleanAppsLimit += 60
+    renderDiskCleanAppsList(body)
+  })
 }
 
 async function renderDiskCleanApps(body) {
@@ -5500,6 +5550,7 @@ async function renderDiskCleanApps(body) {
     search?.addEventListener('input', () => {
       clearTimeout(searchTimer)
       searchTimer = setTimeout(() => {
+        diskCleanAppsLimit = 60
         renderDiskCleanAppsList(body)
       }, 120)
     })
@@ -5507,6 +5558,7 @@ async function renderDiskCleanApps(body) {
     body.querySelector('#dc-filter-all')?.addEventListener('click', () => {
       if (diskCleanFilterCandidates) {
         diskCleanFilterCandidates = false
+        diskCleanAppsLimit = 60
         body.querySelector('#dc-filter-all')?.classList.add('active')
         body.querySelector('#dc-filter-candidates')?.classList.remove('active')
         renderDiskCleanAppsList(body)
@@ -5516,6 +5568,7 @@ async function renderDiskCleanApps(body) {
     body.querySelector('#dc-filter-candidates')?.addEventListener('click', () => {
       if (!diskCleanFilterCandidates) {
         diskCleanFilterCandidates = true
+        diskCleanAppsLimit = 60
         body.querySelector('#dc-filter-all')?.classList.remove('active')
         body.querySelector('#dc-filter-candidates')?.classList.add('active')
         renderDiskCleanAppsList(body)
@@ -5574,7 +5627,8 @@ function renderDiskCleanLeftoversList(body) {
     if (!q) return true
     return `${it.name || ''} ${it.path || ''}`.toLowerCase().includes(q)
   })
-  const rows = filtered.map((it) => {
+  const displayed = filtered.slice(0, diskCleanLeftoversLimit)
+  const rows = displayed.map((it) => {
     const ageBadge = (it.ageBadgeRu || it.ageBadgeEn)
       ? `<div class="dc-age-badge ${it.ageStatus || 'neutral'}">${escapeHtml(lang === 'en' ? (it.ageBadgeEn || it.ageBadgeRu) : (it.ageBadgeRu || it.ageBadgeEn))}</div>`
       : ''
@@ -5590,9 +5644,24 @@ function renderDiskCleanLeftoversList(body) {
     </div>`
   }).join('')
 
+  const remaining = filtered.length - displayed.length
+  const moreBtn = remaining > 0
+    ? `<div class="dc-show-more-wrap" style="text-align:center; padding:12px 0;">
+        <button type="button" class="btn soft compact dc-show-more" id="dc-leftovers-show-more">
+          ${escapeHtml(t('diskCleanShowMore'))} (+${Math.min(60, remaining)})
+        </button>
+      </div>`
+    : ''
+
   const listHost = body.querySelector('#cleaner-list-body')
-  if (listHost) listHost.innerHTML = rows || `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`
+  if (listHost) listHost.innerHTML = rows ? (rows + moreBtn) : `<div class="sf-empty">${t('diskCleanLeftoversEmpty')}</div>`
   bindDiskCleanLeftoverActions(body)
+
+  body.querySelector('#dc-leftovers-show-more')?.addEventListener('click', (ev) => {
+    ev.preventDefault()
+    diskCleanLeftoversLimit += 60
+    renderDiskCleanLeftoversList(body)
+  })
 }
 
 async function renderDiskCleanLeftovers(body) {
@@ -5654,6 +5723,7 @@ async function renderDiskCleanLeftovers(body) {
     search?.addEventListener('input', () => {
       clearTimeout(searchTimer)
       searchTimer = setTimeout(() => {
+        diskCleanLeftoversLimit = 60
         renderDiskCleanLeftoversList(body)
       }, 120)
     })
