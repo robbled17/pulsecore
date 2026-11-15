@@ -2649,9 +2649,21 @@ function renderBootDiagnostics(data) {
   // Startup items
   const list = $('boot-items-list')
   const countEl = $('boot-items-count')
-  const items = data.startupItems || []
-  if (countEl) countEl.textContent = String(items.length)
-  const enabledCount = items.filter((it) => it.status === 'enabled').length
+  const rawItems = data.startupItems || []
+  if (countEl) countEl.textContent = String(rawItems.length)
+  const enabledCount = rawItems.filter((it) => it.status === 'enabled').length
+
+  const items = [...rawItems].sort((a, b) => {
+    const getPrio = (x) => {
+      if (!x.isProtected && (x.status === 'enabled' || x.status === 'delayed')) return 0
+      if (x.isProtected) return 1
+      return 2
+    }
+    const pa = getPrio(a)
+    const pb = getPrio(b)
+    if (pa !== pb) return pa - pb
+    return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+  })
 
   // Badge
   const badge = $('boot-rating-badge')
@@ -2750,29 +2762,41 @@ function renderBootDiagnostics(data) {
       else if (item.location === 'startup_folder') locationLabel = t('bootLocFolder')
       else locationLabel = t('bootLocRegistry')
 
-      const actionsHTML = item.isProtected
-        ? `<span class="boot-protected-tag">🔒 ${t('bootSystemProtected')}</span>`
-        : `
-          ${!isDelayed ? `
-            <button type="button" class="btn soft compact btn-boot-delay" data-boot-id="${escapeHtml(item.id)}">
-              ${t('bootDelay60s')}
-              <span class="info-tip" tabindex="0" data-tooltip-key="bootDelayBtnTip">i</span>
-            </button>
-          ` : ''}
-          ${isDisabled ? `
-            <button type="button" class="btn soft compact btn-boot-enable" data-boot-id="${escapeHtml(item.id)}">
-              ${t('bootEnableBtn')}
-            </button>
-          ` : `
-            <button type="button" class="btn soft compact btn-boot-disable" data-boot-id="${escapeHtml(item.id)}">
-              ${t('bootDisableBtn')}
-              <span class="info-tip" tabindex="0" data-tooltip-key="bootDisableBtnTip">i</span>
-            </button>
-          `}
+      let actionsHTML = ''
+      if (item.isProtected) {
+        actionsHTML = `<span class="boot-protected-tag">🔒 ${t('bootSystemProtected')}</span>`
+      } else if (isDisabled) {
+        actionsHTML = `
+          <button type="button" class="btn soft compact btn-boot-enable" data-boot-id="${escapeHtml(item.id)}">
+            ${t('bootEnableBtn')}
+          </button>
         `
+      } else if (isDelayed) {
+        actionsHTML = `
+          <button type="button" class="btn soft compact btn-boot-normal" data-boot-id="${escapeHtml(item.id)}">
+            ${t('bootNormalBtn')}
+          </button>
+          <button type="button" class="btn soft compact btn-boot-disable" data-boot-id="${escapeHtml(item.id)}">
+            ${t('bootDisableBtn')}
+            <span class="info-tip" tabindex="0" data-tooltip-key="bootDisableBtnTip">i</span>
+          </button>
+        `
+      } else {
+        // enabled
+        actionsHTML = `
+          <button type="button" class="btn soft compact btn-boot-delay" data-boot-id="${escapeHtml(item.id)}">
+            ${t('bootDelay60s')}
+            <span class="info-tip" tabindex="0" data-tooltip-key="bootDelayBtnTip">i</span>
+          </button>
+          <button type="button" class="btn soft compact btn-boot-disable" data-boot-id="${escapeHtml(item.id)}">
+            ${t('bootDisableBtn')}
+            <span class="info-tip" tabindex="0" data-tooltip-key="bootDisableBtnTip">i</span>
+          </button>
+        `
+      }
 
       return `
-        <div class="boot-item-row" data-boot-id="${escapeHtml(item.id)}">
+        <div class="boot-item-row${isDisabled ? ' disabled' : ''}" data-boot-id="${escapeHtml(item.id)}">
           <div class="boot-item-main">
             <div class="boot-item-icon">${escapeHtml(initials)}</div>
             <div class="boot-item-meta">
@@ -6870,11 +6894,27 @@ function wireUI() {
       delayBtn.disabled = true
       try {
         const res = await SetStartupItemMode(id, 'delayed')
-        showToast(resultMsg(res) || t('bootDelayedSuccess'), !!res?.ok, { holdMs: 3000 })
+        showToast(resultMsg(res) || t('bootDelayedSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
         await loadBootDiagnostics(true)
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
         delayBtn.disabled = false
+      }
+      return
+    }
+
+    const normalBtn = ev.target.closest('.btn-boot-normal')
+    if (normalBtn) {
+      const id = normalBtn.getAttribute('data-boot-id')
+      if (!id) return
+      normalBtn.disabled = true
+      try {
+        const res = await SetStartupItemMode(id, 'enabled')
+        showToast(resultMsg(res) || t('bootNormalSuccess') || t('bootEnabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
+        await loadBootDiagnostics(true)
+      } catch (err) {
+        showToast(String(err), false, { holdMs: 4000 })
+        normalBtn.disabled = false
       }
       return
     }
@@ -6886,7 +6926,7 @@ function wireUI() {
       disableBtn.disabled = true
       try {
         const res = await SetStartupItemMode(id, 'disabled')
-        showToast(resultMsg(res) || t('bootDisabledSuccess'), !!res?.ok, { holdMs: 3000 })
+        showToast(resultMsg(res) || t('bootDisabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
         await loadBootDiagnostics(true)
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
@@ -6902,7 +6942,7 @@ function wireUI() {
       enableBtn.disabled = true
       try {
         const res = await SetStartupItemMode(id, 'enabled')
-        showToast(resultMsg(res) || t('bootEnabledSuccess'), !!res?.ok, { holdMs: 3000 })
+        showToast(resultMsg(res) || t('bootEnabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
         await loadBootDiagnostics(true)
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })

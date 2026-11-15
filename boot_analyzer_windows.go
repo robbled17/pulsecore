@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -540,6 +541,8 @@ func (a *App) GetBootDiagnostics() (BootDiagnostics, error) {
 		filteredItems = append(filteredItems, item)
 	}
 
+	sortStartupItems(filteredItems)
+
 	return BootDiagnostics{
 		EventLogAvailable:  hasLog,
 		BootTimeSec:        bootSec,
@@ -558,6 +561,27 @@ func (a *App) GetBootDiagnostics() (BootDiagnostics, error) {
 func sanitizeTaskName(id string) string {
 	reg := regexp.MustCompile(`[^a-zA-Z0-9_\-]`)
 	return reg.ReplaceAllString(id, "_")
+}
+
+func startupItemPriority(item BootStartupItem) int {
+	if !item.IsProtected && (item.Status == "enabled" || item.Status == "delayed") {
+		return 0
+	}
+	if item.IsProtected {
+		return 1
+	}
+	return 2
+}
+
+func sortStartupItems(items []BootStartupItem) {
+	sort.SliceStable(items, func(i, j int) bool {
+		pi := startupItemPriority(items[i])
+		pj := startupItemPriority(items[j])
+		if pi != pj {
+			return pi < pj
+		}
+		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+	})
 }
 
 // SetStartupItemMode changes startup behavior ("enabled", "delayed", "disabled").

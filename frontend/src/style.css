@@ -5471,7 +5471,10 @@ body.win11 .gameoverlay {
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   gap: 12px;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.boot-item-row.disabled {
+  opacity: 0.78;
 }
 .boot-item-row:hover {
   background: rgba(255, 255, 255, 0.04);

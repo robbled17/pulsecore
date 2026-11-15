@@ -89,3 +89,40 @@ func TestIsStartupApprovedEnabled(t *testing.T) {
 		t.Errorf("expected nil to be enabled by default")
 	}
 }
+
+func TestSortStartupItems(t *testing.T) {
+	items := []BootStartupItem{
+		{Name: "Telegram", Status: "disabled", IsProtected: false},
+		{Name: "Realtek Audio", Status: "enabled", IsProtected: true},
+		{Name: "Discord", Status: "enabled", IsProtected: false},
+		{Name: "Steam", Status: "delayed", IsProtected: false},
+		{Name: "NVIDIA Container", Status: "enabled", IsProtected: true},
+		{Name: "AnyDesk", Status: "disabled", IsProtected: false},
+		{Name: "Browser", Status: "enabled", IsProtected: false},
+	}
+
+	sortStartupItems(items)
+
+	// Group 1: Enabled/delayed non-protected: Browser, Discord, Steam (alphabetical)
+	// Group 2: Protected: NVIDIA Container, Realtek Audio (alphabetical)
+	// Group 3: Disabled non-protected: AnyDesk, Telegram (alphabetical)
+	expected := []string{
+		"Browser",
+		"Discord",
+		"Steam",
+		"NVIDIA Container",
+		"Realtek Audio",
+		"AnyDesk",
+		"Telegram",
+	}
+
+	if len(items) != len(expected) {
+		t.Fatalf("expected %d items, got %d", len(expected), len(items))
+	}
+
+	for i, exp := range expected {
+		if items[i].Name != exp {
+			t.Errorf("item[%d] = %q, expected %q", i, items[i].Name, exp)
+		}
+	}
+}
