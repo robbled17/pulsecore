@@ -982,5 +982,8 @@
   "homeScore100Title": "一切良好",
   "homeScore100Sub": "系统处于最佳运行状态 (100/100)",
   "homeScoreDeductedSub": "因当前负载扣除 {pts} 分",
-  "unitsPtsShort": "分"
+  "unitsPtsShort": "分",
+  "homeRecommendationsTitle": "建议执行的优化",
+  "homeDeductionsSub": "已扣除 {pts} 分 · 点击项目或执行优化",
+  "homeAllGoodSubOptimal": "未发现任何异常 · 系统运行状态最佳"
 }

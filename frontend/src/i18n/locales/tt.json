@@ -982,5 +982,8 @@
   "homeScore100Title": "Барысы да яхшы",
   "homeScore100Sub": "Системаның оптималь эше (100/100)",
   "homeScoreDeductedSub": "Хәзерге йөкләнеш өчен {pts} балл алынды",
-  "unitsPtsShort": "б."
+  "unitsPtsShort": "б.",
+  "homeRecommendationsTitle": "Тәкъдим ителгән гамәлләр",
+  "homeDeductionsSub": "{pts} балл алынды · Элементка басыгыз яки оптимизация ясагыз",
+  "homeAllGoodSubOptimal": "Кире яклар табылмады · Система оптималь эшли"
 }

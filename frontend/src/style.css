@@ -1594,10 +1594,14 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   margin-bottom: 8px;
   color: var(--text-primary);
 }
-.home-problem.st-good {
+.home-problem.st-good,
+.home-problem.home-all-good {
   background: var(--bg-card) !important;
   border: 1px solid #334155 !important;
   border-left: 3px solid var(--status-success-text) !important;
+}
+.home-problem.home-all-good.has-deductions {
+  border-left-color: #38bdf8 !important;
 }
 .home-problem.st-caution {
   border-color: var(--status-warn-border);
@@ -5159,6 +5163,26 @@ body.win11 .gameoverlay {
   background: rgba(56, 189, 248, 0.28);
   outline: none;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+/* High-contrast Info Tip inside primary / accent buttons (e.g. "Подготовить к игре") */
+.btn.primary .info-tip,
+.btn-primary .info-tip,
+.home-prepare-btn .info-tip {
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.45) !important;
+  background: rgba(15, 23, 42, 0.12) !important;
+}
+.btn.primary .info-tip:hover,
+.btn.primary .info-tip:focus-visible,
+.btn-primary .info-tip:hover,
+.btn-primary .info-tip:focus-visible,
+.home-prepare-btn .info-tip:hover,
+.home-prepare-btn .info-tip:focus-visible {
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.75) !important;
+  background: rgba(15, 23, 42, 0.22) !important;
+  box-shadow: 0 0 6px rgba(15, 23, 42, 0.25) !important;
 }
 
 .info-tip-popup {

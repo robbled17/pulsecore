@@ -982,5 +982,8 @@
   "homeScore100Title": "Alles bestens",
   "homeScore100Sub": "Optimale Systemleistung (100/100)",
   "homeScoreDeductedSub": "{pts} Pkt. für aktuelle Auslastung abgezogen",
-  "unitsPtsShort": "Pkt."
+  "unitsPtsShort": "Pkt.",
+  "homeRecommendationsTitle": "Empfohlene Maßnahmen",
+  "homeDeductionsSub": "{pts} Pkt. abgezogen · Klicken Sie auf einen Eintrag zur Optimierung",
+  "homeAllGoodSubOptimal": "Keine Probleme gefunden · System läuft optimal"
 }

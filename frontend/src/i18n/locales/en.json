@@ -982,5 +982,8 @@
   "homeScore100Title": "Everything is optimal",
   "homeScore100Sub": "Optimal system performance (100/100)",
   "homeScoreDeductedSub": "Deducted {pts} pts for current load",
-  "unitsPtsShort": "pts"
+  "unitsPtsShort": "pts",
+  "homeRecommendationsTitle": "Here's what you can do",
+  "homeDeductionsSub": "{pts} pts deducted · Click an item or run optimization",
+  "homeAllGoodSubOptimal": "No issues found · System running optimally"
 }

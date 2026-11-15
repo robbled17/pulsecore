@@ -982,5 +982,8 @@
   "homeScore100Title": "Всё отлично",
   "homeScore100Sub": "Оптимальная работа системы (100/100)",
   "homeScoreDeductedSub": "Снято {pts} б. за текущую нагрузку",
-  "unitsPtsShort": "б."
+  "unitsPtsShort": "б.",
+  "homeRecommendationsTitle": "Вот что можно сделать",
+  "homeDeductionsSub": "Снято {pts} б. · Нажмите на пункт или выполните оптимизацию",
+  "homeAllGoodSubOptimal": "Замечаний не найдено · Система работает оптимально"
 }

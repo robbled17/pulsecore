@@ -1125,19 +1125,21 @@ async function renderHome() {
           </button>
           <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>`
       }
-      const lostPts = 100 - score
-      let titleText = t('homeAllGood')
-      let subText = escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))
+      const hasDeductions = Array.isArray(st.deductions) && st.deductions.length > 0 && score < 100
+      const lostPts = Math.max(0, 100 - score)
+      let titleText = ''
+      let subText = ''
 
-      if (score === 100) {
-        titleText = t('homeScore100Title')
-        subText = t('homeScore100Sub')
-      } else if (lostPts > 0) {
-        subText = `${escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))} · ${t('homeScoreDeductedSub', { pts: lostPts })}`
+      if (!hasDeductions) {
+        titleText = t('homeAllGood')
+        subText = t('homeAllGoodSubOptimal')
+      } else {
+        titleText = t('homeRecommendationsTitle')
+        subText = t('homeDeductionsSub', { pts: lostPts })
       }
 
       let deductionsHtml = ''
-      if (st.deductions && st.deductions.length && score < 100) {
+      if (hasDeductions) {
         deductionsHtml = `
           <div class="home-deductions-list">
             ${st.deductions.map((d) => {
@@ -1154,7 +1156,7 @@ async function renderHome() {
         `
       }
 
-      findings.innerHTML = `<div class="home-problem home-all-good st-good">
+      findings.innerHTML = `<div class="home-problem home-all-good ${hasDeductions ? 'has-deductions st-caution' : 'st-good'}">
         <div class="home-all-good-head">
           <div class="problem-title">${titleText}</div>
           <div class="home-all-good-sub meta">${subText}</div>

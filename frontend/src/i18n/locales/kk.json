@@ -982,5 +982,8 @@
   "homeScore100Title": "Бәрі тамаша",
   "homeScore100Sub": "Жүйенің оңтайлы жұмысы (100/100)",
   "homeScoreDeductedSub": "Ағымдағы жүктеме үшін {pts} ұпай алынды",
-  "unitsPtsShort": "ұп."
+  "unitsPtsShort": "ұп.",
+  "homeRecommendationsTitle": "Ұсынылатын әрекеттер",
+  "homeDeductionsSub": "{pts} ұпай алынды · Тармақты басыңыз немесе оңтайландыруды орындаңыз",
+  "homeAllGoodSubOptimal": "Ақаулар табылмады · Жүйе оңтайлы жұмыс істеп тұр"
 }

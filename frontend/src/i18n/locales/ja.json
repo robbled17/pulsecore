@@ -982,5 +982,8 @@
   "homeScore100Title": "すべて良好",
   "homeScore100Sub": "最適なシステムパフォーマンス (100/100)",
   "homeScoreDeductedSub": "現在の負荷により {pts} 点減点",
-  "unitsPtsShort": "点"
+  "unitsPtsShort": "点",
+  "homeRecommendationsTitle": "推奨される対応",
+  "homeDeductionsSub": "{pts} 点減点 · 項目をクリックまたは最適化を実行",
+  "homeAllGoodSubOptimal": "問題は見つかりませんでした · システムは正常に稼働しています"
 }
