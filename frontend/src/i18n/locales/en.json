@@ -955,7 +955,7 @@
   "fastStartupWarnDesc": "Windows kernel has not rebooted for {days} days due to Fast Startup — driver cache accumulated.",
   "bootRebootNow": "Reboot",
   "bootDisableFastStartup": "Disable Fast Startup",
-  "bootLogDisabledNote": "Windows Diagnostics log is disabled, but the startup apps audit below is fully active.",
+  "bootLogDisabledNote": "Windows Diagnostics log is unavailable or requires administrator privileges; the startup apps audit below is fully active.",
   "bootStartupListTitle": "Startup Applications & Degraders",
   "bootDelay60s": "Delay 60 s",
   "bootDelayedPill": "Delayed 60 s",

@@ -327,8 +327,8 @@
         </div>
 
         <!-- Boot Diagnostics Card -->
-        <div class="panel boot-diag-card collapsed" id="boot-diag-card">
-          <div class="panel-title-row boot-diag-header" id="boot-diag-header" role="button" tabindex="0" aria-expanded="false">
+        <div class="boot-diag-card collapsed" id="boot-diag-card">
+          <div class="boot-diag-header" id="boot-diag-header" role="button" tabindex="0" aria-expanded="false">
             <div class="boot-diag-title-wrap">
               <span class="panel-title" data-i18n="bootDiagTitle">Почему долго загружается Windows?</span>
               <span class="info-tip" tabindex="0" data-tooltip-key="bootDiagGeneralTip">i</span>
@@ -339,7 +339,7 @@
             </div>
           </div>
 
-          <div class="boot-diag-body" id="boot-diag-body">
+          <div class="boot-diag-body" id="boot-diag-body" hidden style="display:none;max-height:0px;">
             <!-- Timeline & Stages bar -->
             <div class="boot-breakdown-section" id="boot-breakdown-section">
               <div class="boot-breakdown-meta">

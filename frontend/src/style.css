@@ -5168,11 +5168,14 @@ body.win11 .gameoverlay {
 }
 
 /* Boot Diagnostics Card */
+.panel.boot-diag-card,
 .boot-diag-card {
+  padding: 0 !important;
   margin-bottom: 16px;
-  background: #0f172a !important;
-  border: 1px solid #334155 !important;
-  border-radius: 14px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--accent-glow) !important;
   overflow: hidden;
   transition: border-color 0.2s ease;
 }
@@ -5182,7 +5185,10 @@ body.win11 .gameoverlay {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
+  padding: 14px 18px !important;
+  margin: 0 !important;
+  min-height: 48px;
+  box-sizing: border-box;
 }
 .boot-diag-header:hover {
   background: rgba(255, 255, 255, 0.02);
@@ -5223,14 +5229,20 @@ body.win11 .gameoverlay {
 .boot-diag-chevron {
   font-size: 14px;
   color: #94a3b8;
+  display: inline-block;
   transition: transform 0.2s ease;
 }
 .boot-diag-card.collapsed .boot-diag-chevron {
-  transform: rotate(-90deg);
+  transform: rotate(0deg);
+}
+.boot-diag-card.expanded .boot-diag-chevron,
+.boot-diag-card:not(.collapsed) .boot-diag-chevron {
+  transform: rotate(180deg);
 }
 .boot-diag-card.collapsed .boot-diag-body {
   display: none !important;
 }
+.boot-diag-card.expanded .boot-diag-body,
 .boot-diag-card:not(.collapsed) .boot-diag-body {
   display: block !important;
 }

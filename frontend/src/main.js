@@ -2580,8 +2580,27 @@ function renderLag(m) {
 
 let bootDiagData = null
 let bootDiagLoading = false
-let bootCardExpanded = false
-let userToggledBootCard = false
+
+function syncBootCardExpanded() {
+  const card = $('boot-diag-card')
+  const bodyEl = $('boot-diag-body')
+  const hdr = $('boot-diag-header')
+  const chevron = $('boot-diag-chevron')
+  if (!card || !bodyEl) return
+
+  const expanded = !!window.__bootCardExpanded
+  card.classList.toggle('expanded', expanded)
+  card.classList.toggle('collapsed', !expanded)
+  if (hdr) hdr.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+
+  bodyEl.hidden = !expanded
+  bodyEl.style.display = expanded ? 'block' : 'none'
+  bodyEl.style.maxHeight = expanded ? 'none' : '0px'
+
+  if (chevron) {
+    chevron.style.transform = expanded ? 'rotate(180deg)' : 'rotate(0deg)'
+  }
+}
 
 async function loadBootDiagnostics(force = false) {
   if (bootDiagLoading) return
@@ -2635,14 +2654,11 @@ function renderBootDiagnostics(data) {
     }
   }
 
-  // Auto expand on slow boot or fast startup warning if user has not manually toggled
-  if (!userToggledBootCard) {
-    if (data.bootRating === 'slow' || data.fastStartupWarning) {
-      bootCardExpanded = true
-    }
+  // Initialize expanded state on first data arrival if not manually toggled yet
+  if (typeof window.__bootCardExpanded !== 'boolean') {
+    window.__bootCardExpanded = enabledCount > 4 || !!data.fastStartupWarning || data.bootRating === 'slow'
   }
-  card.classList.toggle('collapsed', !bootCardExpanded)
-  $('boot-diag-header')?.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
+  syncBootCardExpanded()
 
   // Breakdown bar
   const breakdownSec = $('boot-breakdown-section')
@@ -6583,24 +6599,17 @@ function wireUI() {
     if (!hdr) return
     if (ev.target.closest('.info-tip') || ev.target.closest('button')) return
 
-    const card = $('boot-diag-card')
-    if (!card) return
-    userToggledBootCard = true
-    bootCardExpanded = !bootCardExpanded
-    card.classList.toggle('collapsed', !bootCardExpanded)
-    hdr.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
+    ev.preventDefault()
+    window.__bootCardExpanded = !window.__bootCardExpanded
+    syncBootCardExpanded()
   })
 
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' || ev.key === ' ') {
       if (document.activeElement?.id === 'boot-diag-header') {
         ev.preventDefault()
-        const card = $('boot-diag-card')
-        if (!card) return
-        userToggledBootCard = true
-        bootCardExpanded = !bootCardExpanded
-        card.classList.toggle('collapsed', !bootCardExpanded)
-        document.activeElement.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
+        window.__bootCardExpanded = !window.__bootCardExpanded
+        syncBootCardExpanded()
       }
     }
   })
