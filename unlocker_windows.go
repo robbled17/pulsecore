@@ -46,6 +46,59 @@ type LockProcessInfo struct {
 	ExePath     string `json:"exePath"`
 }
 
+// collectCandidateFilesForRM recursively gathers files inside a folder up to depth 3,
+// prioritizing file types most commonly locked by running applications.
+func collectCandidateFilesForRM(targetPath string) []string {
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		return nil
+	}
+	if !info.IsDir() {
+		return []string{targetPath}
+	}
+
+	var priorityFiles []string
+	var normalFiles []string
+
+	cleanTarget := filepath.Clean(targetPath)
+	_ = filepath.WalkDir(cleanTarget, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			rel, err := filepath.Rel(cleanTarget, p)
+			if err == nil && rel != "." {
+				depth := strings.Count(rel, string(filepath.Separator)) + 1
+				if depth > 3 {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(p))
+		switch ext {
+		case ".exe", ".dll", ".db", ".lock", ".log", ".asar", ".pak", ".node", ".bin", ".dat", ".tmp":
+			if len(priorityFiles) < 48 {
+				priorityFiles = append(priorityFiles, p)
+			}
+		default:
+			if len(normalFiles) < 32 {
+				normalFiles = append(normalFiles, p)
+			}
+		}
+		if len(priorityFiles)+len(normalFiles) >= 80 {
+			return filepath.SkipAll
+		}
+		return nil
+	})
+
+	res := append(priorityFiles, normalFiles...)
+	if len(res) == 0 {
+		res = []string{targetPath}
+	}
+	return res
+}
+
 // FindLockingProcesses uses Windows Restart Manager API to identify blocking processes.
 func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 	targetPath = strings.TrimSpace(targetPath)
@@ -53,29 +106,9 @@ func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 		return nil, fmt.Errorf("empty path")
 	}
 
-	// Collect file paths to register
-	var filePaths []string
-	info, err := os.Stat(targetPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if info.IsDir() {
-		// Collect top-level files and executables/dlls (limit to 64 to keep fast)
-		entries, err := os.ReadDir(targetPath)
-		if err == nil {
-			for _, entry := range entries {
-				full := filepath.Join(targetPath, entry.Name())
-				filePaths = append(filePaths, full)
-				if len(filePaths) >= 64 {
-					break
-				}
-			}
-		}
-		// Also register the folder itself
-		filePaths = append(filePaths, targetPath)
-	} else {
-		filePaths = append(filePaths, targetPath)
+	filePaths := collectCandidateFilesForRM(targetPath)
+	if len(filePaths) == 0 {
+		return nil, nil
 	}
 
 	var sessionHandle uint32
@@ -165,6 +198,10 @@ func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 			appName = procName
 		}
 
+		if isProtectedSystemProcess(procName, pid) || isProtectedSystemProcess(appName, pid) {
+			continue
+		}
+
 		out = append(out, LockProcessInfo{
 			PID:         pid,
 			AppName:     appName,
@@ -200,7 +237,7 @@ func getProcessNameAndPath(pid uint32) (exePath string, procName string) {
 
 // isProtectedSystemProcess returns true for OS core processes that must never be terminated.
 func isProtectedSystemProcess(procName string, pid uint32) bool {
-	if pid <= 4 || pid == uint32(os.Getpid()) {
+	if pid > 0 && (pid <= 4 || pid == uint32(os.Getpid())) {
 		return true
 	}
 	// Check if matches our own executable path
@@ -210,12 +247,18 @@ func isProtectedSystemProcess(procName string, pid uint32) bool {
 		}
 	}
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(procName)))
+	if isSelfOrWebView(base) {
+		return true
+	}
 	switch base {
 	case "explorer.exe", "csrss.exe", "lsass.exe", "services.exe",
 		"smss.exe", "wininit.exe", "winlogon.exe", "system",
 		"svchost.exe", "dwm.exe", "pulsecore.exe", "fontdrvhost.exe",
 		"msedgewebview2.exe", "pulsecorehelper.exe", "conhost.exe",
-		"runtimebroker.exe", "sihost.exe", "taskhostw.exe":
+		"runtimebroker.exe", "sihost.exe", "taskhostw.exe",
+		"searchhost.exe", "searchindexer.exe", "ctfmon.exe",
+		"startmenuexperiencehost.exe", "shellexperiencehost.exe",
+		"applicationframehost.exe":
 		return true
 	}
 	return false
