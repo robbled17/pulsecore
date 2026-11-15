@@ -86,12 +86,12 @@
               <circle class="home-ring-fg" id="home-ring-fg" cx="60" cy="60" r="52" />
             </svg>
             <div class="home-ring-text">
-              <div class="home-score" id="home-score">-</div>
+              <div class="home-score" id="home-score">--</div>
               <div class="home-score-den">/100</div>
             </div>
           </div>
           <div class="home-score-meta">
-            <div class="home-status" id="home-status"></div>
+            <div class="home-status" id="home-status" data-i18n="homeMeasuringHealth">Измерение...</div>
             <div class="meta" id="home-checked"></div>
           </div>
         </div>
@@ -327,8 +327,8 @@
         </div>
 
         <!-- Boot Diagnostics Card -->
-        <div class="panel boot-diag-card" id="boot-diag-card">
-          <div class="panel-title-row boot-diag-header" id="boot-diag-header" role="button" tabindex="0" aria-expanded="true">
+        <div class="panel boot-diag-card collapsed" id="boot-diag-card">
+          <div class="panel-title-row boot-diag-header" id="boot-diag-header" role="button" tabindex="0" aria-expanded="false">
             <div class="boot-diag-title-wrap">
               <span class="panel-title" data-i18n="bootDiagTitle">Почему долго загружается Windows?</span>
               <span class="info-tip" tabindex="0" data-tooltip-key="bootDiagGeneralTip">i</span>

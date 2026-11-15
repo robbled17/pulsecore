@@ -968,7 +968,7 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
   stroke-linecap: round;
   stroke-dasharray: 326.7;
   stroke-dashoffset: 326.7;
-  transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s ease;
 }
 .home-ring-text {
   position: absolute;
@@ -5229,7 +5229,10 @@ body.win11 .gameoverlay {
   transform: rotate(-90deg);
 }
 .boot-diag-card.collapsed .boot-diag-body {
-  display: none;
+  display: none !important;
+}
+.boot-diag-card:not(.collapsed) .boot-diag-body {
+  display: block !important;
 }
 .boot-diag-body {
   padding: 0 18px 18px 18px;
@@ -5460,4 +5463,40 @@ body.win11 .gameoverlay {
   text-align: center;
   font-size: 13px;
   color: #94a3b8;
+}
+
+/* Home Score Deductions Breakdown */
+.home-deductions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 12px 0;
+  width: 100%;
+}
+.home-deduction-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+.home-deduction-badge {
+  font-family: var(--mono, monospace);
+  font-weight: 700;
+  font-size: 11px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.home-deduction-text b {
+  color: #f1f5f9;
+  font-weight: 600;
 }

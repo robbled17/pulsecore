@@ -34,7 +34,7 @@ type BootStartupItem struct {
 }
 
 func (a *App) GetBootDiagnostics() (BootDiagnostics, error) {
-	return BootDiagnostics{}, nil
+	return BootDiagnostics{BootRating: "unknown"}, nil
 }
 
 func (a *App) SetStartupItemMode(id string, mode string) error {

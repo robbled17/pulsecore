@@ -977,5 +977,10 @@
   "bootUnitSec": "s",
   "bootLocTask": "Aufgabenplanung",
   "bootLocFolder": "Autostart-Ordner",
-  "bootLocRegistry": "Registry Run"
+  "bootLocRegistry": "Registry Run",
+  "bootSummaryAutorun": "Autostart: {count} aktiv",
+  "homeScore100Title": "Alles bestens",
+  "homeScore100Sub": "Optimale Systemleistung (100/100)",
+  "homeScoreDeductedSub": "{pts} Pkt. für aktuelle Auslastung abgezogen",
+  "unitsPtsShort": "Pkt."
 }

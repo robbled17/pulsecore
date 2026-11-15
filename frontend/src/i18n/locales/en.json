@@ -977,5 +977,10 @@
   "bootUnitSec": "s",
   "bootLocTask": "Task Scheduler",
   "bootLocFolder": "Startup folder",
-  "bootLocRegistry": "Registry Run"
+  "bootLocRegistry": "Registry Run",
+  "bootSummaryAutorun": "Startup: {count} active",
+  "homeScore100Title": "Everything is optimal",
+  "homeScore100Sub": "Optimal system performance (100/100)",
+  "homeScoreDeductedSub": "Deducted {pts} pts for current load",
+  "unitsPtsShort": "pts"
 }

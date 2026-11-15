@@ -977,5 +977,10 @@
   "bootUnitSec": "秒",
   "bootLocTask": "任务计划程序",
   "bootLocFolder": "启动文件夹",
-  "bootLocRegistry": "注册表 Run"
+  "bootLocRegistry": "注册表 Run",
+  "bootSummaryAutorun": "开机启动: {count} 个已启用",
+  "homeScore100Title": "一切良好",
+  "homeScore100Sub": "系统处于最佳运行状态 (100/100)",
+  "homeScoreDeductedSub": "因当前负载扣除 {pts} 分",
+  "unitsPtsShort": "分"
 }

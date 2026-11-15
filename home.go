@@ -211,7 +211,7 @@ func (a *App) GetHomeState() HomeState {
 		}
 	}
 
-	initialized := m.Timestamp != "" && m.RAMTotalMB > 0
+	initialized := m.Timestamp != "" && m.RAMTotalMB > 0 && (m.RAMPercent > 0 || m.CPUPercent > 0)
 	hasSamples := initialized && len(m.Disks) > 0
 
 	return HomeState{

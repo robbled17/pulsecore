@@ -600,22 +600,7 @@ func computeSystemHealth(win []healthSample, leakN, incidents, startupHigh int, 
 		score = 100
 	}
 
-	deductions := make([]HealthDeduction, 0, len(factors))
-	if wSum > 0 {
-		for _, f := range factors {
-			if !f.Available || f.Score >= 99.5 {
-				continue
-			}
-			lost := int(math.Round((100 - f.Score) * f.Weight / wSum))
-			if lost < 1 {
-				lost = 1
-			}
-			deductions = append(deductions, HealthDeduction{
-				Key: f.Key, LabelRu: f.LabelRu, LabelEn: f.LabelEn, Points: lost,
-				DetailRu: f.DetailRu, DetailEn: f.DetailEn,
-			})
-		}
-	}
+	deductions := buildDeductions(factors, score, wSum)
 
 	gradeRu, gradeEn := healthGrade(score)
 	sumRu := fmt.Sprintf("%d/100 - %s", score, gradeRu)
@@ -732,7 +717,85 @@ func applyDiskSMARTHealthFactor(rep SystemHealthReport, smart DiskHealthReport) 
 	rep.SummaryRu = fmt.Sprintf("%d/100 - %s", overall, gradeRu)
 	rep.SummaryEn = fmt.Sprintf("%d/100 - %s", overall, gradeEn)
 	rep.OK, rep.Watch, rep.Action = ok, watch, action
+	rep.Deductions = buildDeductions(out, overall, wSum)
 	return rep
+}
+
+func buildDeductions(factors []HealthFactor, score int, wSum float64) []HealthDeduction {
+	totalLost := 100 - score
+	if wSum <= 0 || totalLost <= 0 {
+		return nil
+	}
+
+	type factorLoss struct {
+		f        HealthFactor
+		rawLoss  float64
+		detailRu string
+		detailEn string
+	}
+
+	var losses []factorLoss
+	var totalRawLoss float64
+
+	for _, f := range factors {
+		if !f.Available || f.Score >= 99.5 {
+			continue
+		}
+		raw := (100.0 - f.Score) * f.Weight
+		totalRawLoss += raw
+
+		dru := f.DetailRu
+		den := f.DetailEn
+
+		switch f.Key {
+		case "ram":
+			dru = strings.TrimSuffix(f.DetailRu, " - запас есть.")
+			dru = strings.TrimPrefix(dru, "RAM ")
+			dru = "занято " + dru
+			den = "usage: " + strings.TrimSuffix(f.DetailEn, " - headroom OK.")
+		case "cpu_load":
+			dru = strings.ReplaceAll(f.DetailRu, "Средняя нагрузка CPU в норме.", "повышенная нагрузка CPU")
+			den = strings.ReplaceAll(f.DetailEn, "Average CPU load looks fine.", "elevated CPU load")
+		case "cpu_temp":
+			dru = strings.ReplaceAll(f.DetailRu, "Температура CPU ", "нагрев CPU ")
+			den = strings.ReplaceAll(f.DetailEn, "CPU temperature ", "CPU temp ")
+		}
+
+		losses = append(losses, factorLoss{
+			f: f, rawLoss: raw, detailRu: dru, detailEn: den,
+		})
+	}
+
+	if totalRawLoss <= 0 || len(losses) == 0 {
+		return nil
+	}
+
+	deductions := make([]HealthDeduction, 0, len(losses))
+	allocated := 0
+
+	for i, fl := range losses {
+		pts := int(math.Round(float64(totalLost) * fl.rawLoss / totalRawLoss))
+		if pts < 1 {
+			pts = 1
+		}
+		if i == len(losses)-1 {
+			rem := totalLost - allocated
+			if rem > 0 {
+				pts = rem
+			}
+		}
+		allocated += pts
+		deductions = append(deductions, HealthDeduction{
+			Key:      fl.f.Key,
+			LabelRu:  fl.f.LabelRu,
+			LabelEn:  fl.f.LabelEn,
+			Points:   pts,
+			DetailRu: fl.detailRu,
+			DetailEn: fl.detailEn,
+		})
+	}
+
+	return deductions
 }
 
 func healthGrade(score int) (string, string) {

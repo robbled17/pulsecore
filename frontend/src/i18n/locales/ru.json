@@ -977,5 +977,10 @@
   "bootUnitSec": "с",
   "bootLocTask": "Планировщик",
   "bootLocFolder": "Папка автозагрузки",
-  "bootLocRegistry": "Реестр Run"
+  "bootLocRegistry": "Реестр Run",
+  "bootSummaryAutorun": "Автозагрузка: {count} вкл.",
+  "homeScore100Title": "Всё отлично",
+  "homeScore100Sub": "Оптимальная работа системы (100/100)",
+  "homeScoreDeductedSub": "Снято {pts} б. за текущую нагрузку",
+  "unitsPtsShort": "б."
 }

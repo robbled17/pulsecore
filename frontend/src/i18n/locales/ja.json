@@ -977,5 +977,10 @@
   "bootUnitSec": "秒",
   "bootLocTask": "タスクスケジューラ",
   "bootLocFolder": "スタートアップフォルダー",
-  "bootLocRegistry": "レジストリ Run"
+  "bootLocRegistry": "レジストリ Run",
+  "bootSummaryAutorun": "スタートアップ: {count} 件有効",
+  "homeScore100Title": "すべて良好",
+  "homeScore100Sub": "最適なシステムパフォーマンス (100/100)",
+  "homeScoreDeductedSub": "現在の負荷により {pts} 点減点",
+  "unitsPtsShort": "点"
 }

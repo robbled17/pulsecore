@@ -977,5 +977,10 @@
   "bootUnitSec": "с",
   "bootLocTask": "Тапсырмалар жоспарлаушысы",
   "bootLocFolder": "Автоқосу қалтасы",
-  "bootLocRegistry": "Run тізілімі"
+  "bootLocRegistry": "Run тізілімі",
+  "bootSummaryAutorun": "Автоқосу: {count} қосулы",
+  "homeScore100Title": "Бәрі тамаша",
+  "homeScore100Sub": "Жүйенің оңтайлы жұмысы (100/100)",
+  "homeScoreDeductedSub": "Ағымдағы жүктеме үшін {pts} ұпай алынды",
+  "unitsPtsShort": "ұп."
 }

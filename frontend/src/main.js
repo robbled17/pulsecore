@@ -1004,6 +1004,8 @@ function setActiveTab(name) {
   SetActiveTab(backendTab).catch(() => {})
 }
 
+let hasInitialHomeStats = false
+
 async function renderHome() {
   const scoreEl = $('home-score')
   const statusEl = $('home-status')
@@ -1017,15 +1019,13 @@ async function renderHome() {
   try { st = await GetHomeState() } catch (_) { st = null }
   if (!st) return
 
-  const isMeasuring = !st.initialized || !st.hasSamples
+  const isMeasuring = !hasInitialHomeStats && (!st.initialized || !st.hasSamples)
   if (isMeasuring) {
-    scoreEl.textContent = '—'
+    scoreEl.textContent = '--'
     if (statusEl) statusEl.textContent = t('homeMeasuringHealth')
     if (checkedEl) checkedEl.textContent = ''
     if (ringFg) {
-      ringFg.style.strokeDasharray = '40 20'
-      ringFg.style.strokeDashoffset = '0'
-      ringFg.style.stroke = themeToken('--accent', '#38bdf8')
+      ringFg.style.strokeDashoffset = '326.7'
       ringFg.classList.add('home-score-measuring')
     }
     findings.innerHTML = `<div class="home-problem home-all-good st-good">
@@ -1038,6 +1038,8 @@ async function renderHome() {
     </div>`
     return
   }
+
+  hasInitialHomeStats = true
 
   if (ringFg) {
     ringFg.classList.remove('home-score-measuring')
@@ -1115,10 +1117,40 @@ async function renderHome() {
           </button>
           <div class="meta home-prepare-hint">${t('homePrepareHint')}</div>`
       }
+      const lostPts = 100 - score
+      let titleText = t('homeAllGood')
+      let subText = escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))
+
+      if (score === 100) {
+        titleText = t('homeScore100Title')
+        subText = t('homeScore100Sub')
+      } else if (lostPts > 0) {
+        subText = `${escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))} · ${t('homeScoreDeductedSub', { pts: lostPts })}`
+      }
+
+      let deductionsHtml = ''
+      if (st.deductions && st.deductions.length && score < 100) {
+        deductionsHtml = `
+          <div class="home-deductions-list">
+            ${st.deductions.map((d) => {
+              const detail = lang === 'en' ? (d.detailEn || d.detailRu) : (d.detailRu || d.detailEn)
+              const label = lang === 'en' ? (d.labelEn || d.labelRu) : (d.labelRu || d.labelEn)
+              return `
+                <div class="home-deduction-item">
+                  <span class="home-deduction-badge">−${d.points} ${t('unitsPtsShort')}</span>
+                  <span class="home-deduction-text"><b>${escapeHtml(label)}:</b> ${escapeHtml(detail)}</span>
+                </div>
+              `
+            }).join('')}
+          </div>
+        `
+      }
+
       findings.innerHTML = `<div class="home-problem home-all-good st-good">
         <div class="home-all-good-head">
-          <div class="problem-title">${t('homeAllGood')}</div>
-          <div class="home-all-good-sub meta">${escapeHtml(msgText(st.status, st.statusRu, st.statusEn) || t('homeStatusExcellent'))}</div>
+          <div class="problem-title">${titleText}</div>
+          <div class="home-all-good-sub meta">${subText}</div>
+          ${deductionsHtml}
         </div>
         <div class="home-eco-status" data-eco-count="${ecoN}">
           <span class="home-eco-pill">${escapeHtml(ecoLine)}</span>
@@ -2548,6 +2580,8 @@ function renderLag(m) {
 
 let bootDiagData = null
 let bootDiagLoading = false
+let bootCardExpanded = false
+let userToggledBootCard = false
 
 async function loadBootDiagnostics(force = false) {
   if (bootDiagLoading) return
@@ -2572,28 +2606,48 @@ function renderBootDiagnostics(data) {
   const card = $('boot-diag-card')
   if (!card) return
 
+  // Startup items
+  const list = $('boot-items-list')
+  const countEl = $('boot-items-count')
+  const items = data.startupItems || []
+  if (countEl) countEl.textContent = String(items.length)
+  const enabledCount = items.filter((it) => it.status === 'enabled').length
+
   // Badge
   const badge = $('boot-rating-badge')
   if (badge) {
-    const rating = data.bootRating || 'moderate'
-    badge.className = 'boot-rating-badge ' + rating
-    const secStr = fmt(data.bootTimeSec, 1)
-    if (rating === 'fast') {
-      badge.textContent = t('bootRatingFast', { sec: secStr })
-    } else if (rating === 'slow') {
-      badge.textContent = t('bootRatingSlow', { sec: secStr })
-      // Auto expand on slow boot
-      card.classList.remove('collapsed')
-      $('boot-diag-header')?.setAttribute('aria-expanded', 'true')
+    const hasTiming = data.eventLogAvailable && data.bootTimeSec > 0 && data.bootRating !== 'unknown'
+    if (!hasTiming) {
+      const isMany = enabledCount > 4
+      badge.className = 'boot-rating-badge ' + (isMany ? 'moderate' : 'fast')
+      badge.textContent = t('bootSummaryAutorun', { count: enabledCount })
     } else {
-      badge.textContent = t('bootRatingModerate', { sec: secStr })
+      const rating = data.bootRating || 'moderate'
+      badge.className = 'boot-rating-badge ' + rating
+      const secStr = fmt(data.bootTimeSec, 1)
+      if (rating === 'fast') {
+        badge.textContent = t('bootRatingFast', { sec: secStr })
+      } else if (rating === 'slow') {
+        badge.textContent = t('bootRatingSlow', { sec: secStr })
+      } else {
+        badge.textContent = t('bootRatingModerate', { sec: secStr })
+      }
     }
   }
+
+  // Auto expand on slow boot or fast startup warning if user has not manually toggled
+  if (!userToggledBootCard) {
+    if (data.bootRating === 'slow' || data.fastStartupWarning) {
+      bootCardExpanded = true
+    }
+  }
+  card.classList.toggle('collapsed', !bootCardExpanded)
+  $('boot-diag-header')?.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
 
   // Breakdown bar
   const breakdownSec = $('boot-breakdown-section')
   const logDisabled = $('boot-log-unavailable')
-  if (!data.eventLogAvailable) {
+  if (!data.eventLogAvailable || data.bootTimeSec <= 0) {
     breakdownSec?.classList.add('hidden')
     logDisabled?.classList.remove('hidden')
   } else {
@@ -2632,12 +2686,6 @@ function renderBootDiagnostics(data) {
       fsBanner.classList.add('hidden')
     }
   }
-
-  // Startup items
-  const list = $('boot-items-list')
-  const countEl = $('boot-items-count')
-  const items = data.startupItems || []
-  if (countEl) countEl.textContent = String(items.length)
 
   if (list) {
     if (!items.length) {
@@ -6530,12 +6578,31 @@ function wireUI() {
     renderStartupList().catch(() => {})
   })
 
-  $('boot-diag-header')?.addEventListener('click', () => {
+  document.addEventListener('click', (ev) => {
+    const hdr = ev.target.closest('#boot-diag-header')
+    if (!hdr) return
+    if (ev.target.closest('.info-tip') || ev.target.closest('button')) return
+
     const card = $('boot-diag-card')
-    const hdr = $('boot-diag-header')
-    if (!card || !hdr) return
-    const isCollapsed = card.classList.toggle('collapsed')
-    hdr.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true')
+    if (!card) return
+    userToggledBootCard = true
+    bootCardExpanded = !bootCardExpanded
+    card.classList.toggle('collapsed', !bootCardExpanded)
+    hdr.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
+  })
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      if (document.activeElement?.id === 'boot-diag-header') {
+        ev.preventDefault()
+        const card = $('boot-diag-card')
+        if (!card) return
+        userToggledBootCard = true
+        bootCardExpanded = !bootCardExpanded
+        card.classList.toggle('collapsed', !bootCardExpanded)
+        document.activeElement.setAttribute('aria-expanded', bootCardExpanded ? 'true' : 'false')
+      }
+    }
   })
 
   $('boot-items-list')?.addEventListener('click', async (ev) => {

@@ -977,5 +977,10 @@
   "bootUnitSec": "с",
   "bootLocTask": "Бурычлар планлаштыручысы",
   "bootLocFolder": "Автойөкләү папкасы",
-  "bootLocRegistry": "Run реестры"
+  "bootLocRegistry": "Run реестры",
+  "bootSummaryAutorun": "Автойөкләү: {count} кабызылган",
+  "homeScore100Title": "Барысы да яхшы",
+  "homeScore100Sub": "Системаның оптималь эше (100/100)",
+  "homeScoreDeductedSub": "Хәзерге йөкләнеш өчен {pts} балл алынды",
+  "unitsPtsShort": "б."
 }

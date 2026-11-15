@@ -461,7 +461,9 @@ func (a *App) GetBootDiagnostics() (BootDiagnostics, error) {
 	bootSec, kernelSec, desktopSec, degraders, hasLog := readBootEventsFromLog()
 
 	rating := "fast"
-	if bootSec >= 50.0 {
+	if !hasLog || bootSec <= 0.0 {
+		rating = "unknown"
+	} else if bootSec >= 50.0 {
 		rating = "slow"
 	} else if bootSec >= 25.0 {
 		rating = "moderate"
