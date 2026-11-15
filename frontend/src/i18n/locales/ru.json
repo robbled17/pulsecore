@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "б.",
   "homeRecommendationsTitle": "Вот что можно сделать",
   "homeDeductionsSub": "Снято {pts} б. · Нажмите на пункт или выполните оптимизацию",
-  "homeAllGoodSubOptimal": "Замечаний не найдено · Система работает оптимально"
+  "homeAllGoodSubOptimal": "Замечаний не найдено · Система работает оптимально",
+  "copySupportReport": "Скопировать отчёт для поддержки",
+  "supportReportCopied": "Отчёт для поддержки скопирован в буфер обмена",
+  "supportReportCopyError": "Не удалось скопировать отчёт",
+  "diskCleanShaderRebuildNotice": "Кэш шейдеров пересоберётся автоматически при следующем запуске игр.",
+  "delayedStartupTitle": "Задержка отложенного запуска",
+  "delayedStartup30": "30 секунд",
+  "delayedStartup60": "60 секунд (по умолчанию)",
+  "delayedStartup120": "120 секунд",
+  "thermalThresholdLabel": "Порог тревоги по температуре"
 }

@@ -69,29 +69,31 @@ func hwndBelongsToUs(hwnd windows.HWND) bool {
 	return wpid == windows.GetCurrentProcessId()
 }
 
-func findOurMainHWND() windows.HWND {
-	pid := windows.GetCurrentProcessId()
-	var found uintptr
-	cb := windows.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-		vis, _, _ := procIsWindowVisible.Call(hwnd)
-		if vis == 0 {
-			return 1
-		}
-		var wpid uint32
-		_, _, _ = procGetWindowThread.Call(hwnd, uintptr(unsafe.Pointer(&wpid)))
-		if wpid != pid {
-			return 1
-		}
-		// Prefer the root owner window for the process.
-		root, _, _ := procGetAncestor.Call(hwnd, gaRoot)
+var enumMainHWNDCb = windows.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
+	vis, _, _ := procIsWindowVisible.Call(hwnd)
+	if vis == 0 {
+		return 1
+	}
+	var wpid uint32
+	_, _, _ = procGetWindowThread.Call(hwnd, uintptr(unsafe.Pointer(&wpid)))
+	if wpid != windows.GetCurrentProcessId() {
+		return 1
+	}
+	// Prefer the root owner window for the process.
+	root, _, _ := procGetAncestor.Call(hwnd, gaRoot)
+	if lparam != 0 {
 		if root != 0 {
-			found = root
+			*(*uintptr)(unsafe.Pointer(lparam)) = root
 		} else {
-			found = hwnd
+			*(*uintptr)(unsafe.Pointer(lparam)) = hwnd
 		}
-		return 0
-	})
-	_, _, _ = procEnumWindows.Call(cb, 0)
+	}
+	return 0
+})
+
+func findOurMainHWND() windows.HWND {
+	var found uintptr
+	_, _, _ = procEnumWindows.Call(enumMainHWNDCb, uintptr(unsafe.Pointer(&found)))
 	return windows.HWND(found)
 }
 

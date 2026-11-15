@@ -168,3 +168,26 @@ func TestIsPathUnderTarget(t *testing.T) {
 		t.Errorf("unrelated path must not be under target")
 	}
 }
+
+func TestCmdlineContainsPath(t *testing.T) {
+	cases := []struct {
+		cmdline string
+		target  string
+		want    bool
+	}{
+		{`"C:\Games\Doom\doom.exe"`, `C:\Games`, true},
+		{`C:\GamesLauncher\agent.exe`, `C:\Games`, false},
+		{`--dir="C:\Games"`, `C:\Games`, true},
+		{`--dir=C:\Games\MyGame`, `C:\Games`, true},
+		{`C:\Games`, `C:\Games`, true},
+		{`C:\MyGames\game.exe`, `C:\Games`, false},
+		{`"D:\Projects\pulsecore" --test`, `D:\Projects\pulsecore`, true},
+		{`"D:\Projects\pulsecore-roadmap\app.exe"`, `D:\Projects\pulsecore`, false},
+	}
+	for _, c := range cases {
+		got := cmdlineContainsPath(c.cmdline, c.target)
+		if got != c.want {
+			t.Errorf("cmdlineContainsPath(%q, %q) = %v, want %v", c.cmdline, c.target, got, c.want)
+		}
+	}
+}

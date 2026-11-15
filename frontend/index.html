@@ -299,8 +299,11 @@
       </section>
 
       <section id="tab-lag" class="tab tab-pane">
-        <header class="section-head">
+        <header class="section-head row-between">
           <h1 data-i18n="tabLagShort">Лаги</h1>
+          <button type="button" class="btn soft compact btn-copy-support-report" id="btn-copy-support-lag" style="gap:6px;">
+            <span>📋</span> <span data-i18n="copySupportReport">Скопировать отчёт для поддержки</span>
+          </button>
         </header>
         <div id="lag-system-verdict" class="status-banner ok">✓ Система работает стабильно</div>
         <div class="panel" id="lag-live-panel">
@@ -615,6 +618,12 @@
             <option value="clear" data-i18n="ecoExitClear">Снимать ограничения автоматически</option>
             <option value="keep" data-i18n="ecoExitKeep">Оставлять ограничения</option>
           </select>
+          <div class="settings-section-title settings-section-title-sub" data-i18n="delayedStartupTitle">Задержка отложенного запуска</div>
+          <select id="opt-delayed-startup" class="lang-select lang-select-block settings-select" aria-label="Delayed startup delay">
+            <option value="30" data-i18n="delayedStartup30">30 секунд</option>
+            <option value="60" data-i18n="delayedStartup60" selected>60 секунд (по умолчанию)</option>
+            <option value="120" data-i18n="delayedStartup120">120 секунд</option>
+          </select>
         </div>
 
         <div class="settings-card settings-group">
@@ -625,7 +634,14 @@
             <button type="button" class="btn poll settings-btn active" data-poll="1000">1 s</button>
             <button type="button" class="btn poll settings-btn" data-poll="2000">2 s</button>
           </div>
-          <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-temp-alert" /> <span data-i18n="optTempAlert">Уведомление при превышении температуры CPU/GPU выше 85°C</span></label>
+          <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-temp-alert" /> <span data-i18n="optTempAlert">Уведомление при превышении температуры CPU/GPU</span></label>
+          <div class="settings-slider-row" id="thermal-threshold-row" style="margin-top:10px;">
+            <div class="settings-slider-header row-between" style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;">
+              <span data-i18n="thermalThresholdLabel">Порог тревоги по температуре</span>
+              <b id="thermal-threshold-val" style="color:var(--text-bright,#fff);">85°C</b>
+            </div>
+            <input type="range" id="opt-thermal-threshold" min="75" max="95" step="1" value="85" class="settings-slider" style="width:100%;cursor:pointer;" />
+          </div>
         </div>
 
         <div class="settings-card settings-group">

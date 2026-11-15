@@ -83,6 +83,8 @@ export function ExportDiagnosticReport(arg1:string):Promise<main.DiagnosticExpor
 
 export function FreezeProcess(arg1:number):Promise<void>;
 
+export function GenerateDiagnosticReport():Promise<string>;
+
 export function GetActiveGameStatus():Promise<main.ActiveGameStatus>;
 
 export function GetAdvancedModeState():Promise<main.AdvancedModeState>;

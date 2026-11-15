@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -112,6 +113,7 @@ type App struct {
 	cachedTempLabelEn  string
 	lastDisk           time.Time
 	cachedDisks        []DiskMetrics
+	diskCollecting     atomic.Bool
 	lastVamp           time.Time
 
 	sessionStart      time.Time
@@ -289,6 +291,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	nvmlShutdown()
 	a.stopTray()
 	DestroyLingeringConflictWindows()
 	setGameTimerPeriod(false)
@@ -534,12 +537,36 @@ func (a *App) disksForTab(tab string, now time.Time) []DiskMetrics {
 	if tab != "overview" || !due {
 		return cached
 	}
-	disks := a.collectDisks(now)
-	a.mu.Lock()
-	a.cachedDisks = append([]DiskMetrics(nil), disks...)
-	a.lastDisk = time.Now()
-	a.mu.Unlock()
-	return disks
+
+	if !a.diskCollecting.CompareAndSwap(false, true) {
+		return cached
+	}
+
+	ch := make(chan []DiskMetrics, 1)
+	go func() {
+		defer a.diskCollecting.Store(false)
+		ch <- a.collectDisks(now)
+	}()
+
+	select {
+	case disks := <-ch:
+		a.mu.Lock()
+		a.cachedDisks = append([]DiskMetrics(nil), disks...)
+		a.lastDisk = time.Now()
+		a.mu.Unlock()
+		return disks
+	case <-time.After(500 * time.Millisecond):
+		// Slow HDD or hanging drive: return cached snapshot immediately and store result when ready
+		go func() {
+			if disks, ok := <-ch; ok && len(disks) > 0 {
+				a.mu.Lock()
+				a.cachedDisks = append([]DiskMetrics(nil), disks...)
+				a.lastDisk = time.Now()
+				a.mu.Unlock()
+			}
+		}()
+		return cached
+	}
 }
 
 func (a *App) batteryCached(now time.Time) BatteryMetrics {
@@ -956,13 +983,17 @@ func (a *App) TriggerThermalCheck(temp float64) {
 		a.thermalArmed = false
 		return
 	}
-	if temp > 85 {
+	threshold := float64(a.prefs.ThermalAlertThreshold)
+	if threshold < 75 || threshold > 95 {
+		threshold = 85
+	}
+	if temp > threshold {
 		if a.hotSince.IsZero() {
 			a.hotSince = now
 		}
 		if now.Sub(a.hotSince) >= time.Duration(thermalHoldSec)*time.Second && !a.thermalArmed {
 			a.thermalArmed = true
-			go a.emitThermalAlarm(temp)
+			go a.emitThermalAlarm(temp, threshold)
 		}
 		return
 	}
@@ -970,7 +1001,7 @@ func (a *App) TriggerThermalCheck(temp float64) {
 	a.thermalArmed = false
 }
 
-func (a *App) emitThermalAlarm(temp float64) {
+func (a *App) emitThermalAlarm(temp float64, threshold float64) {
 	defer func() {
 		if r := recover(); r != nil {
 			logCrash("emitThermalAlarm", r)
@@ -978,12 +1009,12 @@ func (a *App) emitThermalAlarm(temp float64) {
 	}()
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
 	title := "PulseCore Emergency Hardware Alarm"
-	body := fmt.Sprintf("CPU temperature %.1f°C exceeded 85°C for %ds. Consider Silent mode.", temp, thermalHoldSec)
+	body := fmt.Sprintf("CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.", temp, threshold, thermalHoldSec)
 	showWindowsToast(title, body)
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "thermal:alarm", map[string]interface{}{
 			"temperature": temp,
-			"limit":       thermalLimitC,
+			"limit":       threshold,
 		})
 	}
 }

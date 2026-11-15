@@ -216,6 +216,12 @@ func (a *App) BuildDiagnosticReport() DiagnosticReport {
 	}
 }
 
+// GenerateDiagnosticReport returns the full plain-text diagnostic report suitable for copying to clipboard.
+func (a *App) GenerateDiagnosticReport() string {
+	rep := a.BuildDiagnosticReport()
+	return reportToTXT(rep)
+}
+
 // ExportDiagnosticReport builds TXT or JSON content for local save.
 func (a *App) ExportDiagnosticReport(format string) DiagnosticExport {
 	format = strings.ToLower(strings.TrimSpace(format))

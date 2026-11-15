@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "分",
   "homeRecommendationsTitle": "建议执行的优化",
   "homeDeductionsSub": "已扣除 {pts} 分 · 点击项目或执行优化",
-  "homeAllGoodSubOptimal": "未发现任何异常 · 系统运行状态最佳"
+  "homeAllGoodSubOptimal": "未发现任何异常 · 系统运行状态最佳",
+  "copySupportReport": "复制支持诊断报告",
+  "supportReportCopied": "支持报告已复制到剪贴板",
+  "supportReportCopyError": "复制报告失败",
+  "diskCleanShaderRebuildNotice": "着色器缓存将在下次启动游戏时自动重建。",
+  "delayedStartupTitle": "延迟启动等待时间",
+  "delayedStartup30": "30 秒",
+  "delayedStartup60": "60 秒（默认）",
+  "delayedStartup120": "120 秒",
+  "thermalThresholdLabel": "温度报警阈值"
 }

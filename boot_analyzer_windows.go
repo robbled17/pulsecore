@@ -87,7 +87,8 @@ func isProtectedStartupItem(name, command string) bool {
 		"nvidia", "nvcontainer", "nvcpl", "nvdisplay",
 		"amd", "radeon", "amddvr", "amdow",
 		"intel graphics", "igfx", "igfxtray",
-		"securityhealthsystray", "securityhealthhost",
+		"securityhealthsystray", "securityhealthhost", "securityhealth",
+		"windows hello", "bioiso", "ngc", "windefend", "msmpeng", "smartscreen",
 		"ctfmon", "pulsecore",
 	}
 	for _, term := range protectedTerms {
@@ -96,6 +97,17 @@ func isProtectedStartupItem(name, command string) bool {
 		}
 	}
 	return false
+}
+
+func delayedTaskDelayArg(delaySec int) string {
+	switch delaySec {
+	case 30:
+		return "0000:30"
+	case 120:
+		return "0002:00"
+	default:
+		return "0001:00"
+	}
 }
 
 // parseEvent100XML extracts boot timing metrics from Event 100 XML.
@@ -675,9 +687,10 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 			if err := writeStartupApproved(root, approvedKeyPath, valName, false); err != nil {
 				return err
 			}
-			// Create delayed task for 60s
+			// Create delayed task
+			delayArg := delayedTaskDelayArg(a.getDelayedStartupDelaySec())
 			if cmd != "" {
-				cmdArgs := []string{"/create", "/tn", taskName, "/tr", cmd, "/sc", "onlogon", "/delay", "0001:00", "/f", "/rl", "limited"}
+				cmdArgs := []string{"/create", "/tn", taskName, "/tr", cmd, "/sc", "onlogon", "/delay", delayArg, "/f", "/rl", "limited"}
 				c := exec.Command("schtasks", cmdArgs...)
 				c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 				_ = c.Run()
@@ -718,7 +731,8 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 				targetFolder = filepath.Join(os.Getenv("ProgramData"), `Microsoft\Windows\Start Menu\Programs\Startup`)
 			}
 			fullPath := filepath.Join(targetFolder, fileName)
-			cmdArgs := []string{"/create", "/tn", taskName, "/tr", `"` + fullPath + `"`, "/sc", "onlogon", "/delay", "0001:00", "/f", "/rl", "limited"}
+			delayArg := delayedTaskDelayArg(a.getDelayedStartupDelaySec())
+			cmdArgs := []string{"/create", "/tn", taskName, "/tr", `"` + fullPath + `"`, "/sc", "onlogon", "/delay", delayArg, "/f", "/rl", "limited"}
 			c := exec.Command("schtasks", cmdArgs...)
 			c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 			_ = c.Run()

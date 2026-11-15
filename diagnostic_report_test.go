@@ -40,3 +40,12 @@ func TestFilepathBaseSafe(t *testing.T) {
 		t.Fatal("base")
 	}
 }
+
+func TestGenerateDiagnosticReport(t *testing.T) {
+	a := &App{}
+	a.metrics.CPUName = "TestCPU"
+	content := a.GenerateDiagnosticReport()
+	if !strings.Contains(content, "Диагностический отчёт PulseCore") {
+		t.Fatalf("expected report header in content: %s", content)
+	}
+}

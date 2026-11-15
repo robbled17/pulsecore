@@ -148,6 +148,11 @@ type shellExecuteInfoW struct {
 
 // queryRecycleBinInfo queries SHQueryRecycleBinW (all drives). Returns (size, items, err).
 func queryRecycleBinInfo() (int64, int64, error) {
+	return queryRecycleBinInfoDrive("")
+}
+
+// queryRecycleBinInfoDrive queries SHQueryRecycleBinW for a specific drive (e.g. "C" or "C:\"), or all drives if empty.
+func queryRecycleBinInfoDrive(drive string) (int64, int64, error) {
 	// SHQUERYRBINFO: DWORD cbSize, padding, int64 i64Size, int64 i64NumItems.
 	var info struct {
 		cbSize uint32
@@ -156,7 +161,14 @@ func queryRecycleBinInfo() (int64, int64, error) {
 		items  int64
 	}
 	info.cbSize = uint32(unsafe.Sizeof(info))
-	r, _, err := procSHQueryRecycleBinW.Call(0, uintptr(unsafe.Pointer(&info)))
+	var pszRoot uintptr
+	if drive != "" {
+		d := normalizeDriveLetter(drive)
+		if d != "" {
+			pszRoot = uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(d + `:\`)))
+		}
+	}
+	r, _, err := procSHQueryRecycleBinW.Call(pszRoot, uintptr(unsafe.Pointer(&info)))
 	if r != 0 {
 		return -1, -1, err
 	}
@@ -174,19 +186,31 @@ func queryRecycleBinInfo() (int64, int64, error) {
 // emptyRecycleBinNative calls SHEmptyRecycleBinW for all drives (hwnd=0, pszRootPath=nil).
 // It verifies bin state beforehand to avoid ERROR_FILE_NOT_FOUND when already empty.
 func emptyRecycleBinNative() error {
-	size, items, err := queryRecycleBinInfo()
+	return emptyRecycleBinNativeDrive("")
+}
+
+// emptyRecycleBinNativeDrive calls SHEmptyRecycleBinW for a specific drive (e.g. "C") or all drives if empty.
+func emptyRecycleBinNativeDrive(drive string) error {
+	size, items, err := queryRecycleBinInfoDrive(drive)
 	if err == nil && (size == 0 || items == 0) {
 		return nil
 	}
+	var pszRoot uintptr
+	if drive != "" {
+		d := normalizeDriveLetter(drive)
+		if d != "" {
+			pszRoot = uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(d + `:\`)))
+		}
+	}
 	r, _, callErr := procSHEmptyRecycleBinW.Call(
 		0,
-		0, // nil = all bins
+		pszRoot,
 		uintptr(sherbNoConfirmation|sherbNoProgressUI|sherbNoSound),
 	)
 	if r != 0 {
 		// S_OK == 0; non-zero HRESULT
 		// If call returned an error, recheck if the recycle bin is actually empty now
-		sizeAfter, itemsAfter, errAfter := queryRecycleBinInfo()
+		sizeAfter, itemsAfter, errAfter := queryRecycleBinInfoDrive(drive)
 		if errAfter == nil && (sizeAfter == 0 || itemsAfter == 0) {
 			return nil
 		}

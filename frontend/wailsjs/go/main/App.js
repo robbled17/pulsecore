@@ -162,6 +162,10 @@ export function FreezeProcess(arg1) {
   return window['go']['main']['App']['FreezeProcess'](arg1);
 }
 
+export function GenerateDiagnosticReport() {
+  return window['go']['main']['App']['GenerateDiagnosticReport']();
+}
+
 export function GetActiveGameStatus() {
   return window['go']['main']['App']['GetActiveGameStatus']();
 }

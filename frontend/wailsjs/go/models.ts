@@ -3546,6 +3546,8 @@ export namespace main {
 	    miniHudOpacityPercent: number;
 	    miniHudAcrylic: boolean;
 	    conflictWatcherEnabled: boolean;
+	    delayedStartupSec: number;
+	    thermalAlertThreshold: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new appPrefs(source);
@@ -3567,6 +3569,8 @@ export namespace main {
 	        this.miniHudOpacityPercent = source["miniHudOpacityPercent"];
 	        this.miniHudAcrylic = source["miniHudAcrylic"];
 	        this.conflictWatcherEnabled = source["conflictWatcherEnabled"];
+	        this.delayedStartupSec = source["delayedStartupSec"];
+	        this.thermalAlertThreshold = source["thermalAlertThreshold"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

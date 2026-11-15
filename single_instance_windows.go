@@ -30,16 +30,38 @@ func acquireSingleInstance() bool {
 	return true
 }
 
-var bringInstanceCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-	user32 := windows.NewLazySystemDLL("user32.dll")
-	procGetWindowTextW := user32.NewProc("GetWindowTextW")
-	procShowWindow := user32.NewProc("ShowWindow")
-	procSetForegroundWindow := user32.NewProc("SetForegroundWindow")
+func isMainAppWindowTitle(txt string) bool {
+	trimmed := strings.TrimSpace(txt)
+	if trimmed == "PulseCore" {
+		return true
+	}
+	if strings.HasPrefix(trimmed, "PulseCore") {
+		lower := strings.ToLower(trimmed)
+		if strings.Contains(lower, "tray") ||
+			strings.Contains(lower, "conflict") ||
+			strings.Contains(lower, "hud") ||
+			strings.Contains(lower, "overlay") ||
+			strings.Contains(lower, "helper") {
+			return false
+		}
+		return true
+	}
+	return false
+}
 
+var (
+	user32DLL               = windows.NewLazySystemDLL("user32.dll")
+	procGetWindowTextW      = user32DLL.NewProc("GetWindowTextW")
+	procShowWindow          = user32DLL.NewProc("ShowWindow")
+	procSetForegroundWindow = user32DLL.NewProc("SetForegroundWindow")
+	procEnumWindowsSingle   = user32DLL.NewProc("EnumWindows")
+)
+
+var bringInstanceCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 	var buf [256]uint16
 	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 256)
 	txt := windows.UTF16ToString(buf[:])
-	if strings.Contains(txt, "PulseCore") {
+	if isMainAppWindowTitle(txt) {
 		procShowWindow.Call(hwnd, 9 /* SW_RESTORE */)
 		procSetForegroundWindow.Call(hwnd)
 		return 0
@@ -48,7 +70,5 @@ var bringInstanceCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr 
 })
 
 func bringExistingInstanceToFront() {
-	user32 := windows.NewLazySystemDLL("user32.dll")
-	procEnumWindows := user32.NewProc("EnumWindows")
-	procEnumWindows.Call(bringInstanceCb, 0)
+	procEnumWindowsSingle.Call(bringInstanceCb, 0)
 }

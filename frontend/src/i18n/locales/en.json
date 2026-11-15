@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "pts",
   "homeRecommendationsTitle": "Here's what you can do",
   "homeDeductionsSub": "{pts} pts deducted · Click an item or run optimization",
-  "homeAllGoodSubOptimal": "No issues found · System running optimally"
+  "homeAllGoodSubOptimal": "No issues found · System running optimally",
+  "copySupportReport": "Copy support report",
+  "supportReportCopied": "Support report copied to clipboard",
+  "supportReportCopyError": "Failed to copy report",
+  "diskCleanShaderRebuildNotice": "Shader cache will be rebuilt automatically next time games start.",
+  "delayedStartupTitle": "Delayed startup interval",
+  "delayedStartup30": "30 seconds",
+  "delayedStartup60": "60 seconds (default)",
+  "delayedStartup120": "120 seconds",
+  "thermalThresholdLabel": "Thermal alert threshold"
 }

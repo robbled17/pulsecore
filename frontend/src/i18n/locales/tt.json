@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "б.",
   "homeRecommendationsTitle": "Тәкъдим ителгән гамәлләр",
   "homeDeductionsSub": "{pts} балл алынды · Элементка басыгыз яки оптимизация ясагыз",
-  "homeAllGoodSubOptimal": "Кире яклар табылмады · Система оптималь эшли"
+  "homeAllGoodSubOptimal": "Кире яклар табылмады · Система оптималь эшли",
+  "copySupportReport": "Ярдәм хисабын күчерү",
+  "supportReportCopied": "Ярдәм хисабы алмашу буферына күчерелде",
+  "supportReportCopyError": "Хисапны күчереп булмады",
+  "diskCleanShaderRebuildNotice": "Шейдерлар кэшы уеннарны киләсе тапкыр кабызганда автоматик рәвештә яңадан төзеләчәк.",
+  "delayedStartupTitle": "Кичектерелгән башлап җибәрү тоткарлыгы",
+  "delayedStartup30": "30 секунд",
+  "delayedStartup60": "60 секунд (гадәти)",
+  "delayedStartup120": "120 секунд",
+  "thermalThresholdLabel": "Температура сигнализациясе чиге"
 }

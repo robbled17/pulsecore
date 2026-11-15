@@ -37,6 +37,10 @@ type appPrefs struct {
 	MiniHUDOpacityPercent int  `json:"miniHudOpacityPercent"`
 	MiniHUDAcrylic        bool `json:"miniHudAcrylic"`
 	ConflictWatcherEnabled bool `json:"conflictWatcherEnabled"`
+	// DelayedStartupSec: 30 | 60 | 120 (default 60)
+	DelayedStartupSec int `json:"delayedStartupSec"`
+	// ThermalAlertThreshold: 75..95 (default 85)
+	ThermalAlertThreshold int `json:"thermalAlertThreshold"`
 }
 
 func defaultPrefs() appPrefs {
@@ -47,6 +51,8 @@ func defaultPrefs() appPrefs {
 		ShowTrayTemp:           true,
 		ConflictWatcherEnabled: true,
 		EcoExitPolicy:          "ask",
+		DelayedStartupSec:      60,
+		ThermalAlertThreshold:  85,
 		MiniHUDPosX:            -1,
 		MiniHUDPosY:            -1,
 		MiniHUDOpacityPercent:  80,
@@ -81,6 +87,12 @@ func (a *App) loadPrefs() {
 	}
 	if p.EcoExitPolicy == "" {
 		p.EcoExitPolicy = "ask"
+	}
+	if p.DelayedStartupSec != 30 && p.DelayedStartupSec != 60 && p.DelayedStartupSec != 120 {
+		p.DelayedStartupSec = 60
+	}
+	if p.ThermalAlertThreshold < 75 || p.ThermalAlertThreshold > 95 {
+		p.ThermalAlertThreshold = 85
 	}
 	if p.MiniHUDOpacityPercent != 60 && p.MiniHUDOpacityPercent != 80 && p.MiniHUDOpacityPercent != 100 {
 		p.MiniHUDOpacityPercent = 80
@@ -179,6 +191,12 @@ func (a *App) SetBehaviorSettings(p appPrefs) error {
 	} else {
 		p.ShowTrayTemp = p.ShowTempOnTray
 	}
+	if p.DelayedStartupSec != 30 && p.DelayedStartupSec != 60 && p.DelayedStartupSec != 120 {
+		p.DelayedStartupSec = 60
+	}
+	if p.ThermalAlertThreshold < 75 || p.ThermalAlertThreshold > 95 {
+		p.ThermalAlertThreshold = 85
+	}
 	if err := a.savePrefs(p); err != nil {
 		return err
 	}
@@ -187,6 +205,15 @@ func (a *App) SetBehaviorSettings(p appPrefs) error {
 	a.mu.Unlock()
 	a.UpdateTrayIconNow()
 	return nil
+}
+
+func (a *App) getDelayedStartupDelaySec() int {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if a.prefs.DelayedStartupSec == 30 || a.prefs.DelayedStartupSec == 60 || a.prefs.DelayedStartupSec == 120 {
+		return a.prefs.DelayedStartupSec
+	}
+	return 60
 }
 
 func setWindowsAutoStart(enable bool) error {

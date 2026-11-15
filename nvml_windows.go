@@ -201,6 +201,20 @@ func (n *nvmlAPI) sample() nvmlSample {
 	return out
 }
 
+func (n *nvmlAPI) shutdown() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if !n.initOK || n.shutdownFn == nil {
+		return
+	}
+	_, _, _ = n.shutdownFn.Call()
+	n.initOK = false
+}
+
+func nvmlShutdown() {
+	nvmlGlobal.shutdown()
+}
+
 func readGPUViaNVML() nvmlSample {
 	return nvmlGlobal.sample()
 }

@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "点",
   "homeRecommendationsTitle": "推奨される対応",
   "homeDeductionsSub": "{pts} 点減点 · 項目をクリックまたは最適化を実行",
-  "homeAllGoodSubOptimal": "問題は見つかりませんでした · システムは正常に稼働しています"
+  "homeAllGoodSubOptimal": "問題は見つかりませんでした · システムは正常に稼働しています",
+  "copySupportReport": "サポートレポートをコピー",
+  "supportReportCopied": "サポートレポートをクリップボードにコピーしました",
+  "supportReportCopyError": "レポートのコピーに失敗しました",
+  "diskCleanShaderRebuildNotice": "シェーダーキャッシュは、次回ゲーム起動時に自動的に再構築されます。",
+  "delayedStartupTitle": "遅延起動の待機時間",
+  "delayedStartup30": "30秒",
+  "delayedStartup60": "60秒（デフォルト）",
+  "delayedStartup120": "120秒",
+  "thermalThresholdLabel": "温度アラートしきい値"
 }

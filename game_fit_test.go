@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEvaluateGameFit_Excellent(t *testing.T) {
 	sys := SystemPowerProfile{GPUPowerScore: 85, CPUPowerScore: 70, VRAMGB: 12, RAMGB: 32, CPUCores: 8}
@@ -62,5 +65,21 @@ func TestEvaluateGameFit_Pre2017ExcellentOn6GB(t *testing.T) {
 	}
 	if req.High.ReqVRAMGB > 3 {
 		t.Fatalf("year cap failed: High VRAM=%.1f", req.High.ReqVRAMGB)
+	}
+}
+
+func TestEvaluateGameFit_TightGPUPowerWithVRAMSurplus(t *testing.T) {
+	sys := SystemPowerProfile{GPUPowerScore: 50, CPUPowerScore: 80, VRAMGB: 12, RAMGB: 32, CPUCores: 8}
+	req := gameReqSet{
+		Low:      gameReq{ReqGPUScore: 30, ReqCPUScore: 30, ReqVRAMGB: 4},
+		High:     gameReq{ReqGPUScore: 70, ReqCPUScore: 50, ReqVRAMGB: 8},
+		ReqRAMGB: 16,
+	}
+	verdict, _, _, _, rRu, _ := EvaluateGameFitUnified(sys, GameInfo{ID: "test"}, req)
+	if verdict != "tight" {
+		t.Fatalf("expected tight, got %s", verdict)
+	}
+	if !strings.Contains(rRu, "по мощности GPU") || !strings.Contains(rRu, "VRAM 12 ГБ с запасом") {
+		t.Fatalf("expected reason with VRAM surplus, got %q", rRu)
 	}
 }

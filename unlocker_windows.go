@@ -48,6 +48,53 @@ type LockProcessInfo struct {
 	ExePath     string `json:"exePath"`
 }
 
+// cmdlineContainsPath checks if cmdline references targetPath as an exact argument, path token, or prefix.
+func cmdlineContainsPath(cmdline, targetPath string) bool {
+	t := strings.ToLower(filepath.Clean(strings.TrimSpace(targetPath)))
+	if t == "" || cmdline == "" {
+		return false
+	}
+	cmdLower := strings.ToLower(cmdline)
+	idx := 0
+	for {
+		pos := strings.Index(cmdLower[idx:], t)
+		if pos == -1 {
+			break
+		}
+		actualPos := idx + pos
+		endPos := actualPos + len(t)
+
+		// Predecessor boundary: start of string, whitespace, quotes, equals sign, comma, semicolon
+		validPrefix := false
+		if actualPos == 0 {
+			validPrefix = true
+		} else {
+			prevChar := cmdLower[actualPos-1]
+			if prevChar == ' ' || prevChar == '\t' || prevChar == '"' || prevChar == '\'' || prevChar == '=' || prevChar == ',' || prevChar == ';' {
+				validPrefix = true
+			}
+		}
+
+		// Successor boundary: end of string, whitespace, quotes, path separators, comma, semicolon
+		validSuffix := false
+		if endPos >= len(cmdLower) {
+			validSuffix = true
+		} else {
+			nextChar := cmdLower[endPos]
+			if nextChar == ' ' || nextChar == '\t' || nextChar == '"' || nextChar == '\'' || nextChar == ',' || nextChar == ';' || nextChar == '\\' || nextChar == '/' {
+				validSuffix = true
+			}
+		}
+
+		if validPrefix && validSuffix {
+			return true
+		}
+
+		idx = actualPos + 1
+	}
+	return false
+}
+
 // isPathUnderTarget returns true if path is equal to target or is a descendant of target.
 func isPathUnderTarget(path, target string) bool {
 	p := strings.ToLower(filepath.Clean(strings.TrimSpace(path)))
@@ -335,10 +382,10 @@ func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
 				}
 			}
 
-			// 3. Check process command line arguments
+			// 3. Check process command line arguments (strict token/boundary matching)
 			if !matched {
 				if cmdline, err := p.Cmdline(); err == nil && cmdline != "" {
-					if strings.Contains(strings.ToLower(cmdline), strings.ToLower(targetPath)) {
+					if cmdlineContainsPath(cmdline, targetPath) {
 						matched = true
 					}
 				}

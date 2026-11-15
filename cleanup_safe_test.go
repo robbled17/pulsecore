@@ -12,10 +12,26 @@ func TestCleanupPathBlocksPersonal(t *testing.T) {
 		`C:\Users\Rob\Downloads\setup.exe`,
 		`C:\Users\Rob\Desktop\note.txt`,
 		`C:\Users\Rob\AppData\Local\Google\Chrome\User Data\Default\Login Data`,
+		`D:\Documents\important.docx`,
+		`D:\Windows\System32\kernel32.dll`,
+		`E:\Program Files\App\data.db`,
 	}
 	for _, p := range blocked {
 		if isSafeCleanupPath(p) {
 			t.Fatalf("must block %s", p)
+		}
+	}
+}
+
+func TestCleanupPathAllowsMultiDriveGameCaches(t *testing.T) {
+	allowed := []string{
+		`D:\SteamLibrary\steamapps\shadercache\dx12_pipeline.bin`,
+		`E:\Games\SteamLibrary\steamapps\downloading\chunk.tmp`,
+		`D:\$Recycle.Bin\S-1-5-21-123456\$R1234.tmp`,
+	}
+	for _, p := range allowed {
+		if !isSafeCleanupPath(p) {
+			t.Fatalf("expected path to be allowed: %s", p)
 		}
 	}
 }

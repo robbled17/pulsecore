@@ -98,9 +98,9 @@ func (a *App) scanAndCachePreviewCleanup(drive string) []CleanupCat {
 				}
 			case "recycle":
 				cat.Irreversible = true
-				rbBytes, _, _ := queryRecycleBinInfo()
+				rbBytes, _, _ := queryRecycleBinInfoDrive(drive)
 				if rbBytes < 0 {
-					rbBytes = recycleBinSizeApprox()
+					rbBytes = recycleBinSizeApproxForDrive(drive)
 				}
 				if rbBytes < 0 {
 					rbBytes = 0
@@ -203,7 +203,7 @@ func (a *App) ApplyDiskCleanupForDrive(drive string, cats []string) CleanupResul
 			if !allowed[id] {
 				continue
 			}
-			st := cleanOneCategoryFileByFile(id)
+			st := cleanOneCategoryFileByFileForDrive(d, id)
 			catStats[id] = st
 			if st.freed > 0 {
 				n += st.freed
@@ -473,6 +473,12 @@ func isSafeCleanupPath(p string) bool {
 			return false
 		}
 	}
+
+	// Reject symlinks to prevent following traversal outside safe directories
+	if fi, err := os.Lstat(p); err == nil && (fi.Mode()&os.ModeSymlink != 0) {
+		return false
+	}
+
 	temp := strings.ToLower(filepath.Clean(os.TempDir()))
 	la := strings.ToLower(filepath.Clean(os.Getenv("LOCALAPPDATA")))
 	ro := strings.ToLower(filepath.Clean(os.Getenv("APPDATA")))
@@ -513,8 +519,25 @@ func isSafeCleanupPath(p string) bool {
 		filepath.Join(home, ".cache", "pip"),
 		filepath.Join(home, ".cargo", "registry", "cache"),
 		`c:\programdata\microsoft\windows\wer`,
-		`c:\$recycle.bin`,
 	}
+
+	// Dynamically register safe prefixes for all drives: Recycle Bins & game caches
+	for r := 'a'; r <= 'z'; r++ {
+		d := string(r)
+		safePrefixes = append(safePrefixes,
+			d+`:\$recycle.bin`,
+			d+`:\steamlibrary\steamapps\shadercache`,
+			d+`:\steamlibrary\steamapps\downloading`,
+			d+`:\games\steamlibrary\steamapps\shadercache`,
+			d+`:\games\steamlibrary\steamapps\downloading`,
+			d+`:\games\steamapps\shadercache`,
+			d+`:\games\steamapps\downloading`,
+			d+`:\steamapps\shadercache`,
+			d+`:\steamapps\downloading`,
+			d+`:\epic games\launcher\vaultcache`,
+		)
+	}
+
 	matchedPrefix := false
 	for _, pref := range safePrefixes {
 		pref = strings.ToLower(filepath.Clean(pref))
@@ -548,27 +571,46 @@ type cleanStats struct {
 	locked int64
 }
 
-func cleanOneCategoryFileByFile(id string) cleanStats {
+func cleanOneCategoryFileByFileForDrive(drive, id string) cleanStats {
+	isSystemDrive := strings.EqualFold(drive, "C") || drive == ""
 	switch id {
 	case "shader_cache":
-		return cleanDirsFileByFile(shaderCacheDirs(), 5)
+		if isSystemDrive {
+			return cleanDirsFileByFile(append(shaderCacheDirs(), steamShaderCacheDirsForDrive(drive)...), 5)
+		}
+		return cleanDirsFileByFile(steamShaderCacheDirsForDrive(drive), 5)
 	case "recycle":
-		return cleanStats{freed: emptyRecycleBin()}
+		return cleanStats{freed: emptyRecycleBinForDrive(drive)}
 	case "app_cache":
-		return cleanDirsFileByFile(appCacheDirs(), 5)
+		if isSystemDrive {
+			return cleanDirsFileByFile(appCacheDirs(), 5)
+		}
 	case "user_temp":
-		return cleanUserTempFileByFile()
+		if isSystemDrive {
+			return cleanUserTempFileByFile()
+		}
 	case "browser_cache":
-		return cleanBrowserCachesFileByFile()
+		if isSystemDrive {
+			return cleanBrowserCachesFileByFile()
+		}
 	case "thumbnails":
-		return cleanThumbcachesFileByFile()
+		if isSystemDrive {
+			return cleanThumbcachesFileByFile()
+		}
 	case "wer_reports":
-		return cleanDirsFileByFile(werDirs(), 4)
+		if isSystemDrive {
+			return cleanDirsFileByFile(werDirs(), 4)
+		}
 	case "package_cache":
-		return cleanDirsFileByFile(packageCacheDirs(), 4)
-	default:
-		return cleanStats{}
+		if isSystemDrive {
+			return cleanDirsFileByFile(packageCacheDirs(), 4)
+		}
 	}
+	return cleanStats{}
+}
+
+func cleanOneCategoryFileByFile(id string) cleanStats {
+	return cleanOneCategoryFileByFileForDrive("C", id)
 }
 
 func walkCleanFileByFile(root string, maxDepth int, olderThan time.Time, filter func(string, os.FileInfo) bool) cleanStats {
@@ -904,7 +946,15 @@ func cleanBrowserCaches() int64 {
 }
 
 func recycleBinSizeApprox() int64 {
-	root := `C:\$Recycle.Bin`
+	return recycleBinSizeApproxForDrive("C")
+}
+
+func recycleBinSizeApproxForDrive(drive string) int64 {
+	d := normalizeDriveLetter(drive)
+	if d == "" {
+		d = "C"
+	}
+	root := d + `:\$Recycle.Bin`
 	return dirSizeBudget(root, time.Now().Add(1200*time.Millisecond), 2)
 }
 
@@ -941,15 +991,19 @@ func dirSizeBudget(root string, deadline time.Time, maxDepth int) int64 {
 }
 
 func emptyRecycleBin() int64 {
-	size, items, _ := queryRecycleBinInfo()
+	return emptyRecycleBinForDrive("")
+}
+
+func emptyRecycleBinForDrive(drive string) int64 {
+	size, items, _ := queryRecycleBinInfoDrive(drive)
 	if size <= 0 || items <= 0 {
 		return 0
 	}
 	before := size
-	_ = emptyRecycleBinNative()
+	_ = emptyRecycleBinNativeDrive(drive)
 	// Brief settle for FS accounting.
 	time.Sleep(300 * time.Millisecond)
-	after, _, _ := queryRecycleBinInfo()
+	after, _, _ := queryRecycleBinInfoDrive(drive)
 	if after >= 0 && before > after {
 		return before - after
 	}

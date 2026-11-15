@@ -1003,5 +1003,14 @@
   "unitsPtsShort": "ұп.",
   "homeRecommendationsTitle": "Ұсынылатын әрекеттер",
   "homeDeductionsSub": "{pts} ұпай алынды · Тармақты басыңыз немесе оңтайландыруды орындаңыз",
-  "homeAllGoodSubOptimal": "Ақаулар табылмады · Жүйе оңтайлы жұмыс істеп тұр"
+  "homeAllGoodSubOptimal": "Ақаулар табылмады · Жүйе оңтайлы жұмыс істеп тұр",
+  "copySupportReport": "Қолдау есебін көшіру",
+  "supportReportCopied": "Қолдау есебі алмасу буферіне көшірілді",
+  "supportReportCopyError": "Есепті көшіру сәтсіз аяқталды",
+  "diskCleanShaderRebuildNotice": "Шейдерлер кэші ойындарды келесі рет іске қосқанда автоматты түрде қайта құрылады.",
+  "delayedStartupTitle": "Кейінге қалдырылған іске қосу кідірісі",
+  "delayedStartup30": "30 секунд",
+  "delayedStartup60": "60 секунд (әдепкі)",
+  "delayedStartup120": "120 секунд",
+  "thermalThresholdLabel": "Температуралық дабыл шегі"
 }

@@ -4120,6 +4120,28 @@ body.game-overlay-active #gameoverlay {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+#tab-settings .settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  max-width: 420px;
+}
+[data-theme="light"] #tab-settings .settings-slider {
+  background: rgba(15, 23, 42, 0.15);
+}
+#tab-settings .settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #38bdf8;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+}
 #tab-settings .settings-debug-toggle {
   margin-top: 14px;
   background: transparent;

@@ -165,8 +165,13 @@ func EvaluateGameFitUnified(sys SystemPowerProfile, game GameInfo, req gameReqSe
 			reasonRu = fmt.Sprintf("ОЗУ %.0f ГБ, рекомендуется %.0f ГБ", userRAM, recRAM)
 			reasonEn = fmt.Sprintf("RAM %.0f GB, recommended %.0f GB", userRAM, recRAM)
 		} else if (req.High.ReqGPUScore > 0 && gpuRec < 0.90) || (req.Low.ReqGPUScore > 0 && gpuMin < 0.95) {
-			reasonRu = "видеокарта подходит для средних настроек (для ультра рекомендуется более мощная)"
-			reasonEn = "GPU suitable for medium settings (more powerful GPU recommended for ultra)"
+			if userVRAM >= recVRAM && recVRAM > 0 && !sys.IsIntegrated {
+				reasonRu = fmt.Sprintf("по мощности GPU · VRAM %.0f ГБ с запасом", userVRAM)
+				reasonEn = fmt.Sprintf("by GPU performance · VRAM %.0f GB with headroom", userVRAM)
+			} else {
+				reasonRu = "видеокарта подходит для средних настроек (для ультра рекомендуется более мощная)"
+				reasonEn = "GPU suitable for medium settings (more powerful GPU recommended for ultra)"
+			}
 		}
 		return "tight", "warn", "Впритык", "Barely", reasonRu, reasonEn
 	}
@@ -259,6 +264,10 @@ func fitReason(sys SystemPowerProfile, min, rec gameReq, gpuMin, cpuMin, gpuRec,
 		return "процессор слабее минимальных требований",
 			"CPU is below minimum requirements"
 	case gpuRec < 0.95 && level == "tight":
+		if vramHave >= rec.ReqVRAMGB && rec.ReqVRAMGB > 0 && !sys.IsIntegrated {
+			return fmt.Sprintf("по мощности GPU · VRAM %.0f ГБ с запасом", vramHave),
+				fmt.Sprintf("by GPU performance · VRAM %.0f GB with headroom", vramHave)
+		}
 		return "видеокарта слабее рекомендованной",
 			"GPU is below recommended"
 	case cpuRec < 0.90 && level == "tight":

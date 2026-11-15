@@ -925,6 +925,8 @@ function readBehavior() {
     showTrayTemp: !!$('opt-tray-temp')?.checked,
     tempAlerts: !!$('opt-temp-alert')?.checked,
     ecoExitPolicy: $('opt-eco-exit')?.value || 'ask',
+    delayedStartupSec: Number($('opt-delayed-startup')?.value) || 60,
+    thermalAlertThreshold: Number($('opt-thermal-threshold')?.value) || 85,
     conflictWatcherEnabled: $('toggle-conflict-watcher') ? !!$('toggle-conflict-watcher').checked : ($('opt-conflict-watcher') ? !!$('opt-conflict-watcher').checked : true),
   }
 }
@@ -943,6 +945,12 @@ async function loadBehavior() {
     if ($('opt-tray-temp')) $('opt-tray-temp').checked = p.showTrayTemp !== undefined ? (p.showTrayTemp !== false) : (p.showTempOnTray !== false)
     if ($('opt-temp-alert')) $('opt-temp-alert').checked = p.tempAlerts !== false
     if ($('opt-eco-exit')) $('opt-eco-exit').value = p.ecoExitPolicy || 'ask'
+    if ($('opt-delayed-startup')) $('opt-delayed-startup').value = String(p.delayedStartupSec || 60)
+    const thresh = p.thermalAlertThreshold && p.thermalAlertThreshold >= 75 && p.thermalAlertThreshold <= 95 ? p.thermalAlertThreshold : 85
+    if ($('opt-thermal-threshold')) {
+      $('opt-thermal-threshold').value = String(thresh)
+      if ($('thermal-threshold-val')) $('thermal-threshold-val').textContent = `${thresh}°C`
+    }
     const watcherVal = p.conflictWatcherEnabled !== false
     if ($('toggle-conflict-watcher')) $('toggle-conflict-watcher').checked = watcherVal
     if ($('opt-conflict-watcher')) $('opt-conflict-watcher').checked = watcherVal
@@ -1162,6 +1170,11 @@ async function renderHome() {
               `
             }).join('')}
           </div>
+          <div class="home-deductions-footer" style="margin-top:12px;">
+            <button type="button" class="btn soft compact btn-copy-support-report" id="btn-copy-support-home" style="display:inline-flex;align-items:center;gap:6px;">
+              <span>📋</span> <span>${t('copySupportReport')}</span>
+            </button>
+          </div>
         `
       }
 
@@ -1283,23 +1296,31 @@ async function toggleReportPreview() {
 }
 
 async function copySupportReport() {
-  const format = $('report-format')?.value || 'txt'
-  let res
-  try { res = await ExportDiagnosticReport(format) } catch (err) {
+  let reportText = ''
+  try {
+    if (window.go?.main?.App?.GenerateDiagnosticReport) {
+      reportText = await window.go.main.App.GenerateDiagnosticReport()
+    } else {
+      const format = $('report-format')?.value || 'txt'
+      const res = await ExportDiagnosticReport(format)
+      if (res?.ok && res.content) reportText = String(res.content)
+    }
+  } catch (err) {
     showToast(String(err), false, { holdMs: 5000 })
     return
   }
-  if (!res?.ok || !res.content) {
-    showToast(resultMsg(res, 'reportFail'), false, { holdMs: 5000 })
+  if (!reportText) {
+    showToast(t('supportReportCopyError'), false, { holdMs: 5000 })
     return
   }
   try {
-    await navigator.clipboard.writeText(String(res.content))
-    showToast(t('reportCopied'), true, { holdMs: 4000 })
+    await navigator.clipboard.writeText(reportText)
+    showToast(t('supportReportCopied'), true, { holdMs: 4000 })
   } catch (_) {
-    showToast(t('reportFail'), false, { holdMs: 5000 })
+    showToast(t('supportReportCopyError'), false, { holdMs: 5000 })
   }
 }
+window.__copySupportReport = copySupportReport
 
 async function exportReport(format) {
   let res
@@ -4427,7 +4448,7 @@ function gamePosterHTML(g) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name: game.name || 'Game', year, genre, cls: 'game-poster' })
-  return `<img class="game-poster" src="${src}" alt="${name}" width="200" height="300" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-poster" src="${src}" alt="${name}" width="200" height="300" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function compactCoverHTML(p, opts = {}) {
@@ -4441,7 +4462,7 @@ function compactCoverHTML(p, opts = {}) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name, year, genre, cls: 'game-cover', hideTitle })
-  return `<img class="game-cover" src="${src}" alt="" width="200" height="300" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-cover" src="${src}" alt="" width="200" height="300" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function genreBucket(g) {
@@ -4502,6 +4523,22 @@ function syncGamePanelPadding(open) {
   }
 }
 
+let gameGridRenderToken = 0
+
+function renderSingleGameCardHTML(g) {
+  const safeName = String(g.name || g.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const titleAttr = String(g.name || g.title || '').replace(/"/g, '&quot;')
+  const idAttr = String(g.id || '').replace(/"/g, '&quot;')
+  if (!idAttr || !safeName) return ''
+  return `
+    <button type="button" class="game-card ${g.id === selectedGameId ? 'active selected' : ''}" data-game="${idAttr}" title="${titleAttr}">
+      ${gamePosterHTML(g)}
+      <div class="game-card-body">
+        <div class="g-name title">${safeName}</div>
+      </div>
+    </button>`
+}
+
 function renderGameGrid() {
   const host = $('game-grid')
   if (!host) return
@@ -4530,23 +4567,29 @@ function renderGameGrid() {
     return
   }
   host.dataset.gridSig = sig
-  const frag = document.createDocumentFragment()
-  const tmp = document.createElement('div')
-  tmp.innerHTML = list.filter((g) => g && (g.name || g.title)).map((g) => {
-    const safeName = String(g.name || g.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const titleAttr = String(g.name || g.title || '').replace(/"/g, '&quot;')
-    const idAttr = String(g.id || '').replace(/"/g, '&quot;')
-    if (!idAttr || !safeName) return ''
-    return `
-    <button type="button" class="game-card ${g.id === selectedGameId ? 'active selected' : ''}" data-game="${idAttr}" title="${titleAttr}">
-      ${gamePosterHTML(g)}
-      <div class="game-card-body">
-        <div class="g-name title">${safeName}</div>
-      </div>
-    </button>`
-  }).join('')
-  while (tmp.firstChild) frag.appendChild(tmp.firstChild)
-  host.replaceChildren(frag)
+
+  const validGames = list.filter((g) => g && (g.name || g.title))
+  const renderToken = ++gameGridRenderToken
+  host.replaceChildren()
+
+  // Incremental batched rendering (10 cards per frame) to prevent layout thrashing and concurrent image spikes
+  let index = 0
+  const batchSize = 10
+  function appendBatch() {
+    if (renderToken !== gameGridRenderToken) return
+    const slice = validGames.slice(index, index + batchSize)
+    if (!slice.length) return
+    const frag = document.createDocumentFragment()
+    const tmp = document.createElement('div')
+    tmp.innerHTML = slice.map((g) => renderSingleGameCardHTML(g)).join('')
+    while (tmp.firstChild) frag.appendChild(tmp.firstChild)
+    host.appendChild(frag)
+    index += batchSize
+    if (index < validGames.length) {
+      requestAnimationFrame(appendBatch)
+    }
+  }
+  appendBatch()
 }
 
 let gamePanelLastFocus = null
@@ -5968,11 +6011,14 @@ async function renderDiskCleanCache(body, cachedCats = null) {
     const updatedStatus = body.querySelector('#dc-cache-status')
     if (updatedStatus) {
       updatedStatus.classList.remove('hidden')
-      updatedStatus.innerHTML = cleanCompareCardHTML(
+      const freedFormatted = formatBytesSmart(window.__lastCleanCompare.freed, true)
+      const noticeHtml = `<div class="dc-clean-rebuild-notice" style="margin-top:8px;font-size:12px;color:var(--text-muted,#94a3b8);line-height:1.4;">${t('diskCleanShaderRebuildNotice')}</div>`
+      const baseStatus = cleanCompareCardHTML(
         window.__lastCleanCompare.usedBefore,
         window.__lastCleanCompare.usedAfter,
         window.__lastCleanCompare.freed,
-      ) || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: formatBytesSmart(window.__lastCleanCompare.freed, true) })}</div>`
+      ) || `<div class="dc-status-ok">${t('smartFixCleanupDone', { gb: freedFormatted })}</div>`
+      updatedStatus.innerHTML = baseStatus + noticeHtml
     }
     renderHome().catch(() => {})
   })
@@ -6756,9 +6802,14 @@ function wireUI() {
     btn.addEventListener('click', () => applyTheme(btn.dataset.theme))
   })
   wireCustomDropdowns()
-  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'toggle-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
+  ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'toggle-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit', 'opt-delayed-startup'].forEach((id) => {
     $(id)?.addEventListener('change', saveBehavior)
   })
+  $('opt-thermal-threshold')?.addEventListener('input', (e) => {
+    const v = e.target.value
+    if ($('thermal-threshold-val')) $('thermal-threshold-val').textContent = `${v}°C`
+  })
+  $('opt-thermal-threshold')?.addEventListener('change', saveBehavior)
   $('opt-tray-temp')?.addEventListener('change', async () => {
     try {
       if (window.go?.main?.App?.UpdateTrayIconNow) {
@@ -6781,6 +6832,14 @@ function wireUI() {
   })
   $('btn-about-report-toggle')?.addEventListener('click', () => { toggleReportPreview().catch(() => {}) })
   $('btn-report-copy')?.addEventListener('click', () => { copySupportReport().catch(() => {}) })
+  $('btn-copy-support-lag')?.addEventListener('click', () => { copySupportReport().catch(() => {}) })
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-copy-support-report')
+    if (btn) {
+      e.preventDefault()
+      copySupportReport().catch(() => {})
+    }
+  })
 
   try {
     EventsOn('ui:tray-tip', () => {
@@ -7304,9 +7363,8 @@ function wireUI() {
       setActiveTab('lag')
       const card = $('boot-diag-card')
       if (card) {
-        bootCardExpanded = true
-        card.classList.add('expanded')
-        $('boot-diag-header')?.setAttribute('aria-expanded', 'true')
+        window.__bootCardExpanded = true
+        syncBootCardExpanded()
         try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (_) {}
       }
     }
