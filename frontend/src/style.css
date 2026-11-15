@@ -5547,17 +5547,27 @@ body.win11 .gameoverlay {
   width: 100%;
 }
 .home-deduction-item {
-  display: inline-flex;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
-  padding: 5px 10px;
+  padding: 6px 10px;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.4;
   color: #cbd5e1;
+  width: 100%;
+  box-sizing: border-box;
+}
+.home-deduction-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 .home-deduction-badge {
   font-family: inherit;
@@ -5571,7 +5581,31 @@ body.win11 .gameoverlay {
   border-radius: 4px;
   flex-shrink: 0;
 }
+.home-deduction-text {
+  min-width: 0;
+  word-break: break-word;
+}
 .home-deduction-text b {
   color: #f1f5f9;
   font-weight: 600;
+}
+.home-deduction-action {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  height: 26px;
+  line-height: 1;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  transition: all 0.15s ease;
+}
+.home-deduction-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #f8fafc;
 }

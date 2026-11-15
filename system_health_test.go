@@ -121,3 +121,86 @@ func TestHealthGrade(t *testing.T) {
 		t.Fatal("empty grade")
 	}
 }
+
+func TestApplyDiskSMARTHealthFactorNormalWear(t *testing.T) {
+	base := computeSystemHealth(sampleWin(10, 20, 45, true), 0, 0, 0, nil)
+	smart := DiskHealthReport{
+		OK:              true,
+		DriveLetter:     "C:",
+		StatusLevel:     DiskStatusGood,
+		HealthPercentOK: true,
+		HealthPercent:   99.0,
+		StatusWordRu:    "Хорошо",
+		StatusWordEn:    "Good",
+		HealthSourceRu:  "SATA SSD: атрибут износа ID 169 (0xA9)",
+		HealthSourceEn:  "SATA SSD: wear attribute ID 169 (0xA9)",
+	}
+	rep := applyDiskSMARTHealthFactor(base, smart)
+	for _, d := range rep.Deductions {
+		if d.Key == "disk_smart" {
+			t.Fatalf("expected 0 deductions for 99%% SSD health, got deduction: %+v", d)
+		}
+	}
+}
+
+func TestApplyDiskSMARTHealthFactorLowHealth(t *testing.T) {
+	base := computeSystemHealth(sampleWin(10, 20, 45, true), 0, 0, 0, nil)
+	smart := DiskHealthReport{
+		OK:              true,
+		DriveLetter:     "C:",
+		StatusLevel:     DiskStatusGood,
+		HealthPercentOK: true,
+		HealthPercent:   72.0,
+		StatusWordRu:    "Хорошо",
+		StatusWordEn:    "Good",
+	}
+	rep := applyDiskSMARTHealthFactor(base, smart)
+	found := false
+	for _, d := range rep.Deductions {
+		if d.Key == "disk_smart" {
+			found = true
+			if d.ActionID != "open_smart" {
+				t.Fatalf("expected ActionID open_smart, got %s", d.ActionID)
+			}
+			if d.ActionLabelRu != "S.M.A.R.T." {
+				t.Fatalf("expected ActionLabelRu S.M.A.R.T., got %s", d.ActionLabelRu)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected deduction for 72% health")
+	}
+}
+
+func TestDeductionActionsSet(t *testing.T) {
+	rep := computeSystemHealth(sampleWin(40, 50, 96, true), 0, 0, 0, nil)
+	for _, d := range rep.Deductions {
+		if d.ActionID == "" {
+			t.Fatalf("deduction %s has empty ActionID", d.Key)
+		}
+		if d.ActionLabelRu == "" || d.ActionLabelEn == "" {
+			t.Fatalf("deduction %s has missing action labels", d.Key)
+		}
+	}
+}
+
+func TestRunHomeActionDeductions(t *testing.T) {
+	app := &App{}
+	res := app.RunHomeAction("free_ram", "")
+	if !res.OK {
+		t.Fatalf("free_ram failed: %+v", res)
+	}
+	if res.FreedRAMMB <= 0 {
+		t.Fatalf("expected FreedRAMMB > 0, got %f", res.FreedRAMMB)
+	}
+
+	resStartup := app.RunHomeAction("open_startup", "")
+	if !resStartup.OK || resStartup.OpenTab != "lag" {
+		t.Fatalf("open_startup want OpenTab lag, got %+v", resStartup)
+	}
+
+	resSmart := app.RunHomeAction("open_smart", "")
+	if !resSmart.OK || resSmart.OpenTab != "disk_smart" {
+		t.Fatalf("open_smart want OpenTab disk_smart, got %+v", resSmart)
+	}
+}

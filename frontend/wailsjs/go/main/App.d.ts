@@ -351,6 +351,8 @@ export function ToggleMiniHUD(arg1:boolean):Promise<void>;
 
 export function TriggerThermalCheck(arg1:number):Promise<void>;
 
+export function TrimMemoryWorkingSet():Promise<main.HomeActionResult>;
+
 export function UninstallWithCleanup(arg1:string):Promise<main.UninstallAppResult>;
 
 export function WindowMaximisedState():Promise<boolean>;

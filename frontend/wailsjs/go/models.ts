@@ -1785,6 +1785,9 @@ export namespace main {
 	    points: number;
 	    detailRu: string;
 	    detailEn: string;
+	    actionId: string;
+	    actionLabelRu: string;
+	    actionLabelEn: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new HealthDeduction(source);
@@ -1798,6 +1801,9 @@ export namespace main {
 	        this.points = source["points"];
 	        this.detailRu = source["detailRu"];
 	        this.detailEn = source["detailEn"];
+	        this.actionId = source["actionId"];
+	        this.actionLabelRu = source["actionLabelRu"];
+	        this.actionLabelEn = source["actionLabelEn"];
 	    }
 	}
 	export class HealthFactor {

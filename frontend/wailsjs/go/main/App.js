@@ -698,6 +698,10 @@ export function TriggerThermalCheck(arg1) {
   return window['go']['main']['App']['TriggerThermalCheck'](arg1);
 }
 
+export function TrimMemoryWorkingSet() {
+  return window['go']['main']['App']['TrimMemoryWorkingSet']();
+}
+
 export function UninstallWithCleanup(arg1) {
   return window['go']['main']['App']['UninstallWithCleanup'](arg1);
 }

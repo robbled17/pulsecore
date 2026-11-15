@@ -39,12 +39,15 @@ type HealthHistoryPoint struct {
 
 // HealthDeduction explains how many points a factor cost vs a perfect 100.
 type HealthDeduction struct {
-	Key      string `json:"key"`
-	LabelRu  string `json:"labelRu"`
-	LabelEn  string `json:"labelEn"`
-	Points   int    `json:"points"` // points lost from overall score
-	DetailRu string `json:"detailRu"`
-	DetailEn string `json:"detailEn"`
+	Key           string `json:"key"`
+	LabelRu       string `json:"labelRu"`
+	LabelEn       string `json:"labelEn"`
+	Points        int    `json:"points"` // points lost from overall score
+	DetailRu      string `json:"detailRu"`
+	DetailEn      string `json:"detailEn"`
+	ActionID      string `json:"actionId"`
+	ActionLabelRu string `json:"actionLabelRu"`
+	ActionLabelEn string `json:"actionLabelEn"`
 }
 
 // SystemHealthReport is the UI payload for «Здоровье системы».
@@ -647,7 +650,14 @@ func applyDiskSMARTHealthFactor(rep SystemHealthReport, smart DiskHealthReport) 
 	status := "ok"
 	factorScore := 100.0
 	if smart.HealthPercentOK {
-		factorScore = smart.HealthPercent
+		if smart.StatusLevel == DiskStatusGood && smart.HealthPercent >= 80.0 {
+			factorScore = 100.0
+		} else {
+			factorScore = smart.HealthPercent
+			if factorScore < 80.0 && status == "ok" {
+				status = "watch"
+			}
+		}
 	}
 	switch smart.StatusLevel {
 	case DiskStatusCaution:
@@ -850,17 +860,46 @@ func buildDeductions(factors []HealthFactor, score int, wSum float64) []HealthDe
 
 	deductions := make([]HealthDeduction, len(allocs))
 	for i, a := range allocs {
+		actID, actRu, actEn := deductionAction(a.fl.f.Key)
 		deductions[i] = HealthDeduction{
-			Key:      a.fl.f.Key,
-			LabelRu:  a.fl.f.LabelRu,
-			LabelEn:  a.fl.f.LabelEn,
-			Points:   a.pts,
-			DetailRu: a.fl.detailRu,
-			DetailEn: a.fl.detailEn,
+			Key:           a.fl.f.Key,
+			LabelRu:       a.fl.f.LabelRu,
+			LabelEn:       a.fl.f.LabelEn,
+			Points:        a.pts,
+			DetailRu:      a.fl.detailRu,
+			DetailEn:      a.fl.detailEn,
+			ActionID:      actID,
+			ActionLabelRu: actRu,
+			ActionLabelEn: actEn,
 		}
 	}
 
 	return deductions
+}
+
+func deductionAction(key string) (actionID, labelRu, labelEn string) {
+	switch key {
+	case "system_disk":
+		return "free_disk", "Очистить", "Clean up"
+	case "ram", "signals":
+		return "free_ram", "Освободить", "Free up"
+	case "cpu_load":
+		return "eco_mode", "Ограничить", "Throttle"
+	case "startup":
+		return "open_startup", "Настроить", "Configure"
+	case "cpu_temp":
+		return "inspect_cpu", "Проверить", "Inspect"
+	case "gpu":
+		return "inspect_gpu", "Проверить", "Inspect"
+	case "disk_activity":
+		return "inspect_disk", "Проверить", "Inspect"
+	case "recent_lags":
+		return "open_lag", "Лаги", "Stutters"
+	case "disk_smart":
+		return "open_smart", "S.M.A.R.T.", "S.M.A.R.T."
+	default:
+		return "", "", ""
+	}
 }
 
 func healthGrade(score int) (string, string) {

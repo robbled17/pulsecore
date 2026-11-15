@@ -1145,10 +1145,18 @@ async function renderHome() {
             ${st.deductions.map((d) => {
               const detail = lang === 'en' ? (d.detailEn || d.detailRu) : (d.detailRu || d.detailEn)
               const label = lang === 'en' ? (d.labelEn || d.labelRu) : (d.labelRu || d.labelEn)
+              const actionLabel = (d.actionId && (t('homeDeductionAction_' + d.actionId) || (lang === 'en' ? (d.actionLabelEn || d.actionLabelRu) : (d.actionLabelRu || d.actionLabelEn)))) || ''
               return `
                 <div class="home-deduction-item">
-                  <span class="home-deduction-badge">−${d.points} ${t('unitsPtsShort')}</span>
-                  <span class="home-deduction-text"><b>${escapeHtml(label)}:</b> ${escapeHtml(detail)}</span>
+                  <div class="home-deduction-info">
+                    <span class="home-deduction-badge">−${d.points} ${t('unitsPtsShort')}</span>
+                    <span class="home-deduction-text"><b>${escapeHtml(label)}:</b> ${escapeHtml(detail)}</span>
+                  </div>
+                  ${d.actionId && actionLabel ? `
+                    <button type="button" class="btn soft compact home-deduction-action" data-home-action="${escapeHtml(d.actionId)}" data-home-arg="${escapeHtml(d.key || '')}">
+                      ${escapeHtml(actionLabel)}
+                    </button>
+                  ` : ''}
                 </div>
               `
             }).join('')}
@@ -7024,6 +7032,22 @@ function wireUI() {
     const msg = resultMsg(res)
     if (msg) showToast(msg, !!res?.ok, { holdMs: res?.canRevert ? 12000 : 5000 })
     if (res?.openTab) setActiveTab(res.openTab)
+    if (action === 'open_startup' || (res?.openTab === 'lag' && action === 'open_startup')) {
+      setActiveTab('lag')
+      const card = $('boot-diag-card')
+      if (card) {
+        bootCardExpanded = true
+        card.classList.add('expanded')
+        $('boot-diag-header')?.setAttribute('aria-expanded', 'true')
+        try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (_) {}
+      }
+    }
+    if (action === 'open_smart' || res?.openTab === 'disk_smart') {
+      revealDiskSpecs(arg || 'C')
+    }
+    if (action === 'inspect_cpu' || action === 'inspect_gpu' || action === 'inspect_disk' || action === 'open_lag') {
+      setActiveTab('lag')
+    }
     if (action === 'open_disk') {
       revealDiskSpecs(arg || 'C')
     }
