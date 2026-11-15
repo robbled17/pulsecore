@@ -4,7 +4,6 @@ go 1.26.0
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/energye/systray v1.0.3
 	github.com/go-ole/go-ole v1.3.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/wailsapp/wails/v2 v2.17.1

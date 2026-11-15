@@ -24,6 +24,7 @@ type appPrefs struct {
 	CloseToTray    bool   `json:"closeToTray"`
 	TempAlerts     bool   `json:"tempAlerts"`
 	ShowTempOnTray bool   `json:"showTempOnTray"`
+	ShowTrayTemp   bool   `json:"showTrayTemp,omitempty"`
 	TrayTipShown   bool   `json:"trayTipShown"`
 	// EcoExitPolicy: ask | clear | keep
 	EcoExitPolicy string `json:"ecoExitPolicy"`
@@ -43,6 +44,7 @@ func defaultPrefs() appPrefs {
 		TempAlerts:             true,
 		CloseToTray:            true,
 		ShowTempOnTray:         true,
+		ShowTrayTemp:           true,
 		ConflictWatcherEnabled: true,
 		EcoExitPolicy:          "ask",
 		MiniHUDPosX:            -1,
@@ -91,8 +93,13 @@ func (a *App) loadPrefs() {
 			p.CloseToTray = true
 		}
 		if _, ok := keys["showTempOnTray"]; !ok {
-			p.ShowTempOnTray = true
+			if _, ok2 := keys["showTrayTemp"]; ok2 {
+				p.ShowTempOnTray = p.ShowTrayTemp
+			} else {
+				p.ShowTempOnTray = true
+			}
 		}
+		p.ShowTrayTemp = p.ShowTempOnTray
 		if _, ok := keys["miniHudPosX"]; !ok {
 			p.MiniHUDPosX = -1
 		}
@@ -161,12 +168,24 @@ func (a *App) SetBehaviorSettings(p appPrefs) error {
 	p.MiniHUDPosY = prev.MiniHUDPosY
 	p.MiniHUDOpacityPercent = prev.MiniHUDOpacityPercent
 	p.MiniHUDAcrylic = prev.MiniHUDAcrylic
+	if p.ShowTrayTemp != p.ShowTempOnTray {
+		if p.ShowTrayTemp {
+			p.ShowTempOnTray = true
+		} else if !p.ShowTempOnTray {
+			p.ShowTrayTemp = false
+		} else {
+			p.ShowTempOnTray = p.ShowTrayTemp
+		}
+	} else {
+		p.ShowTrayTemp = p.ShowTempOnTray
+	}
 	if err := a.savePrefs(p); err != nil {
 		return err
 	}
 	a.mu.Lock()
 	a.prefs = p
 	a.mu.Unlock()
+	a.UpdateTrayIconNow()
 	return nil
 }
 

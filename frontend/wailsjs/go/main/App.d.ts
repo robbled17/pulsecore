@@ -369,4 +369,6 @@ export function TrimMemoryWorkingSet():Promise<main.HomeActionResult>;
 
 export function UninstallWithCleanup(arg1:string):Promise<main.UninstallAppResult>;
 
+export function UpdateTrayIconNow():Promise<void>;
+
 export function WindowMaximisedState():Promise<boolean>;

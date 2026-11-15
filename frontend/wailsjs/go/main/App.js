@@ -734,6 +734,10 @@ export function UninstallWithCleanup(arg1) {
   return window['go']['main']['App']['UninstallWithCleanup'](arg1);
 }
 
+export function UpdateTrayIconNow() {
+  return window['go']['main']['App']['UpdateTrayIconNow']();
+}
+
 export function WindowMaximisedState() {
   return window['go']['main']['App']['WindowMaximisedState']();
 }

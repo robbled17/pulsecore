@@ -922,6 +922,7 @@ function readBehavior() {
     startMinimized: !!$('opt-start-min')?.checked,
     closeToTray: !!$('opt-close-tray')?.checked,
     showTempOnTray: !!$('opt-tray-temp')?.checked,
+    showTrayTemp: !!$('opt-tray-temp')?.checked,
     tempAlerts: !!$('opt-temp-alert')?.checked,
     ecoExitPolicy: $('opt-eco-exit')?.value || 'ask',
     conflictWatcherEnabled: $('toggle-conflict-watcher') ? !!$('toggle-conflict-watcher').checked : ($('opt-conflict-watcher') ? !!$('opt-conflict-watcher').checked : true),
@@ -939,7 +940,7 @@ async function loadBehavior() {
     if ($('opt-autostart')) $('opt-autostart').checked = !!p.autoStart
     if ($('opt-start-min')) $('opt-start-min').checked = !!p.startMinimized
     if ($('opt-close-tray')) $('opt-close-tray').checked = p.closeToTray !== false
-    if ($('opt-tray-temp')) $('opt-tray-temp').checked = p.showTempOnTray !== false
+    if ($('opt-tray-temp')) $('opt-tray-temp').checked = p.showTrayTemp !== undefined ? (p.showTrayTemp !== false) : (p.showTempOnTray !== false)
     if ($('opt-temp-alert')) $('opt-temp-alert').checked = p.tempAlerts !== false
     if ($('opt-eco-exit')) $('opt-eco-exit').value = p.ecoExitPolicy || 'ask'
     const watcherVal = p.conflictWatcherEnabled !== false
@@ -6757,6 +6758,13 @@ function wireUI() {
   wireCustomDropdowns()
   ;['opt-autostart', 'opt-start-min', 'opt-close-tray', 'opt-tray-temp', 'opt-conflict-watcher', 'toggle-conflict-watcher', 'opt-temp-alert', 'opt-eco-exit'].forEach((id) => {
     $(id)?.addEventListener('change', saveBehavior)
+  })
+  $('opt-tray-temp')?.addEventListener('change', async () => {
+    try {
+      if (window.go?.main?.App?.UpdateTrayIconNow) {
+        await window.go.main.App.UpdateTrayIconNow()
+      }
+    } catch (_) {}
   })
   $('toggle-conflict-watcher')?.addEventListener('change', async (ev) => {
     try { await SetConflictWatcherEnabled(!!ev.target.checked) } catch (err) { console.error(err) }

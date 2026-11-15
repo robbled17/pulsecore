@@ -3537,6 +3537,7 @@ export namespace main {
 	    closeToTray: boolean;
 	    tempAlerts: boolean;
 	    showTempOnTray: boolean;
+	    showTrayTemp?: boolean;
 	    trayTipShown: boolean;
 	    ecoExitPolicy: string;
 	    hiddenGames?: HiddenGamePref[];
@@ -3557,6 +3558,7 @@ export namespace main {
 	        this.closeToTray = source["closeToTray"];
 	        this.tempAlerts = source["tempAlerts"];
 	        this.showTempOnTray = source["showTempOnTray"];
+	        this.showTrayTemp = source["showTrayTemp"];
 	        this.trayTipShown = source["trayTipShown"];
 	        this.ecoExitPolicy = source["ecoExitPolicy"];
 	        this.hiddenGames = this.convertValues(source["hiddenGames"], HiddenGamePref);
