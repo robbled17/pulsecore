@@ -211,8 +211,13 @@ func (a *App) GetHomeState() HomeState {
 		}
 	}
 
+	h := a.ensureHealth()
+	h.mu.Lock()
+	realSamples := len(h.window)
+	h.mu.Unlock()
+
 	initialized := m.Timestamp != "" && m.RAMTotalMB > 0 && (m.RAMPercent > 0 || m.CPUPercent > 0)
-	hasSamples := initialized && len(m.Disks) > 0
+	hasSamples := initialized && len(m.Disks) > 0 && realSamples > 0
 
 	return HomeState{
 		Score: health.Score, ScoreIfAllFixed: ScoreIfAllFixed(health.Score, probs),

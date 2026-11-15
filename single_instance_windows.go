@@ -30,23 +30,25 @@ func acquireSingleInstance() bool {
 	return true
 }
 
-func bringExistingInstanceToFront() {
+var bringInstanceCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 	user32 := windows.NewLazySystemDLL("user32.dll")
-	procEnumWindows := user32.NewProc("EnumWindows")
 	procGetWindowTextW := user32.NewProc("GetWindowTextW")
 	procShowWindow := user32.NewProc("ShowWindow")
 	procSetForegroundWindow := user32.NewProc("SetForegroundWindow")
 
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-		var buf [256]uint16
-		procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 256)
-		txt := windows.UTF16ToString(buf[:])
-		if strings.Contains(txt, "PulseCore") {
-			procShowWindow.Call(hwnd, 9 /* SW_RESTORE */)
-			procSetForegroundWindow.Call(hwnd)
-			return 0
-		}
-		return 1
-	})
-	procEnumWindows.Call(cb, 0)
+	var buf [256]uint16
+	procGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 256)
+	txt := windows.UTF16ToString(buf[:])
+	if strings.Contains(txt, "PulseCore") {
+		procShowWindow.Call(hwnd, 9 /* SW_RESTORE */)
+		procSetForegroundWindow.Call(hwnd)
+		return 0
+	}
+	return 1
+})
+
+func bringExistingInstanceToFront() {
+	user32 := windows.NewLazySystemDLL("user32.dll")
+	procEnumWindows := user32.NewProc("EnumWindows")
+	procEnumWindows.Call(bringInstanceCb, 0)
 }

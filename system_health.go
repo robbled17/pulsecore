@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -601,6 +602,15 @@ func computeSystemHealth(win []healthSample, leakN, incidents, startupHigh int, 
 	}
 
 	deductions := buildDeductions(factors, score, wSum)
+	if len(deductions) > 0 {
+		sumPts := 0
+		for _, d := range deductions {
+			sumPts += d.Points
+		}
+		if sumPts > 0 && score != 100-sumPts {
+			score = 100 - sumPts
+		}
+	}
 
 	gradeRu, gradeEn := healthGrade(score)
 	sumRu := fmt.Sprintf("%d/100 - %s", score, gradeRu)
@@ -718,6 +728,20 @@ func applyDiskSMARTHealthFactor(rep SystemHealthReport, smart DiskHealthReport) 
 	rep.SummaryEn = fmt.Sprintf("%d/100 - %s", overall, gradeEn)
 	rep.OK, rep.Watch, rep.Action = ok, watch, action
 	rep.Deductions = buildDeductions(out, overall, wSum)
+	if len(rep.Deductions) > 0 {
+		sumPts := 0
+		for _, d := range rep.Deductions {
+			sumPts += d.Points
+		}
+		if sumPts > 0 && overall != 100-sumPts {
+			overall = 100 - sumPts
+			rep.Score = overall
+			gradeRu, gradeEn = healthGrade(overall)
+			rep.GradeRu, rep.GradeEn = gradeRu, gradeEn
+			rep.SummaryRu = fmt.Sprintf("%d/100 - %s", overall, gradeRu)
+			rep.SummaryEn = fmt.Sprintf("%d/100 - %s", overall, gradeEn)
+		}
+	}
 	return rep
 }
 
@@ -735,14 +759,14 @@ func buildDeductions(factors []HealthFactor, score int, wSum float64) []HealthDe
 	}
 
 	var losses []factorLoss
-	var totalRawLoss float64
-
 	for _, f := range factors {
 		if !f.Available || f.Score >= 99.5 {
 			continue
 		}
 		raw := (100.0 - f.Score) * f.Weight
-		totalRawLoss += raw
+		if raw <= 0 {
+			continue
+		}
 
 		dru := f.DetailRu
 		den := f.DetailEn
@@ -766,33 +790,74 @@ func buildDeductions(factors []HealthFactor, score int, wSum float64) []HealthDe
 		})
 	}
 
-	if totalRawLoss <= 0 || len(losses) == 0 {
+	if len(losses) == 0 {
 		return nil
 	}
 
-	deductions := make([]HealthDeduction, 0, len(losses))
+	sort.Slice(losses, func(i, j int) bool {
+		return losses[i].rawLoss > losses[j].rawLoss
+	})
+
+	// Each deduction shown must represent at least 1 point lost.
+	// Therefore we display at most totalLost items.
+	if len(losses) > totalLost {
+		losses = losses[:totalLost]
+	}
+
+	var subRaw float64
+	for _, fl := range losses {
+		subRaw += fl.rawLoss
+	}
+	if subRaw <= 0 {
+		return nil
+	}
+
+	type lossAlloc struct {
+		fl    factorLoss
+		pts   int
+		fract float64
+		idx   int
+	}
+
+	allocs := make([]lossAlloc, len(losses))
 	allocated := 0
+	extra := totalLost - len(losses) // remaining points to distribute proportionally
 
 	for i, fl := range losses {
-		pts := int(math.Round(float64(totalLost) * fl.rawLoss / totalRawLoss))
-		if pts < 1 {
-			pts = 1
+		exact := float64(extra) * (fl.rawLoss / subRaw)
+		floor := int(exact)
+		allocs[i] = lossAlloc{
+			fl:    fl,
+			pts:   1 + floor, // guaranteed at least 1 point
+			fract: exact - float64(floor),
+			idx:   i,
 		}
-		if i == len(losses)-1 {
-			rem := totalLost - allocated
-			if rem > 0 {
-				pts = rem
-			}
-		}
-		allocated += pts
-		deductions = append(deductions, HealthDeduction{
-			Key:      fl.f.Key,
-			LabelRu:  fl.f.LabelRu,
-			LabelEn:  fl.f.LabelEn,
-			Points:   pts,
-			DetailRu: fl.detailRu,
-			DetailEn: fl.detailEn,
+		allocated += 1 + floor
+	}
+
+	rem := totalLost - allocated
+	if rem > 0 {
+		sort.Slice(allocs, func(i, j int) bool {
+			return allocs[i].fract > allocs[j].fract
 		})
+		for i := 0; i < rem && i < len(allocs); i++ {
+			allocs[i].pts++
+		}
+		sort.Slice(allocs, func(i, j int) bool {
+			return allocs[i].idx < allocs[j].idx
+		})
+	}
+
+	deductions := make([]HealthDeduction, len(allocs))
+	for i, a := range allocs {
+		deductions[i] = HealthDeduction{
+			Key:      a.fl.f.Key,
+			LabelRu:  a.fl.f.LabelRu,
+			LabelEn:  a.fl.f.LabelEn,
+			Points:   a.pts,
+			DetailRu: a.fl.detailRu,
+			DetailEn: a.fl.detailEn,
+		}
 	}
 
 	return deductions

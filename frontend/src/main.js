@@ -155,6 +155,14 @@ window.__pcPosterError = function (img) {
   } catch (_) {}
 }
 
+window.__pcPosterLoaded = function (img) {
+  if (!img) return
+  // If an image was delivered as horizontal/banner instead of 2:3 vertical, replace with graceful fallback.
+  if (img.naturalWidth > img.naturalHeight * 1.15) {
+    if (window.__pcPosterError) window.__pcPosterError(img)
+  }
+}
+
 let confirmResolver = null
 function glassConfirm({ title, body, confirmLabel, danger = true } = {}) {
   return new Promise((resolve) => {
@@ -1019,7 +1027,7 @@ async function renderHome() {
   try { st = await GetHomeState() } catch (_) { st = null }
   if (!st) return
 
-  const isMeasuring = !hasInitialHomeStats && (!st.initialized || !st.hasSamples)
+  const isMeasuring = !st.initialized || !st.hasSamples
   if (isMeasuring) {
     scoreEl.textContent = '--'
     if (statusEl) statusEl.textContent = t('homeMeasuringHealth')
@@ -2591,11 +2599,14 @@ function syncBootCardExpanded() {
   const expanded = !!window.__bootCardExpanded
   card.classList.toggle('expanded', expanded)
   card.classList.toggle('collapsed', !expanded)
+  card.style.overflow = expanded ? 'visible' : 'hidden'
   if (hdr) hdr.setAttribute('aria-expanded', expanded ? 'true' : 'false')
 
   bodyEl.hidden = !expanded
   bodyEl.style.display = expanded ? 'block' : 'none'
+  bodyEl.style.height = expanded ? 'auto' : '0px'
   bodyEl.style.maxHeight = expanded ? 'none' : '0px'
+  bodyEl.style.overflow = expanded ? 'visible' : 'hidden'
 
   if (chevron) {
     chevron.style.transform = expanded ? 'rotate(180deg)' : 'rotate(0deg)'
@@ -4348,7 +4359,7 @@ function gamePosterHTML(g) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name: game.name || 'Game', year, genre, cls: 'game-poster' })
-  return `<img class="game-poster" src="${src}" alt="${name}" loading="lazy" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-poster" src="${src}" alt="${name}" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function compactCoverHTML(p, opts = {}) {
@@ -4362,7 +4373,7 @@ function compactCoverHTML(p, opts = {}) {
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
   const payload = JSON.stringify({ name, year, genre, cls: 'game-cover', hideTitle })
-  return `<img class="game-cover" src="${src}" alt="" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
+  return `<img class="game-cover" src="${src}" alt="" loading="lazy" decoding="async" data-fb="${fb}" data-fallback='${payload.replace(/'/g, '&#39;')}' onload="window.__pcPosterLoaded && window.__pcPosterLoaded(this)" onerror="window.__pcPosterError && window.__pcPosterError(this)" />`
 }
 
 function genreBucket(g) {
@@ -4698,7 +4709,8 @@ async function selectGame(gameId) {
     })
     syncGamePanelPadding(true)
   }
-  await predictSelectedGame()
+  syncGamePanelPadding(true)
+  predictSelectedGame().catch(() => {})
   requestAnimationFrame(() => {
     $('btn-game-panel-close')?.focus()
     syncGamePanelPadding(true)
@@ -4845,10 +4857,19 @@ function formatCompactFitDetails(p, fit) {
     if (gb < 1) return fmt(gb * 1024, 0)
     return String(Math.round(gb))
   }
-  const vram = t('fitVramYou', {
-    need: formatVram(need),
-    have: formatVram(have),
-  })
+  let vram = ''
+  if (need > 0) {
+    if (have < need) {
+      vram = t('fitVramYou', {
+        need: formatVram(need),
+        have: formatVram(have),
+      })
+    } else {
+      vram = `VRAM ${t('unitsGB', { n: formatVram(have) })}`
+    }
+  } else if (have > 0) {
+    vram = `VRAM ${t('unitsGB', { n: formatVram(have) })}`
+  }
   let sizeBit = ''
   if (size > 0) {
     sizeBit = size < 1 ? t('fitSizeMB', { n: fmt(size * 1024, 0) }) : t('fitSizeApprox', { n: String(Math.round(size)) })

@@ -225,7 +225,7 @@
     "year": 2011,
     "badge": "Indie",
     "engine": "Bedrock/Java",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1672970/library_600x900.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co8fu7.jpg"
   },
   {
     "id": "rust",
@@ -285,8 +285,8 @@
     "year": 2017,
     "badge": "eSports",
     "engine": "Unreal 5",
-    "posterUrl": "https://cdn2.unrealengine.com/14br-consoles-1920x1080-wlogo-1920x1080-432974386.jpg",
-    "headerUrl": "https://cdn2.unrealengine.com/14br-consoles-1920x1080-wlogo-1920x1080-432974386.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocxbi.jpg",
+    "headerUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocxbi.jpg"
   },
   {
     "id": "valorant",
@@ -298,8 +298,8 @@
     "year": 2020,
     "badge": "eSports",
     "engine": "Unreal 4",
-    "posterUrl": "https://images.contentstack.io/v3/assets/blt370612131b6e0eb3/blt02c83011417b70d6/5eb08b7397b46c1911aa50b6/play-valorant-poster.jpg",
-    "headerUrl": "https://images.contentstack.io/v3/assets/blt370612131b6e0eb3/blt02c83011417b70d6/5eb08b7397b46c1911aa50b6/play-valorant-poster.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocqbp.jpg",
+    "headerUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocqbp.jpg"
   },
   {
     "id": "lol",
@@ -311,8 +311,8 @@
     "year": 2009,
     "badge": "eSports",
     "engine": "Proprietary",
-    "posterUrl": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg",
-    "headerUrl": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coc99o.jpg",
+    "headerUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coc99o.jpg"
   },
   {
     "id": "genshin",
@@ -324,8 +324,8 @@
     "year": 2020,
     "badge": "AAA",
     "engine": "Unity",
-    "posterUrl": "https://img.youtube.com/vi/HLUY1nICQRY/maxresdefault.jpg",
-    "headerUrl": "https://img.youtube.com/vi/HLUY1nICQRY/maxresdefault.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coa9dy.jpg",
+    "headerUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coa9dy.jpg"
   },
   {
     "id": "roblox",
@@ -337,8 +337,8 @@
     "year": 2006,
     "badge": "Indie",
     "engine": "Proprietary",
-    "posterUrl": "https://images.rbxcdn.com/928198f465737402636a048a123f858a.jpg",
-    "headerUrl": "https://images.rbxcdn.com/928198f465737402636a048a123f858a.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocdbd.jpg",
+    "headerUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/cocdbd.jpg"
   },
   {
     "id": "wot",
@@ -2330,7 +2330,7 @@
     "year": 2020,
     "badge": "AAA",
     "engine": "IW",
-    "posterUrl": ""
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coa8id.jpg"
   },
   {
     "id": "cod_bo6",
@@ -2426,7 +2426,7 @@
     "year": 2017,
     "badge": "AAA",
     "engine": "Unity",
-    "posterUrl": ""
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coco22.jpg"
   },
   {
     "id": "hunt",
@@ -2750,7 +2750,7 @@
     "year": 2024,
     "badge": "AAA",
     "engine": "Unreal 4",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2426190/library_600x900.jpg"
+    "posterUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/coajo3.jpg"
   },
   {
     "id": "osu",

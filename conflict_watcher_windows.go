@@ -208,16 +208,17 @@ func resetConflictState(overlay windows.HWND) {
 }
 
 // DestroyLingeringConflictWindows finds and destroys any previous PulseCoreConflictBar windows.
+var destroyLingeringCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+	var buf [256]uint16
+	_, _, _ = procCWGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 256)
+	if windows.UTF16ToString(buf[:]) == "PulseCoreConflictBar" {
+		procCWDestroyWindow.Call(hwnd)
+	}
+	return 1
+})
+
 func DestroyLingeringConflictWindows() {
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-		var buf [256]uint16
-		_, _, _ = procCWGetClassNameW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 256)
-		if windows.UTF16ToString(buf[:]) == "PulseCoreConflictBar" {
-			procCWDestroyWindow.Call(hwnd)
-		}
-		return 1
-	})
-	procCWEnumWindows.Call(cb, 0)
+	procCWEnumWindows.Call(destroyLingeringCb, 0)
 }
 
 // StartConflictWatcher begins the background monitoring of file conflict dialogs.
@@ -237,22 +238,30 @@ func (a *App) conflictWatcherLoop() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		a.mu.RLock()
-		enabled := a.prefs.ConflictWatcherEnabled
-		a.mu.RUnlock()
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logCrash("conflictWatcherLoop-tick", r)
+				}
+			}()
 
-		if !enabled {
-			globalConflict.Lock()
-			if globalConflict.visible && globalConflict.overlayHWND != 0 {
-				procCWPostMessageW.Call(uintptr(globalConflict.overlayHWND), msgHideOverlayCW, 0, 0)
-				globalConflict.visible = false
-				globalConflict.targetHWND = 0
+			a.mu.RLock()
+			enabled := a.prefs.ConflictWatcherEnabled
+			a.mu.RUnlock()
+
+			if !enabled {
+				globalConflict.Lock()
+				if globalConflict.visible && globalConflict.overlayHWND != 0 {
+					procCWPostMessageW.Call(uintptr(globalConflict.overlayHWND), msgHideOverlayCW, 0, 0)
+					globalConflict.visible = false
+					globalConflict.targetHWND = 0
+				}
+				globalConflict.Unlock()
+				return
 			}
-			globalConflict.Unlock()
-			continue
-		}
 
-		checkActiveConflictDialogs()
+			checkActiveConflictDialogs()
+		}()
 	}
 }
 
@@ -491,12 +500,36 @@ func extractTextsViaUIAutomation(hwnd windows.HWND) []string {
 	return texts
 }
 
-func findConflictWindow() (windows.HWND, string, []string) {
-	var target windows.HWND
-	var winTitle string
-	var allTexts []string
+var (
+	childTextMu         sync.Mutex
+	collectedChildTexts []string
+	enumChildTextsCb    = syscall.NewCallback(func(ch uintptr, _ uintptr) uintptr {
+		var chBuf [512]uint16
+		_, _, _ = procCWGetWindowTextW.Call(ch, uintptr(unsafe.Pointer(&chBuf[0])), 512)
+		txt := strings.TrimSpace(windows.UTF16ToString(chBuf[:]))
+		if txt != "" {
+			collectedChildTexts = append(collectedChildTexts, txt)
+		}
+		return 1
+	})
+)
 
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+func getChildWindowTexts(parent uintptr) []string {
+	childTextMu.Lock()
+	defer childTextMu.Unlock()
+	collectedChildTexts = collectedChildTexts[:0]
+	procCWEnumChildWindows.Call(parent, enumChildTextsCb, 0)
+	out := make([]string, len(collectedChildTexts))
+	copy(out, collectedChildTexts)
+	return out
+}
+
+var (
+	conflictEnumMu     sync.Mutex
+	conflictFoundHWND  windows.HWND
+	conflictFoundTitle string
+	conflictFoundTexts []string
+	enumConflictCb     = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 		rv, _, _ := procCWIsWindowVisible.Call(hwnd)
 		if rv == 0 {
 			return 1
@@ -523,17 +556,7 @@ func findConflictWindow() (windows.HWND, string, []string) {
 		uiaTexts := extractTextsViaUIAutomation(windows.HWND(hwnd))
 
 		// 2. Standard Win32 child windows
-		var children []string
-		childCb := syscall.NewCallback(func(ch uintptr, _ uintptr) uintptr {
-			var chBuf [512]uint16
-			_, _, _ = procCWGetWindowTextW.Call(ch, uintptr(unsafe.Pointer(&chBuf[0])), 512)
-			txt := strings.TrimSpace(windows.UTF16ToString(chBuf[:]))
-			if txt != "" {
-				children = append(children, txt)
-			}
-			return 1
-		})
-		procCWEnumChildWindows.Call(hwnd, childCb, 0)
+		children := getChildWindowTexts(hwnd)
 
 		// Merge texts without duplicates
 		seen := map[string]bool{}
@@ -553,16 +576,23 @@ func findConflictWindow() (windows.HWND, string, []string) {
 			strings.Contains(fullContent, "action can't be completed")
 
 		if isConflict {
-			target = windows.HWND(hwnd)
-			winTitle = title
-			allTexts = merged
+			conflictFoundHWND = windows.HWND(hwnd)
+			conflictFoundTitle = title
+			conflictFoundTexts = merged
 			return 0
 		}
 		return 1
 	})
+)
 
-	procCWEnumWindows.Call(cb, 0)
-	return target, winTitle, allTexts
+func findConflictWindow() (windows.HWND, string, []string) {
+	conflictEnumMu.Lock()
+	defer conflictEnumMu.Unlock()
+	conflictFoundHWND = 0
+	conflictFoundTitle = ""
+	conflictFoundTexts = nil
+	procCWEnumWindows.Call(enumConflictCb, 0)
+	return conflictFoundHWND, conflictFoundTitle, conflictFoundTexts
 }
 
 var (
@@ -912,9 +942,10 @@ func matchProcessWithFolder(procName, exePath, cwd, cmdline string, windowTitles
 	return false
 }
 
-func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
-	pidWindows := map[uint32][]string{}
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+var (
+	pidWinMu         sync.Mutex
+	pidWinMap        map[uint32][]string
+	enumPidWindowsCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 		if rv, _, _ := procCWIsWindowVisible.Call(hwnd); rv == 0 {
 			return 1
 		}
@@ -924,13 +955,21 @@ func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
 			var buf [512]uint16
 			procCWGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&buf[0])), 512)
 			txt := strings.TrimSpace(windows.UTF16ToString(buf[:]))
-			if txt != "" {
-				pidWindows[pid] = append(pidWindows[pid], txt)
+			if txt != "" && pidWinMap != nil {
+				pidWinMap[pid] = append(pidWinMap[pid], txt)
 			}
 		}
 		return 1
 	})
-	procCWEnumWindows.Call(cb, 0)
+)
+
+func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
+	pidWinMu.Lock()
+	pidWinMap = make(map[uint32][]string)
+	procCWEnumWindows.Call(enumPidWindowsCb, 0)
+	pidWindows := pidWinMap
+	pidWinMap = nil
+	pidWinMu.Unlock()
 
 	procs, err := process.Processes()
 	if err != nil {
@@ -1028,18 +1067,7 @@ func isWindowStillConflict(hwnd windows.HWND) bool {
 	title := windows.UTF16ToString(titleBuf[:])
 
 	uiaTexts := extractTextsViaUIAutomation(hwnd)
-
-	var children []string
-	cb := syscall.NewCallback(func(ch uintptr, _ uintptr) uintptr {
-		var chBuf [512]uint16
-		_, _, _ = procCWGetWindowTextW.Call(ch, uintptr(unsafe.Pointer(&chBuf[0])), 512)
-		txt := strings.TrimSpace(windows.UTF16ToString(chBuf[:]))
-		if txt != "" {
-			children = append(children, txt)
-		}
-		return 1
-	})
-	procCWEnumChildWindows.Call(uintptr(hwnd), cb, 0)
+	children := getChildWindowTexts(uintptr(hwnd))
 
 	fullContent := strings.ToLower(title + " " + strings.Join(append(uiaTexts, children...), " "))
 	return strings.Contains(fullContent, "уже используется") ||
@@ -1049,12 +1077,13 @@ func isWindowStillConflict(hwnd windows.HWND) bool {
 		strings.Contains(fullContent, "action can't be completed")
 }
 
-func findRetryButton(targetHWND windows.HWND) windows.HWND {
-	var retryBtn windows.HWND
-	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
+var (
+	retryBtnMu     sync.Mutex
+	foundRetryBtn  windows.HWND
+	enumRetryBtnCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 		ctrlID, _, _ := procCWGetDlgCtrlID.Call(hwnd)
 		if ctrlID == 4 { // IDRETRY = 4
-			retryBtn = windows.HWND(hwnd)
+			foundRetryBtn = windows.HWND(hwnd)
 			return 0
 		}
 
@@ -1068,14 +1097,20 @@ func findRetryButton(targetHWND windows.HWND) windows.HWND {
 
 		if strings.Contains(strings.ToLower(cls), "button") {
 			if strings.Contains(txt, "повторить") || strings.Contains(txt, "retry") || strings.Contains(txt, "try again") {
-				retryBtn = windows.HWND(hwnd)
+				foundRetryBtn = windows.HWND(hwnd)
 				return 0
 			}
 		}
 		return 1
 	})
-	procCWEnumChildWindows.Call(uintptr(targetHWND), cb, 0)
-	return retryBtn
+)
+
+func findRetryButton(targetHWND windows.HWND) windows.HWND {
+	retryBtnMu.Lock()
+	defer retryBtnMu.Unlock()
+	foundRetryBtn = 0
+	procCWEnumChildWindows.Call(uintptr(targetHWND), enumRetryBtnCb, 0)
+	return foundRetryBtn
 }
 
 func terminateProcessTree(pid uint32, procName string) {
@@ -1390,7 +1425,6 @@ func conflictBarWndProc(hwnd uintptr, msg uintptr, wparam uintptr, lparam uintpt
 		}
 		globalConflict.overlayHWND = 0
 		globalConflict.Unlock()
-		procCWPostQuitMessage.Call(0)
 		return 0
 	}
 

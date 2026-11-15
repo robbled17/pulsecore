@@ -164,6 +164,9 @@ func EvaluateGameFitUnified(sys SystemPowerProfile, game GameInfo, req gameReqSe
 		} else if recRAM > 0 && userRAM+0.5 < recRAM {
 			reasonRu = fmt.Sprintf("ОЗУ %.0f ГБ, рекомендуется %.0f ГБ", userRAM, recRAM)
 			reasonEn = fmt.Sprintf("RAM %.0f GB, recommended %.0f GB", userRAM, recRAM)
+		} else if (req.High.ReqGPUScore > 0 && gpuRec < 0.90) || (req.Low.ReqGPUScore > 0 && gpuMin < 0.95) {
+			reasonRu = "видеокарта подходит для средних настроек (для ультра рекомендуется более мощная)"
+			reasonEn = "GPU suitable for medium settings (more powerful GPU recommended for ultra)"
 		}
 		return "tight", "warn", "Впритык", "Barely", reasonRu, reasonEn
 	}
