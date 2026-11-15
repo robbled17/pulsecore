@@ -14,6 +14,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/go-ole/go-ole"
+	"github.com/go-ole/go-ole/oleutil"
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
@@ -26,50 +28,50 @@ var (
 	procCWGetWindowTextW           = modUser32CW.NewProc("GetWindowTextW")
 	procCWGetWindowThreadProcessId = modUser32CW.NewProc("GetWindowThreadProcessId")
 	procCWIsWindow                 = modUser32CW.NewProc("IsWindow")
-	procCWIsWindowVisible       = modUser32CW.NewProc("IsWindowVisible")
-	procCWIsIconic              = modUser32CW.NewProc("IsIconic")
-	procCWGetWindowRect         = modUser32CW.NewProc("GetWindowRect")
-	procCWGetClientRect         = modUser32CW.NewProc("GetClientRect")
-	procCWSetWindowPos          = modUser32CW.NewProc("SetWindowPos")
-	procCWShowWindow            = modUser32CW.NewProc("ShowWindow")
-	procCWPostMessageW          = modUser32CW.NewProc("PostMessageW")
-	procCWSendMessageW          = modUser32CW.NewProc("SendMessageW")
-	procCWGetDlgCtrlID          = modUser32CW.NewProc("GetDlgCtrlID")
-	procCWCreateWindowExW       = modUser32CW.NewProc("CreateWindowExW")
-	procCWRegisterClassExW      = modUser32CW.NewProc("RegisterClassExW")
-	procCWDefWindowProcW        = modUser32CW.NewProc("DefWindowProcW")
-	procCWDestroyWindow         = modUser32CW.NewProc("DestroyWindow")
-	procCWInvalidateRect        = modUser32CW.NewProc("InvalidateRect")
-	procCWUpdateWindow          = modUser32CW.NewProc("UpdateWindow")
-	procCWGetMessageW           = modUser32CW.NewProc("GetMessageW")
-	procCWTranslateMessage      = modUser32CW.NewProc("TranslateMessage")
-	procCWDispatchMessageW      = modUser32CW.NewProc("DispatchMessageW")
-	procCWPostQuitMessage       = modUser32CW.NewProc("PostQuitMessage")
-	procCWBeginPaint            = modUser32CW.NewProc("BeginPaint")
-	procCWEndPaint              = modUser32CW.NewProc("EndPaint")
-	procCWDrawTextW             = modUser32CW.NewProc("DrawTextW")
-	procCWFillRect              = modUser32CW.NewProc("FillRect")
-	procCWFrameRect             = modUser32CW.NewProc("FrameRect")
-	procCWLoadCursorW           = modUser32CW.NewProc("LoadCursorW")
-	procCWSetCursor             = modUser32CW.NewProc("SetCursor")
-	procCWGetCursorPos          = modUser32CW.NewProc("GetCursorPos")
-	procCWScreenToClient        = modUser32CW.NewProc("ScreenToClient")
-	procCWGetForegroundWindow   = modUser32CW.NewProc("GetForegroundWindow")
-	procCWGetWindowThreadProcId = modUser32CW.NewProc("GetWindowThreadProcessId")
-	procCWGetAncestor           = modUser32CW.NewProc("GetAncestor")
-	procCWGetParent             = modUser32CW.NewProc("GetParent")
+	procCWIsWindowVisible          = modUser32CW.NewProc("IsWindowVisible")
+	procCWIsIconic                 = modUser32CW.NewProc("IsIconic")
+	procCWGetWindowRect            = modUser32CW.NewProc("GetWindowRect")
+	procCWGetClientRect            = modUser32CW.NewProc("GetClientRect")
+	procCWSetWindowPos             = modUser32CW.NewProc("SetWindowPos")
+	procCWShowWindow               = modUser32CW.NewProc("ShowWindow")
+	procCWPostMessageW             = modUser32CW.NewProc("PostMessageW")
+	procCWSendMessageW             = modUser32CW.NewProc("SendMessageW")
+	procCWGetDlgCtrlID             = modUser32CW.NewProc("GetDlgCtrlID")
+	procCWCreateWindowExW          = modUser32CW.NewProc("CreateWindowExW")
+	procCWRegisterClassExW         = modUser32CW.NewProc("RegisterClassExW")
+	procCWDefWindowProcW           = modUser32CW.NewProc("DefWindowProcW")
+	procCWDestroyWindow            = modUser32CW.NewProc("DestroyWindow")
+	procCWInvalidateRect           = modUser32CW.NewProc("InvalidateRect")
+	procCWUpdateWindow             = modUser32CW.NewProc("UpdateWindow")
+	procCWGetMessageW              = modUser32CW.NewProc("GetMessageW")
+	procCWTranslateMessage         = modUser32CW.NewProc("TranslateMessage")
+	procCWDispatchMessageW         = modUser32CW.NewProc("DispatchMessageW")
+	procCWPostQuitMessage          = modUser32CW.NewProc("PostQuitMessage")
+	procCWBeginPaint               = modUser32CW.NewProc("BeginPaint")
+	procCWEndPaint                 = modUser32CW.NewProc("EndPaint")
+	procCWDrawTextW                = modUser32CW.NewProc("DrawTextW")
+	procCWFillRect                 = modUser32CW.NewProc("FillRect")
+	procCWFrameRect                = modUser32CW.NewProc("FrameRect")
+	procCWLoadCursorW              = modUser32CW.NewProc("LoadCursorW")
+	procCWSetCursor                = modUser32CW.NewProc("SetCursor")
+	procCWGetCursorPos             = modUser32CW.NewProc("GetCursorPos")
+	procCWScreenToClient           = modUser32CW.NewProc("ScreenToClient")
+	procCWGetForegroundWindow      = modUser32CW.NewProc("GetForegroundWindow")
+	procCWGetWindowThreadProcId    = modUser32CW.NewProc("GetWindowThreadProcessId")
+	procCWGetAncestor              = modUser32CW.NewProc("GetAncestor")
+	procCWGetParent                = modUser32CW.NewProc("GetParent")
 
-	modGdi32CW                  = windows.NewLazySystemDLL("gdi32.dll")
-	procCWCreateSolidBrush      = modGdi32CW.NewProc("CreateSolidBrush")
-	procCWCreateRoundRectRgn    = modGdi32CW.NewProc("CreateRoundRectRgn")
-	procCWSetWindowRgn          = modUser32CW.NewProc("SetWindowRgn")
-	procCWCreateFontW           = modGdi32CW.NewProc("CreateFontW")
-	procCWSetBkMode             = modGdi32CW.NewProc("SetBkMode")
-	procCWSetTextColor          = modGdi32CW.NewProc("SetTextColor")
-	procCWSelectObject          = modGdi32CW.NewProc("SelectObject")
-	procCWDeleteObject          = modGdi32CW.NewProc("DeleteObject")
-	procCWRoundRect             = modGdi32CW.NewProc("RoundRect")
-	procCWCreatePen             = modGdi32CW.NewProc("CreatePen")
+	modGdi32CW               = windows.NewLazySystemDLL("gdi32.dll")
+	procCWCreateSolidBrush   = modGdi32CW.NewProc("CreateSolidBrush")
+	procCWCreateRoundRectRgn = modGdi32CW.NewProc("CreateRoundRectRgn")
+	procCWSetWindowRgn       = modUser32CW.NewProc("SetWindowRgn")
+	procCWCreateFontW        = modGdi32CW.NewProc("CreateFontW")
+	procCWSetBkMode          = modGdi32CW.NewProc("SetBkMode")
+	procCWSetTextColor       = modGdi32CW.NewProc("SetTextColor")
+	procCWSelectObject       = modGdi32CW.NewProc("SelectObject")
+	procCWDeleteObject       = modGdi32CW.NewProc("DeleteObject")
+	procCWRoundRect          = modGdi32CW.NewProc("RoundRect")
+	procCWCreatePen          = modGdi32CW.NewProc("CreatePen")
 
 	modKernel32CW                    = windows.NewLazySystemDLL("kernel32.dll")
 	procCWGetModuleHandleW           = modKernel32CW.NewProc("GetModuleHandleW")
@@ -77,27 +79,27 @@ var (
 )
 
 const (
-	wsPopupCW              = 0x80000000
-	wsExTopMostCW          = 0x00000008
-	wsExToolWindowCW       = 0x00000080
-	wsExNoActivateCW       = 0x08000000
-	swpNoActivateCW        = 0x0010
-	swpShowWindowCW        = 0x0040
-	swShowNoActivateCW     = 4
-	swHideCW               = 0
-	hwndTopMostCW          = ^uintptr(0) // -1
-	bmClickCW              = 0x00F5
-	wmCommandCW            = 0x0111
-	wmPaintCW              = 0x000F
-	wmLButtonUpCW          = 0x0202
-	wmSetCursorCW          = 0x0020
-	wmEraseBkgndCW         = 0x0014
-	wmDestroyCW            = 0x0002
-	wmCloseCW              = 0x0010
+	wsPopupCW          = 0x80000000
+	wsExTopMostCW      = 0x00000008
+	wsExToolWindowCW   = 0x00000080
+	wsExNoActivateCW   = 0x08000000
+	swpNoActivateCW    = 0x0010
+	swpShowWindowCW    = 0x0040
+	swShowNoActivateCW = 4
+	swHideCW           = 0
+	hwndTopMostCW      = ^uintptr(0) // -1
+	bmClickCW          = 0x00F5
+	wmCommandCW        = 0x0111
+	wmPaintCW          = 0x000F
+	wmLButtonUpCW      = 0x0202
+	wmSetCursorCW      = 0x0020
+	wmEraseBkgndCW     = 0x0014
+	wmDestroyCW        = 0x0002
+	wmCloseCW          = 0x0010
 
-	wmAppCW                = 0x8000
-	msgShowOverlayCW       = wmAppCW + 1
-	msgHideOverlayCW       = wmAppCW + 2
+	wmAppCW          = 0x8000
+	msgShowOverlayCW = wmAppCW + 1
+	msgHideOverlayCW = wmAppCW + 2
 )
 
 type rectCW struct {
@@ -171,13 +173,22 @@ var (
 	dismissCooldownUntil time.Time
 )
 
+// callCOM invokes a virtual method from an interface pointer using stdcall conventions.
+func callCOM(obj uintptr, methodIndex int, args ...uintptr) uintptr {
+	vtablePtr := *(*uintptr)(unsafe.Pointer(obj))
+	methodPtr := *(*uintptr)(unsafe.Pointer(vtablePtr + uintptr(methodIndex)*unsafe.Sizeof(uintptr(0))))
+	allArgs := append([]uintptr{obj}, args...)
+	r, _, _ := syscall.SyscallN(methodPtr, allArgs...)
+	return r
+}
+
 // isExcludedConflictProcess returns true for processes that must never be considered conflict lockers or displayed in the overlay.
 func isExcludedConflictProcess(procName string, pid uint32) bool {
-	if pid != 0 && pid == uint32(os.Getpid()) {
+	if pid > 0 && (pid <= 4 || pid == uint32(os.Getpid())) {
 		return true
 	}
 	clean := strings.ToLower(filepath.Base(strings.TrimSpace(procName)))
-	if clean == "" || clean == "pulsecore.exe" || clean == "pulsecore" {
+	if clean == "" || clean == "pulsecore.exe" || clean == "pulsecore" || clean == "system" || clean == "idle" {
 		return true
 	}
 	return isProtectedSystemProcess(clean, pid) || isSelfOrWebView(clean)
@@ -333,26 +344,29 @@ func checkActiveConflictDialogs() {
 		return
 	}
 
-	// Extract item name and resolve locked path
-	itemName := extractConflictItemName(foundTitle, childTexts)
-	targetPath := resolveLockedPath(foundTitle, childTexts, itemName)
+	// Universal extraction: resolve item name and target path
+	itemName, targetPath := resolveConflictItemAndPath(foundTitle, childTexts)
 
 	var procs []LockProcessInfo
-	// Way 1: Restart Manager per files in targetPath
+	// 3-Level universal search (Restart Manager -> Toolhelp Modules -> Handles/CWD)
 	if targetPath != "" {
 		procs, _ = FindLockingProcesses(targetPath)
 	}
 
-	// Filter out any excluded processes from RM
+	// Filter out any excluded processes
 	var validProcs []LockProcessInfo
 	for _, p := range procs {
-		if !isExcludedConflictProcess(p.ProcessName, p.PID) && !isExcludedConflictProcess(p.AppName, p.PID) {
+		pName := p.ProcessName
+		if pName == "" {
+			pName = p.AppName
+		}
+		if !isExcludedConflictProcess(pName, p.PID) && !isExcludedConflictProcess(p.AppName, p.PID) {
 			validProcs = append(validProcs, p)
 		}
 	}
 	procs = validProcs
 
-	// Way 2: Process & window matching if RM returned empty
+	// If 3-level search didn't find anything by targetPath, fallback to matching by itemName
 	if len(procs) == 0 && (itemName != "" || targetPath != "") {
 		procs = findProcessesByNameOrPath(itemName, targetPath)
 	}
@@ -395,6 +409,88 @@ func showDockedOverlay(targetHWND windows.HWND, targetPath string, itemName stri
 	globalConflict.visible = true
 }
 
+// extractTextsViaUIAutomation traverses the element tree of hwnd via COM IUIAutomation (TreeScope_Subtree).
+// This reads text from modern DirectUIHWND and XAML controls where Win32 GetWindowText fails.
+func extractTextsViaUIAutomation(hwnd windows.HWND) []string {
+	if hwnd == 0 {
+		return nil
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED); err != nil {
+		if oleErr, ok := err.(*ole.OleError); !ok || (oleErr.Code() != ole.S_OK && oleErr.Code() != 1 && uintptr(oleErr.Code()) != 0x80010106) {
+			return nil
+		}
+	}
+	defer ole.CoUninitialize()
+
+	clsidCUIAutomation := ole.NewGUID("{FF48DBA4-60EF-4201-AA87-54103EEF594E}")
+	iidIUIAutomation := ole.NewGUID("{30CBE57D-D9D0-452A-AB13-7AC0E1029681}")
+
+	unk, err := ole.CreateInstance(clsidCUIAutomation, iidIUIAutomation)
+	if err != nil || unk == nil {
+		return nil
+	}
+	uia := uintptr(unsafe.Pointer(unk))
+	defer callCOM(uia, 2 /* Release */)
+
+	var rootElem uintptr
+	// ElementFromHandle = 6
+	if callCOM(uia, 6, uintptr(hwnd), uintptr(unsafe.Pointer(&rootElem))) != 0 || rootElem == 0 {
+		return nil
+	}
+	defer callCOM(rootElem, 2 /* Release */)
+
+	var trueCond uintptr
+	// CreateTrueCondition = 17
+	if callCOM(uia, 17, uintptr(unsafe.Pointer(&trueCond))) != 0 || trueCond == 0 {
+		return nil
+	}
+	defer callCOM(trueCond, 2 /* Release */)
+
+	var elemArray uintptr
+	// FindAll = 6 (TreeScope_Subtree = 7)
+	if callCOM(rootElem, 6, 7, trueCond, uintptr(unsafe.Pointer(&elemArray))) != 0 || elemArray == 0 {
+		return nil
+	}
+	defer callCOM(elemArray, 2 /* Release */)
+
+	var length int32
+	// get_Length = 3
+	_ = callCOM(elemArray, 3, uintptr(unsafe.Pointer(&length)))
+	if length <= 0 {
+		return nil
+	}
+	if length > 256 {
+		length = 256
+	}
+
+	var texts []string
+	seen := map[string]bool{}
+
+	for i := int32(0); i < length; i++ {
+		var childElem uintptr
+		// GetElement = 4
+		if callCOM(elemArray, 4, uintptr(i), uintptr(unsafe.Pointer(&childElem))) == 0 && childElem != 0 {
+			var bstr *uint16
+			// GetCurrentName = 23
+			if callCOM(childElem, 23, uintptr(unsafe.Pointer(&bstr))) == 0 && bstr != nil {
+				txt := strings.TrimSpace(windows.UTF16PtrToString(bstr))
+				ole.SysFreeString((*int16)(unsafe.Pointer(bstr)))
+				if txt != "" && !seen[txt] {
+					seen[txt] = true
+					texts = append(texts, txt)
+				}
+			}
+			callCOM(childElem, 2 /* Release */)
+		}
+	}
+
+	return texts
+}
+
 func findConflictWindow() (windows.HWND, string, []string) {
 	var target windows.HWND
 	var winTitle string
@@ -423,6 +519,10 @@ func findConflictWindow() (windows.HWND, string, []string) {
 		_, _, _ = procCWGetWindowTextW.Call(hwnd, uintptr(unsafe.Pointer(&titleBuf[0])), 512)
 		title := windows.UTF16ToString(titleBuf[:])
 
+		// 1. Windows UI Automation (reads DirectUIHWND and XAML controls)
+		uiaTexts := extractTextsViaUIAutomation(windows.HWND(hwnd))
+
+		// 2. Standard Win32 child windows
 		var children []string
 		childCb := syscall.NewCallback(func(ch uintptr, _ uintptr) uintptr {
 			var chBuf [512]uint16
@@ -435,7 +535,17 @@ func findConflictWindow() (windows.HWND, string, []string) {
 		})
 		procCWEnumChildWindows.Call(hwnd, childCb, 0)
 
-		fullContent := strings.ToLower(title + " " + strings.Join(children, " "))
+		// Merge texts without duplicates
+		seen := map[string]bool{}
+		var merged []string
+		for _, t := range append(uiaTexts, children...) {
+			if !seen[t] {
+				seen[t] = true
+				merged = append(merged, t)
+			}
+		}
+
+		fullContent := strings.ToLower(title + " " + strings.Join(merged, " "))
 		isConflict := strings.Contains(fullContent, "уже используется") ||
 			strings.Contains(fullContent, "используется") ||
 			strings.Contains(fullContent, "in use") ||
@@ -445,7 +555,7 @@ func findConflictWindow() (windows.HWND, string, []string) {
 		if isConflict {
 			target = windows.HWND(hwnd)
 			winTitle = title
-			allTexts = children
+			allTexts = merged
 			return 0
 		}
 		return 1
@@ -462,6 +572,132 @@ var (
 	lastExplorerStateTime time.Time
 )
 
+// getExplorerShellState queries open Explorer windows directly in-process via COM Shell.Application.
+func getExplorerShellState() (selectedPaths []string, openFolders []string) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED); err != nil {
+		if oleErr, ok := err.(*ole.OleError); !ok || (oleErr.Code() != ole.S_OK && oleErr.Code() != 1 && uintptr(oleErr.Code()) != 0x80010106) {
+			return nil, nil
+		}
+	}
+	defer ole.CoUninitialize()
+
+	unknown, err := oleutil.CreateObject("Shell.Application")
+	if err != nil {
+		return nil, nil
+	}
+	defer unknown.Release()
+
+	shell, err := unknown.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return nil, nil
+	}
+	defer shell.Release()
+
+	windowsDisp, err := oleutil.CallMethod(shell, "Windows")
+	if err != nil || windowsDisp == nil {
+		return nil, nil
+	}
+	windowsObj := windowsDisp.ToIDispatch()
+	defer windowsObj.Release()
+
+	countVar, err := oleutil.GetProperty(windowsObj, "Count")
+	if err != nil {
+		return nil, nil
+	}
+	count := int(countVar.Val)
+
+	for i := 0; i < count; i++ {
+		wDisp, err := oleutil.CallMethod(windowsObj, "Item", i)
+		if err != nil || wDisp == nil {
+			continue
+		}
+		wObj := wDisp.ToIDispatch()
+
+		// 1. LocationURL
+		if locVar, err := oleutil.GetProperty(wObj, "LocationURL"); err == nil {
+			loc := locVar.ToString()
+			if strings.HasPrefix(loc, "file:///") {
+				p := strings.TrimPrefix(loc, "file:///")
+				p = filepath.FromSlash(strings.ReplaceAll(p, "%20", " "))
+				if len(p) >= 3 && p[1] == ':' {
+					openFolders = append(openFolders, filepath.Clean(p))
+				}
+			}
+		}
+
+		// 2. Document
+		if docDisp, err := oleutil.GetProperty(wObj, "Document"); err == nil && docDisp != nil && docDisp.Val != 0 {
+			docObj := docDisp.ToIDispatch()
+			if folderDisp, err := oleutil.GetProperty(docObj, "Folder"); err == nil && folderDisp != nil && folderDisp.Val != 0 {
+				folderObj := folderDisp.ToIDispatch()
+				if selfDisp, err := oleutil.GetProperty(folderObj, "Self"); err == nil && selfDisp != nil && selfDisp.Val != 0 {
+					selfObj := selfDisp.ToIDispatch()
+					if pathVar, err := oleutil.GetProperty(selfObj, "Path"); err == nil {
+						p := pathVar.ToString()
+						if len(p) >= 3 && p[1] == ':' {
+							openFolders = append(openFolders, filepath.Clean(p))
+						}
+					}
+					selfObj.Release()
+				}
+				folderObj.Release()
+			}
+
+			if selDisp, err := oleutil.CallMethod(docObj, "SelectedItems"); err == nil && selDisp != nil && selDisp.Val != 0 {
+				selObj := selDisp.ToIDispatch()
+				if selCountVar, err := oleutil.GetProperty(selObj, "Count"); err == nil {
+					selCount := int(selCountVar.Val)
+					for j := 0; j < selCount; j++ {
+						if itemDisp, err := oleutil.CallMethod(selObj, "Item", j); err == nil && itemDisp != nil && itemDisp.Val != 0 {
+							itemObj := itemDisp.ToIDispatch()
+							if pVar, err := oleutil.GetProperty(itemObj, "Path"); err == nil {
+								p := pVar.ToString()
+								if len(p) >= 3 && p[1] == ':' {
+									selectedPaths = append(selectedPaths, filepath.Clean(p))
+								}
+							}
+							itemObj.Release()
+						}
+					}
+				}
+				selObj.Release()
+			}
+			docObj.Release()
+		}
+		wObj.Release()
+	}
+
+	return selectedPaths, openFolders
+}
+
+func getExplorerPowershellState() (selectedPaths []string, openFolders []string) {
+	cmd := `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $shell = New-Object -ComObject Shell.Application; $shell.Windows() | ForEach-Object { try { $_.Document.SelectedItems() | ForEach-Object { "SEL|" + $_.Path } } catch {}; try { $p = $_.Document.Folder.Self.Path; if ($p) { "DIR|" + $p } } catch {} }`
+	raw, err := runHiddenOutput("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd)
+	if err != nil {
+		return nil, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if strings.HasPrefix(l, "SEL|") {
+			p := strings.TrimPrefix(l, "SEL|")
+			if len(p) >= 3 && p[1] == ':' {
+				selectedPaths = append(selectedPaths, filepath.Clean(p))
+			}
+		} else if strings.HasPrefix(l, "DIR|") {
+			p := strings.TrimPrefix(l, "DIR|")
+			if len(p) >= 3 && p[1] == ':' {
+				openFolders = append(openFolders, filepath.Clean(p))
+			}
+		}
+	}
+	return selectedPaths, openFolders
+}
+
 func getExplorerState() ([]string, []string) {
 	explorerStateMu.Lock()
 	defer explorerStateMu.Unlock()
@@ -470,52 +706,77 @@ func getExplorerState() ([]string, []string) {
 		return cachedSelectedPaths, cachedOpenFolders
 	}
 
-	cmd := `[Console]::OutputEncoding=[Text.Encoding]::UTF8; $shell = New-Object -ComObject Shell.Application; $shell.Windows() | ForEach-Object { try { $_.Document.SelectedItems() | ForEach-Object { "SEL|" + $_.Path } } catch {}; try { $p = $_.Document.Folder.Self.Path; if ($p) { "DIR|" + $p } } catch {} }`
-	raw, err := runHiddenOutput("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd)
-	if err != nil {
-		return cachedSelectedPaths, cachedOpenFolders
+	sel, dirs := getExplorerShellState()
+	if len(sel) == 0 && len(dirs) == 0 {
+		sel, dirs = getExplorerPowershellState()
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	var sel, dirs []string
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if strings.HasPrefix(l, "SEL|") {
-			p := strings.TrimPrefix(l, "SEL|")
-			if len(p) >= 3 && p[1] == ':' {
-				sel = append(sel, p)
-			}
-		} else if strings.HasPrefix(l, "DIR|") {
-			p := strings.TrimPrefix(l, "DIR|")
-			if len(p) >= 3 && p[1] == ':' {
-				dirs = append(dirs, p)
-			}
-		}
-	}
 	cachedSelectedPaths = sel
 	cachedOpenFolders = dirs
 	lastExplorerStateTime = time.Now()
 	return sel, dirs
 }
 
-func extractConflictItemName(title string, children []string) string {
-	// 1. High priority: check open Explorer windows for currently selected file/folder
-	sel, _ := getExplorerState()
-	if len(sel) > 0 {
-		return filepath.Base(sel[0])
+// resolveConflictItemAndPath determines the target name and full path of the locked item.
+func resolveConflictItemAndPath(title string, children []string) (string, string) {
+	selectedPaths, openFolders := getExplorerState()
+
+	// 1. If Explorer has a selected item, check if its name matches dialog texts
+	if len(selectedPaths) > 0 {
+		for _, sel := range selectedPaths {
+			base := filepath.Base(sel)
+			if !isExcludedConflictProcess(base, 0) {
+				for _, t := range append([]string{title}, children...) {
+					if strings.Contains(strings.ToLower(t), strings.ToLower(base)) {
+						return base, sel
+					}
+				}
+			}
+		}
+		// If only one item is selected, use it directly
+		for _, sel := range selectedPaths {
+			base := filepath.Base(sel)
+			if !isExcludedConflictProcess(base, 0) {
+				return base, sel
+			}
+		}
 	}
 
-	// 2. Direct path or quotes in title or children
+	// 2. Direct path in title or children
 	for _, t := range append([]string{title}, children...) {
 		t = strings.TrimSpace(t)
 		if len(t) >= 3 && t[1] == ':' {
-			base := filepath.Base(t)
-			if !isExcludedConflictProcess(base, 0) {
-				return base
+			if _, err := os.Stat(t); err == nil {
+				return filepath.Base(t), t
 			}
 		}
+	}
 
-		// Look for quoted names like "Antigravity Tools" or «Antigravity Tools»
+	// 3. Extract candidate item name from dialog text
+	itemName := extractConflictItemName(title, children)
+
+	// 4. Match candidate item against open Explorer directories
+	if itemName != "" && itemName != "выбранный объект" {
+		for _, folder := range openFolders {
+			if strings.EqualFold(filepath.Base(folder), itemName) {
+				if _, err := os.Stat(folder); err == nil {
+					return itemName, folder
+				}
+			}
+			candidate := filepath.Join(folder, itemName)
+			if _, err := os.Stat(candidate); err == nil {
+				return itemName, candidate
+			}
+		}
+	}
+
+	return itemName, ""
+}
+
+func extractConflictItemName(title string, children []string) string {
+	// 1. Look for quoted names like "Antigravity Tools" or «Antigravity Tools»
+	for _, t := range append([]string{title}, children...) {
+		t = strings.TrimSpace(t)
 		if start := strings.IndexAny(t, `"'«`); start >= 0 {
 			rest := t[start+1:]
 			if end := strings.IndexAny(rest, `"'»`); end > 0 {
@@ -525,8 +786,10 @@ func extractConflictItemName(title string, children []string) string {
 				}
 			}
 		}
+	}
 
-		// Look for text following "повторите попытку" or "try again"
+	// 2. Look for text following "повторите попытку" or "try again"
+	for _, t := range append([]string{title}, children...) {
 		for _, marker := range []string{"повторите попытку.", "повторите попытку:", "повторите попытку", "try again.", "try again:", "try again"} {
 			if idx := strings.Index(strings.ToLower(t), marker); idx >= 0 {
 				after := strings.TrimSpace(t[idx+len(marker):])
@@ -566,46 +829,7 @@ func extractConflictItemName(title string, children []string) string {
 			}
 		}
 	}
-	return "заблокированный объект"
-}
-
-func resolveLockedPath(title string, childTexts []string, itemName string) string {
-	sel, dirs := getExplorerState()
-	if len(sel) > 0 {
-		if itemName != "" {
-			for _, s := range sel {
-				if strings.EqualFold(filepath.Base(s), itemName) {
-					return s
-				}
-			}
-		}
-		return sel[0]
-	}
-
-	for _, text := range append([]string{title}, childTexts...) {
-		text = strings.TrimSpace(text)
-		if len(text) >= 3 && text[1] == ':' {
-			if _, err := os.Stat(text); err == nil {
-				return text
-			}
-		}
-	}
-
-	if itemName != "" {
-		for _, expPath := range dirs {
-			if strings.EqualFold(filepath.Base(expPath), itemName) {
-				if _, err := os.Stat(expPath); err == nil {
-					return expPath
-				}
-			}
-			candidatePath := filepath.Join(expPath, itemName)
-			if _, err := os.Stat(candidatePath); err == nil {
-				return candidatePath
-			}
-		}
-	}
-
-	return ""
+	return "выбранный объект"
 }
 
 func matchProcessWithFolder(procName, exePath, cwd, cmdline string, windowTitles []string, folderName, folderPath string) bool {
@@ -689,7 +913,6 @@ func matchProcessWithFolder(procName, exePath, cwd, cmdline string, windowTitles
 }
 
 func findProcessesByNameOrPath(name, dirPath string) []LockProcessInfo {
-	// Build map of PID -> Window titles
 	pidWindows := map[uint32][]string{}
 	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 		if rv, _, _ := procCWIsWindowVisible.Call(hwnd); rv == 0 {
@@ -759,33 +982,36 @@ func formatConflictOverlayLabels(procs []LockProcessInfo, itemName string) (titl
 	btnText = "Закрыть и удалить"
 	cleanItem := strings.TrimSpace(itemName)
 	if cleanItem == "" {
-		cleanItem = "заблокированный объект"
+		cleanItem = "выбранный объект"
 	}
 
 	var validProcs []LockProcessInfo
 	for _, p := range procs {
-		if !isExcludedConflictProcess(p.ProcessName, p.PID) && !isExcludedConflictProcess(p.AppName, p.PID) {
+		pName := p.ProcessName
+		if pName == "" {
+			pName = p.AppName
+		}
+		if !isExcludedConflictProcess(pName, p.PID) && !isExcludedConflictProcess(p.AppName, p.PID) {
 			validProcs = append(validProcs, p)
 		}
 	}
 
 	subText = fmt.Sprintf("Объект: %s", cleanItem)
 
-	if len(validProcs) == 1 {
+	if len(validProcs) == 0 {
+		titleText = "🔒 Держит: Процесс не определён"
+	} else if len(validProcs) == 1 {
 		pName := validProcs[0].ProcessName
 		if pName == "" {
 			pName = validProcs[0].AppName
 		}
 		titleText = fmt.Sprintf("🔒 Держит: %s", pName)
-	} else if len(validProcs) > 1 {
-		pName := validProcs[0].ProcessName
-		if pName == "" {
-			pName = validProcs[0].AppName
-		}
-		titleText = fmt.Sprintf("🔒 Держит: %s и ещё %d", pName, len(validProcs)-1)
 	} else {
-		titleText = fmt.Sprintf("🔒 Заблокировано: %s", cleanItem)
-		subText = "Папка или файл заняты процессом"
+		mainProc := validProcs[0].ProcessName
+		if mainProc == "" {
+			mainProc = validProcs[0].AppName
+		}
+		titleText = fmt.Sprintf("🔒 Держит: %s (+%d)", mainProc, len(validProcs)-1)
 	}
 	return titleText, subText, btnText
 }
@@ -801,6 +1027,8 @@ func isWindowStillConflict(hwnd windows.HWND) bool {
 	_, _, _ = procCWGetWindowTextW.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&titleBuf[0])), 512)
 	title := windows.UTF16ToString(titleBuf[:])
 
+	uiaTexts := extractTextsViaUIAutomation(hwnd)
+
 	var children []string
 	cb := syscall.NewCallback(func(ch uintptr, _ uintptr) uintptr {
 		var chBuf [512]uint16
@@ -813,7 +1041,7 @@ func isWindowStillConflict(hwnd windows.HWND) bool {
 	})
 	procCWEnumChildWindows.Call(uintptr(hwnd), cb, 0)
 
-	fullContent := strings.ToLower(title + " " + strings.Join(children, " "))
+	fullContent := strings.ToLower(title + " " + strings.Join(append(uiaTexts, children...), " "))
 	return strings.Contains(fullContent, "уже используется") ||
 		strings.Contains(fullContent, "используется") ||
 		strings.Contains(fullContent, "in use") ||
@@ -825,7 +1053,7 @@ func findRetryButton(targetHWND windows.HWND) windows.HWND {
 	var retryBtn windows.HWND
 	cb := syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
 		ctrlID, _, _ := procCWGetDlgCtrlID.Call(hwnd)
-		if ctrlID == 4 { // IDRETRY
+		if ctrlID == 4 { // IDRETRY = 4
 			retryBtn = windows.HWND(hwnd)
 			return 0
 		}

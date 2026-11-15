@@ -4,6 +4,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -27,12 +28,20 @@ func TestIsExcludedConflictProcess(t *testing.T) {
 		t.Errorf("expected pulsecorehelper.exe to be excluded")
 	}
 
+	// System and Idle
+	if !isExcludedConflictProcess("System", 4) {
+		t.Errorf("expected System to be excluded")
+	}
+	if !isExcludedConflictProcess("Idle", 0) {
+		t.Errorf("expected Idle to be excluded")
+	}
+
 	// Critical Windows system processes
 	systemProcs := []string{
 		"explorer.exe", "dwm.exe", "csrss.exe", "svchost.exe",
 		"searchhost.exe", "searchindexer.exe", "ctfmon.exe",
 		"startmenuexperiencehost.exe", "shellexperiencehost.exe",
-		"system", "winlogon.exe",
+		"winlogon.exe",
 	}
 	for _, proc := range systemProcs {
 		if !isExcludedConflictProcess(proc, 9999) {
@@ -102,13 +111,14 @@ func TestFormatConflictOverlayLabels(t *testing.T) {
 		t.Errorf("unexpected btn: %s", btn)
 	}
 
-	// Multiple processes
+	// Multiple processes (e.g. app.exe (+2))
 	procsMulti := []LockProcessInfo{
 		{PID: 100, ProcessName: "Antigravity.exe"},
 		{PID: 101, ProcessName: "worker.exe"},
+		{PID: 102, ProcessName: "helper.exe"},
 	}
 	titleM, subM, _ := formatConflictOverlayLabels(procsMulti, "Antigravity Tools")
-	if titleM != "🔒 Держит: Antigravity.exe и ещё 1" {
+	if titleM != "🔒 Держит: Antigravity.exe (+2)" {
 		t.Errorf("unexpected multi title: %s", titleM)
 	}
 	if subM != "Объект: Antigravity Tools" {
@@ -117,23 +127,44 @@ func TestFormatConflictOverlayLabels(t *testing.T) {
 
 	// Zero processes (unresolved locker)
 	titleZ, subZ, _ := formatConflictOverlayLabels(nil, "Antigravity Tools")
-	if titleZ != "🔒 Заблокировано: Antigravity Tools" {
+	if titleZ != "🔒 Держит: Процесс не определён" {
 		t.Errorf("unexpected zero title: %s", titleZ)
 	}
-	if subZ != "Папка или файл заняты процессом" {
+	if subZ != "Объект: Antigravity Tools" {
 		t.Errorf("unexpected zero sub: %s", subZ)
 	}
 
-	// Filter out pulsecore.exe if accidentally passed
+	// Verify old stubs are completely gone
+	if strings.Contains(titleZ, "Заблокировано:") || strings.Contains(subZ, "Папка или файл заняты процессом") {
+		t.Errorf("old stub text detected in labels")
+	}
+
+	// Filter out pulsecore.exe and system processes if passed
 	procsWithPulsecore := []LockProcessInfo{
 		{PID: 100, ProcessName: "pulsecore.exe"},
-		{PID: 101, ProcessName: "Antigravity.exe"},
+		{PID: 101, ProcessName: "explorer.exe"},
+		{PID: 102, ProcessName: "Antigravity.exe"},
 	}
 	titleF, subF, _ := formatConflictOverlayLabels(procsWithPulsecore, "Antigravity Tools")
 	if titleF != "🔒 Держит: Antigravity.exe" {
-		t.Errorf("expected pulsecore.exe to be filtered out, got: %s", titleF)
+		t.Errorf("expected pulsecore.exe and explorer.exe to be filtered out, got: %s", titleF)
 	}
 	if subF != "Объект: Antigravity Tools" {
 		t.Errorf("unexpected filtered sub: %s", subF)
+	}
+}
+
+func TestIsPathUnderTarget(t *testing.T) {
+	if !isPathUnderTarget(`C:\Apps\Test\bin\tool.exe`, `C:\Apps\Test`) {
+		t.Errorf("expected descendant file to be under target folder")
+	}
+	if !isPathUnderTarget(`C:\Apps\Test`, `C:\Apps\Test`) {
+		t.Errorf("expected exact path to be under target")
+	}
+	if isPathUnderTarget(`C:\Apps\Testing\tool.exe`, `C:\Apps\Test`) {
+		t.Errorf("sibling folder with prefix match must not be considered under target")
+	}
+	if isPathUnderTarget(`C:\Other\file.txt`, `C:\Apps\Test`) {
+		t.Errorf("unrelated path must not be under target")
 	}
 }

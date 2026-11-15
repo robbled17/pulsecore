@@ -5,10 +5,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"unsafe"
 
+	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
 
@@ -19,8 +21,10 @@ var (
 	procRmGetList            = modRstrtMgr.NewProc("RmGetList")
 	procRmEndSession         = modRstrtMgr.NewProc("RmEndSession")
 
-	modKernel32UL              = windows.NewLazySystemDLL("kernel32.dll")
+	modKernel32UL                    = windows.NewLazySystemDLL("kernel32.dll")
 	procULQueryFullProcessImageNameW = modKernel32UL.NewProc("QueryFullProcessImageNameW")
+	procULGetFileType                = modKernel32UL.NewProc("GetFileType")
+	procULGetFinalPathNameByHandleW  = modKernel32UL.NewProc("GetFinalPathNameByHandleW")
 )
 
 type rmUniqueProcess struct {
@@ -46,12 +50,26 @@ type LockProcessInfo struct {
 	ExePath     string `json:"exePath"`
 }
 
-// collectCandidateFilesForRM recursively gathers files inside a folder up to depth 3,
+// isPathUnderTarget returns true if path is equal to target or is a descendant of target.
+func isPathUnderTarget(path, target string) bool {
+	p := strings.ToLower(filepath.Clean(strings.TrimSpace(path)))
+	t := strings.ToLower(filepath.Clean(strings.TrimSpace(target)))
+	if p == "" || t == "" {
+		return false
+	}
+	if p == t {
+		return true
+	}
+	sep := string(filepath.Separator)
+	return strings.HasPrefix(p, t+sep)
+}
+
+// collectCandidateFilesForRM recursively gathers files inside a folder up to depth 4,
 // prioritizing file types most commonly locked by running applications.
 func collectCandidateFilesForRM(targetPath string) []string {
 	info, err := os.Stat(targetPath)
 	if err != nil {
-		return nil
+		return []string{targetPath}
 	}
 	if !info.IsDir() {
 		return []string{targetPath}
@@ -69,7 +87,7 @@ func collectCandidateFilesForRM(targetPath string) []string {
 			rel, err := filepath.Rel(cleanTarget, p)
 			if err == nil && rel != "." {
 				depth := strings.Count(rel, string(filepath.Separator)) + 1
-				if depth > 3 {
+				if depth > 4 {
 					return filepath.SkipDir
 				}
 			}
@@ -78,34 +96,27 @@ func collectCandidateFilesForRM(targetPath string) []string {
 		ext := strings.ToLower(filepath.Ext(p))
 		switch ext {
 		case ".exe", ".dll", ".db", ".lock", ".log", ".asar", ".pak", ".node", ".bin", ".dat", ".tmp":
-			if len(priorityFiles) < 48 {
+			if len(priorityFiles) < 96 {
 				priorityFiles = append(priorityFiles, p)
 			}
 		default:
-			if len(normalFiles) < 32 {
+			if len(normalFiles) < 64 {
 				normalFiles = append(normalFiles, p)
 			}
 		}
-		if len(priorityFiles)+len(normalFiles) >= 80 {
+		if len(priorityFiles)+len(normalFiles) >= 160 {
 			return filepath.SkipAll
 		}
 		return nil
 	})
 
 	res := append(priorityFiles, normalFiles...)
-	if len(res) == 0 {
-		res = []string{targetPath}
-	}
+	res = append(res, cleanTarget)
 	return res
 }
 
-// FindLockingProcesses uses Windows Restart Manager API to identify blocking processes.
-func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
-	targetPath = strings.TrimSpace(targetPath)
-	if targetPath == "" {
-		return nil, fmt.Errorf("empty path")
-	}
-
+// Level 1: Windows Restart Manager
+func findLockingViaRM(targetPath string) ([]LockProcessInfo, error) {
 	filePaths := collectCandidateFilesForRM(targetPath)
 	if len(filePaths) == 0 {
 		return nil, nil
@@ -123,7 +134,6 @@ func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 	}
 	defer procRmEndSession.Call(uintptr(sessionHandle))
 
-	// Convert file paths to UTF-16 pointers
 	filePtrs := make([]*uint16, 0, len(filePaths))
 	for _, p := range filePaths {
 		ptr, err := windows.UTF16PtrFromString(p)
@@ -213,6 +223,316 @@ func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
 	return out, nil
 }
 
+// Level 2: Toolhelp32 process & module scan
+func findLockingViaModules(targetPath string) []LockProcessInfo {
+	targetPath = filepath.Clean(strings.TrimSpace(targetPath))
+	if targetPath == "" {
+		return nil
+	}
+
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return nil
+	}
+	defer windows.CloseHandle(snap)
+
+	var entry windows.ProcessEntry32
+	entry.Size = uint32(unsafe.Sizeof(entry))
+
+	var out []LockProcessInfo
+	seen := map[uint32]bool{}
+	myPID := uint32(os.Getpid())
+
+	err = windows.Process32First(snap, &entry)
+	for err == nil {
+		pid := entry.ProcessID
+		name := windows.UTF16ToString(entry.ExeFile[:])
+
+		if pid > 4 && pid != myPID && !seen[pid] && !isProtectedSystemProcess(name, pid) {
+			exePath, procName := getProcessNameAndPath(pid)
+			if procName == "" {
+				procName = name
+			}
+
+			matched := false
+			if isPathUnderTarget(exePath, targetPath) {
+				matched = true
+			}
+
+			// Check modules if not matched yet
+			if !matched {
+				modSnap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPMODULE|windows.TH32CS_SNAPMODULE32, pid)
+				if err == nil {
+					var modEntry windows.ModuleEntry32
+					modEntry.Size = uint32(unsafe.Sizeof(modEntry))
+					mErr := windows.Module32First(modSnap, &modEntry)
+					for mErr == nil {
+						modPath := windows.UTF16ToString(modEntry.ExePath[:])
+						if isPathUnderTarget(modPath, targetPath) {
+							matched = true
+							break
+						}
+						mErr = windows.Module32Next(modSnap, &modEntry)
+					}
+					_ = windows.CloseHandle(modSnap)
+				}
+			}
+
+			if matched {
+				seen[pid] = true
+				out = append(out, LockProcessInfo{
+					PID:         pid,
+					AppName:     procName,
+					ProcessName: procName,
+					ExePath:     exePath,
+				})
+			}
+		}
+
+		err = windows.Process32Next(snap, &entry)
+	}
+
+	return out
+}
+
+const (
+	systemExtendedHandleInformationClass = 64
+	statusInfoLengthMismatch             = 0xC0000004
+)
+
+type systemHandleTableEntryInfoEx struct {
+	Object                uintptr
+	UniqueProcessId       uintptr
+	HandleValue           uintptr
+	GrantedAccess         uint32
+	CreatorBackTraceIndex uint16
+	ObjectTypeIndex       uint16
+	HandleAttributes      uint32
+	Reserved              uint32
+}
+
+func findLockingViaSystemHandles(targetPath string, seen map[uint32]bool) []LockProcessInfo {
+	if procNtQuerySystemInformation.Find() != nil {
+		return nil
+	}
+
+	var size uint32 = 4 * 1024 * 1024 // 4 MB buffer
+	buf := make([]byte, size)
+	var retLen uint32
+
+	for {
+		r, _, _ := procNtQuerySystemInformation.Call(
+			uintptr(systemExtendedHandleInformationClass),
+			uintptr(unsafe.Pointer(&buf[0])),
+			uintptr(size),
+			uintptr(unsafe.Pointer(&retLen)),
+		)
+		if r == 0 {
+			break
+		}
+		if r != statusInfoLengthMismatch || retLen == 0 {
+			return nil
+		}
+		size = retLen + 256*1024
+		if size > 64*1024*1024 { // Cap at 64MB
+			return nil
+		}
+		buf = make([]byte, size)
+	}
+
+	numHandles := *(*uintptr)(unsafe.Pointer(&buf[0]))
+	if numHandles == 0 {
+		return nil
+	}
+
+	entrySize := unsafe.Sizeof(systemHandleTableEntryInfoEx{})
+	headerSize := unsafe.Sizeof(uintptr(0)) * 2
+	if uintptr(len(buf)) < headerSize+uintptr(numHandles)*entrySize {
+		maxPossible := (uintptr(len(buf)) - headerSize) / entrySize
+		if maxPossible < uintptr(numHandles) {
+			numHandles = maxPossible
+		}
+	}
+
+	entries := unsafe.Slice((*systemHandleTableEntryInfoEx)(unsafe.Pointer(&buf[headerSize])), int(numHandles))
+	myPID := uint32(os.Getpid())
+
+	procCache := map[uint32]windows.Handle{}
+	defer func() {
+		for _, h := range procCache {
+			if h != 0 {
+				_ = windows.CloseHandle(h)
+			}
+		}
+	}()
+
+	var out []LockProcessInfo
+	currProcess := windows.CurrentProcess()
+
+	for i := 0; i < len(entries); i++ {
+		e := &entries[i]
+		pid := uint32(e.UniqueProcessId)
+		if pid <= 4 || pid == myPID || seen[pid] {
+			continue
+		}
+
+		hProc, cached := procCache[pid]
+		if !cached {
+			var err error
+			hProc, err = windows.OpenProcess(windows.PROCESS_DUP_HANDLE, false, pid)
+			if err != nil {
+				procCache[pid] = 0
+				continue
+			}
+			procCache[pid] = hProc
+		}
+		if hProc == 0 {
+			continue
+		}
+
+		var dupHandle windows.Handle
+		err := windows.DuplicateHandle(
+			hProc,
+			windows.Handle(e.HandleValue),
+			currProcess,
+			&dupHandle,
+			0,
+			false,
+			windows.DUPLICATE_SAME_ACCESS,
+		)
+		if err != nil || dupHandle == 0 {
+			continue
+		}
+
+		ft, _, _ := procULGetFileType.Call(uintptr(dupHandle))
+		if ft != 1 { // FILE_TYPE_DISK only (prevents hanging on pipes/sockets)
+			_ = windows.CloseHandle(dupHandle)
+			continue
+		}
+
+		var pathBuf [1024]uint16
+		n, _, _ := procULGetFinalPathNameByHandleW.Call(
+			uintptr(dupHandle),
+			uintptr(unsafe.Pointer(&pathBuf[0])),
+			uintptr(len(pathBuf)),
+			0, // FILE_NAME_NORMALIZED
+		)
+		_ = windows.CloseHandle(dupHandle)
+
+		if n > 0 && n < uintptr(len(pathBuf)) {
+			hPath := windows.UTF16ToString(pathBuf[:n])
+			hPath = strings.TrimPrefix(hPath, `\\?\`)
+			if isPathUnderTarget(hPath, targetPath) {
+				exePath, procName := getProcessNameAndPath(pid)
+				if procName != "" && !isProtectedSystemProcess(procName, pid) {
+					seen[pid] = true
+					out = append(out, LockProcessInfo{
+						PID:         pid,
+						AppName:     procName,
+						ProcessName: procName,
+						ExePath:     exePath,
+					})
+				}
+			}
+		}
+	}
+
+	return out
+}
+
+// Level 3: CWD and Open Handles scan
+func findLockingViaHandlesAndCWD(targetPath string) []LockProcessInfo {
+	targetPath = filepath.Clean(strings.TrimSpace(targetPath))
+	if targetPath == "" {
+		return nil
+	}
+
+	var out []LockProcessInfo
+	seen := map[uint32]bool{}
+	myPID := uint32(os.Getpid())
+
+	// 1. CWD check using gopsutil processes
+	if procs, err := process.Processes(); err == nil {
+		for _, p := range procs {
+			pid := uint32(p.Pid)
+			if pid <= 4 || pid == myPID || seen[pid] {
+				continue
+			}
+			pName, err := p.Name()
+			if err != nil || pName == "" || isProtectedSystemProcess(pName, pid) {
+				continue
+			}
+			cwd, err := p.Cwd()
+			if err == nil && isPathUnderTarget(cwd, targetPath) {
+				seen[pid] = true
+				exePath, _ := p.Exe()
+				out = append(out, LockProcessInfo{
+					PID:         pid,
+					AppName:     pName,
+					ProcessName: pName,
+					ExePath:     exePath,
+				})
+			}
+		}
+	}
+
+	// 2. Open handles check via NtQuerySystemInformation
+	handleProcs := findLockingViaSystemHandles(targetPath, seen)
+	for _, p := range handleProcs {
+		if !seen[p.PID] {
+			seen[p.PID] = true
+			out = append(out, p)
+		}
+	}
+
+	return out
+}
+
+// FindLockingProcesses executes a 3-level cascading search for processes holding targetPath (like LockHunter):
+// Level 1: Windows Restart Manager (rstrtmgr.dll)
+// Level 2: Toolhelp32 process & module scan (process exe and loaded DLLs)
+// Level 3: Open handles via NtQuerySystemInformation and Process CWD
+func FindLockingProcesses(targetPath string) ([]LockProcessInfo, error) {
+	targetPath = strings.TrimSpace(targetPath)
+	if targetPath == "" {
+		return nil, fmt.Errorf("empty path")
+	}
+
+	cleanTarget := filepath.Clean(targetPath)
+	seen := map[uint32]bool{}
+	var result []LockProcessInfo
+
+	addProcs := func(procs []LockProcessInfo) {
+		for _, p := range procs {
+			if p.PID > 4 && !seen[p.PID] && !isProtectedSystemProcess(p.ProcessName, p.PID) && !isProtectedSystemProcess(p.AppName, p.PID) {
+				seen[p.PID] = true
+				result = append(result, p)
+			}
+		}
+	}
+
+	// Level 1: Windows Restart Manager
+	if rmProcs, err := findLockingViaRM(cleanTarget); err == nil && len(rmProcs) > 0 {
+		addProcs(rmProcs)
+	}
+
+	// Level 2: Process ExePath & Module Scan
+	if len(result) == 0 {
+		if modProcs := findLockingViaModules(cleanTarget); len(modProcs) > 0 {
+			addProcs(modProcs)
+		}
+	}
+
+	// Level 3: CWD and Open Handles Scan
+	if len(result) == 0 {
+		if handleProcs := findLockingViaHandlesAndCWD(cleanTarget); len(handleProcs) > 0 {
+			addProcs(handleProcs)
+		}
+	}
+
+	return result, nil
+}
+
 func getProcessNameAndPath(pid uint32) (exePath string, procName string) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
@@ -247,12 +567,15 @@ func isProtectedSystemProcess(procName string, pid uint32) bool {
 		}
 	}
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(procName)))
+	if base == "" || base == "system" || base == "idle" {
+		return true
+	}
 	if isSelfOrWebView(base) {
 		return true
 	}
 	switch base {
 	case "explorer.exe", "csrss.exe", "lsass.exe", "services.exe",
-		"smss.exe", "wininit.exe", "winlogon.exe", "system",
+		"smss.exe", "wininit.exe", "winlogon.exe",
 		"svchost.exe", "dwm.exe", "pulsecore.exe", "fontdrvhost.exe",
 		"msedgewebview2.exe", "pulsecorehelper.exe", "conhost.exe",
 		"runtimebroker.exe", "sihost.exe", "taskhostw.exe",
@@ -273,16 +596,19 @@ func TerminateLockingProcesses(procs []LockProcessInfo) (terminated int, skipped
 		}
 
 		h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, p.PID)
-		if err != nil {
-			skipped++
-			continue
-		}
-		if err := windows.TerminateProcess(h, 1); err == nil {
-			terminated++
+		if err == nil {
+			if err := windows.TerminateProcess(h, 1); err == nil {
+				terminated++
+			} else {
+				skipped++
+			}
+			windows.CloseHandle(h)
 		} else {
 			skipped++
 		}
-		windows.CloseHandle(h)
+
+		// Fallback to taskkill /F /T /PID to terminate child processes
+		_ = exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", p.PID)).Run()
 	}
 	return terminated, skipped, nil
 }
@@ -299,4 +625,3 @@ func UnlockPath(targetPath string) (int, error) {
 	term, _, err := TerminateLockingProcesses(procs)
 	return term, err
 }
-
