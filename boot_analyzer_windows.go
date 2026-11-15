@@ -226,16 +226,38 @@ func readBootEventsFromLog() (bootSec, kernelSec, desktopSec float64, degraders 
 // readStartupApprovedBytes reads the binary value from StartupApproved key.
 func readStartupApprovedBytes(root registry.Key, subKey, valName string) []byte {
 	k, err := registry.OpenKey(root, subKey, registry.QUERY_VALUE)
-	if err != nil {
-		return nil
+	if err == nil {
+		defer k.Close()
+		if b, _, bErr := k.GetBinaryValue(valName); bErr == nil {
+			return b
+		}
 	}
-	defer k.Close()
 
-	b, _, err := k.GetBinaryValue(valName)
-	if err != nil {
-		return nil
+	// If root was HKLM, also check HKCU user override and 32-bit Run32
+	if root == registry.LOCAL_MACHINE {
+		if k2, err2 := registry.OpenKey(registry.CURRENT_USER, subKey, registry.QUERY_VALUE); err2 == nil {
+			defer k2.Close()
+			if b2, _, bErr2 := k2.GetBinaryValue(valName); bErr2 == nil {
+				return b2
+			}
+		}
+		if strings.HasSuffix(subKey, `\Run`) {
+			subKey32 := subKey + "32"
+			if k3, err3 := registry.OpenKey(registry.LOCAL_MACHINE, subKey32, registry.QUERY_VALUE); err3 == nil {
+				defer k3.Close()
+				if b3, _, bErr3 := k3.GetBinaryValue(valName); bErr3 == nil {
+					return b3
+				}
+			}
+			if k4, err4 := registry.OpenKey(registry.CURRENT_USER, subKey32, registry.QUERY_VALUE); err4 == nil {
+				defer k4.Close()
+				if b4, _, bErr4 := k4.GetBinaryValue(valName); bErr4 == nil {
+					return b4
+				}
+			}
+		}
 	}
-	return b
+	return nil
 }
 
 // isStartupApprovedEnabled checks if the first byte of StartupApproved binary is enabled (0x02 = enabled, 0x03 = disabled).
@@ -245,6 +267,26 @@ func isStartupApprovedEnabled(approvedBytes []byte) bool {
 	}
 	// Even number or 0x02 = enabled; odd number (0x01, 0x03) = disabled
 	return approvedBytes[0]%2 == 0
+}
+
+func readFolderStartupApproved(root registry.Key, m map[string][]byte) {
+	k, err := registry.OpenKey(root, `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder`, registry.QUERY_VALUE)
+	if err != nil {
+		return
+	}
+	defer k.Close()
+
+	if valNames, vErr := k.ReadValueNames(0); vErr == nil {
+		for _, vn := range valNames {
+			if b, _, bErr := k.GetBinaryValue(vn); bErr == nil {
+				low := strings.ToLower(vn)
+				if existing, exists := m[low]; exists && !isStartupApprovedEnabled(existing) {
+					continue
+				}
+				m[low] = b
+			}
+		}
+	}
 }
 
 // collectRegistryRunItems reads Run keys and checks StartupApproved.
@@ -305,17 +347,8 @@ func collectStartupFolderItems(folderPath, location, idPrefix string) []BootStar
 	}
 
 	approvedBytesMap := map[string][]byte{}
-	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder`, registry.QUERY_VALUE)
-	if err == nil {
-		if valNames, vErr := k.ReadValueNames(0); vErr == nil {
-			for _, vn := range valNames {
-				if b, _, bErr := k.GetBinaryValue(vn); bErr == nil {
-					approvedBytesMap[strings.ToLower(vn)] = b
-				}
-			}
-		}
-		k.Close()
-	}
+	readFolderStartupApproved(registry.CURRENT_USER, approvedBytesMap)
+	readFolderStartupApproved(registry.LOCAL_MACHINE, approvedBytesMap)
 
 	var items []BootStartupItem
 	for _, entry := range entries {
@@ -631,13 +664,17 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 		switch mode {
 		case "disabled":
 			// Write disabled bytes (0x03)
-			_ = writeStartupApproved(root, approvedKeyPath, valName, false)
+			if err := writeStartupApproved(root, approvedKeyPath, valName, false); err != nil {
+				return err
+			}
 			// Delete delayed task if present
 			_ = exec.Command("schtasks", "/delete", "/tn", taskName, "/f").Run()
 
 		case "delayed":
 			// Disable in StartupApproved
-			_ = writeStartupApproved(root, approvedKeyPath, valName, false)
+			if err := writeStartupApproved(root, approvedKeyPath, valName, false); err != nil {
+				return err
+			}
 			// Create delayed task for 60s
 			if cmd != "" {
 				cmdArgs := []string{"/create", "/tn", taskName, "/tr", cmd, "/sc", "onlogon", "/delay", "0001:00", "/f", "/rl", "limited"}
@@ -650,7 +687,9 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 			// Delete delayed task
 			_ = exec.Command("schtasks", "/delete", "/tn", taskName, "/f").Run()
 			// Write enabled bytes (0x02)
-			_ = writeStartupApproved(root, approvedKeyPath, valName, true)
+			if err := writeStartupApproved(root, approvedKeyPath, valName, true); err != nil {
+				return err
+			}
 		}
 
 	case "startup_user", "startup_common":
@@ -666,10 +705,14 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 
 		switch mode {
 		case "disabled":
-			_ = writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, false)
+			if err := writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, false); err != nil {
+				return err
+			}
 			_ = exec.Command("schtasks", "/delete", "/tn", taskName, "/f").Run()
 		case "delayed":
-			_ = writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, false)
+			if err := writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, false); err != nil {
+				return err
+			}
 			targetFolder := filepath.Join(os.Getenv("APPDATA"), `Microsoft\Windows\Start Menu\Programs\Startup`)
 			if itemType == "startup_common" {
 				targetFolder = filepath.Join(os.Getenv("ProgramData"), `Microsoft\Windows\Start Menu\Programs\Startup`)
@@ -681,7 +724,9 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 			_ = c.Run()
 		case "enabled":
 			_ = exec.Command("schtasks", "/delete", "/tn", taskName, "/f").Run()
-			_ = writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, true)
+			if err := writeStartupApproved(registry.CURRENT_USER, approvedKeyPath, fileName, true); err != nil {
+				return err
+			}
 		}
 
 	case "task":
@@ -712,7 +757,39 @@ func (a *App) SetStartupItemMode(id string, mode string) error {
 func writeStartupApproved(root registry.Key, keyPath, valName string, enable bool) error {
 	k, _, err := registry.CreateKey(root, keyPath, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
-		return err
+		if root == registry.LOCAL_MACHINE {
+			// Non-elevated: attempt elevated PowerShell via UAC
+			valBytes := make([]byte, 12)
+			if enable {
+				valBytes[0] = 0x02
+			} else {
+				valBytes[0] = 0x03
+			}
+			ft := time.Now().UnixNano()/100 + 116444736000000000
+			for i := 0; i < 8; i++ {
+				valBytes[4+i] = byte((ft >> (i * 8)) & 0xFF)
+			}
+			byteList := make([]string, len(valBytes))
+			for i, b := range valBytes {
+				byteList[i] = strconv.Itoa(int(b))
+			}
+			bytesStr := strings.Join(byteList, ",")
+			regPath := `HKLM:\` + keyPath
+			psScript := fmt.Sprintf(`
+$bytes = [byte[]]@(%s)
+if (!(Test-Path -LiteralPath %s)) {
+    New-Item -Path %s -Force | Out-Null
+}
+Set-ItemProperty -LiteralPath %s -Name %s -Value $bytes -Type Binary
+`, bytesStr, quotePS(regPath), quotePS(regPath), quotePS(regPath), quotePS(valName))
+
+			_, elevErr := runElevatedPowerShell(psScript)
+			if elevErr != nil {
+				return fmt.Errorf("требуются права администратора для изменения HKLM: %w", elevErr)
+			}
+			return nil
+		}
+		return fmt.Errorf("ошибка доступа к реестру: %w", err)
 	}
 	defer k.Close()
 

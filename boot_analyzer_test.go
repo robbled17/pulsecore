@@ -126,3 +126,68 @@ func TestSortStartupItems(t *testing.T) {
 		}
 	}
 }
+
+func TestStartupItemModeSwitchingAndEnabledCount(t *testing.T) {
+	// Items including Run (HKCU, HKLM) and StartupFolder
+	items := []BootStartupItem{
+		{ID: "reg:hkcu:Discord", Name: "Discord", Status: "enabled", Location: "registry_user"},
+		{ID: "reg:hklm:Riot Vanguard", Name: "Riot Vanguard", Status: "enabled", Location: "registry_machine"},
+		{ID: "startup_user:ClickMonitorDDC.lnk", Name: "ClickMonitorDDC", Status: "enabled", Location: "startup_folder"},
+		{ID: "reg:hkcu:Telegram", Name: "Telegram", Status: "disabled", Location: "registry_user"},
+	}
+
+	calcEnabled := func(list []BootStartupItem) int {
+		cnt := 0
+		for _, it := range list {
+			if it.Status == "enabled" {
+				cnt++
+			}
+		}
+		return cnt
+	}
+
+	if count := calcEnabled(items); count != 3 {
+		t.Fatalf("expected 3 enabled items initially, got %d", count)
+	}
+
+	// 1. Simulate disabling StartupFolder item (ClickMonitorDDC)
+	for i := range items {
+		if items[i].ID == "startup_user:ClickMonitorDDC.lnk" {
+			items[i].Status = "disabled"
+		}
+	}
+	if count := calcEnabled(items); count != 2 {
+		t.Fatalf("expected 2 enabled items after disabling StartupFolder item, got %d", count)
+	}
+
+	// 2. Simulate disabling HKLM Run item (Riot Vanguard)
+	for i := range items {
+		if items[i].ID == "reg:hklm:Riot Vanguard" {
+			items[i].Status = "disabled"
+		}
+	}
+	if count := calcEnabled(items); count != 1 {
+		t.Fatalf("expected 1 enabled item after disabling Riot Vanguard, got %d", count)
+	}
+
+	// 3. Verify sorting brings disabled items to the bottom
+	sortStartupItems(items)
+	if items[0].Name != "Discord" || items[0].Status != "enabled" {
+		t.Errorf("expected Discord to remain at top as enabled, got %+v", items[0])
+	}
+	for i := 1; i < len(items); i++ {
+		if items[i].Status != "disabled" {
+			t.Errorf("expected item[%d] to be disabled at bottom, got %+v", i, items[i])
+		}
+	}
+
+	// 4. Test StartupApproved byte checks (0x02 = enabled, 0x03 = disabled)
+	bytesDisabled := []byte{0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	bytesEnabled := []byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	if isStartupApprovedEnabled(bytesDisabled) {
+		t.Errorf("expected bytesDisabled to be reported as disabled")
+	}
+	if !isStartupApprovedEnabled(bytesEnabled) {
+		t.Errorf("expected bytesEnabled to be reported as enabled")
+	}
+}

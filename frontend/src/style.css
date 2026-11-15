@@ -2090,7 +2090,11 @@ html, body, .titlebar, .sidebar, .content, .panel, .metric-card, .nav-item, .btn
 body.mini-hud-active #toast,
 body.game-overlay-active #toast,
 body.mini-hud-active .toast,
-body.game-overlay-active .toast {
+body.game-overlay-active .toast,
+body.mini-hud-active #update-banner,
+body.game-overlay-active #update-banner,
+body.mini-hud-active .update-banner,
+body.game-overlay-active .update-banner {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -3366,10 +3370,33 @@ body.game-overlay-active:not(.mini-hud-active) #gameoverlay:not(.hidden) {
 .ov-badge.ov-ft b {
   color: #fbbf24 !important;
 }
-.ov-badge .ov-info {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-right: 2px;
+.ov-badge .ov-info,
+.ov-tip-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  transition: all 0.15s ease;
+  margin: 0 1px;
+}
+.ov-tip-circle:hover,
+.ov-badge:hover .ov-tip-circle,
+.ov-badge .ov-info:hover {
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.28);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
 }
 .ov-close {
   background: transparent !important;

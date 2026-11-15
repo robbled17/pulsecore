@@ -2624,12 +2624,15 @@ function syncBootCardExpanded() {
 }
 
 async function loadBootDiagnostics(force = false) {
-  if (bootDiagLoading) return
+  if (bootDiagLoading && !force) return
   if (bootDiagData && !force) {
     renderBootDiagnostics(bootDiagData)
     return
   }
   bootDiagLoading = true
+  if (force) {
+    bootDiagData = null
+  }
   try {
     const data = await GetBootDiagnostics()
     bootDiagData = data
@@ -3932,6 +3935,7 @@ async function refreshAllDiskSmart(force = false) {
 function setHudMode(enabled) {
   hudEnabled = !!enabled
   if (enabled) {
+    hideUpdateBanner()
     setGameOverlayMode(false, true)
     document.body.classList.add('mini-hud-active')
     document.documentElement.classList.add('mini-hud-active')
@@ -3985,6 +3989,7 @@ let gameOverlayTimer = null
 function setGameOverlayMode(enabled, skipBackend = false) {
   gameOverlayOn = !!enabled
   if (enabled) {
+    hideUpdateBanner()
     hudEnabled = false
     document.body.classList.remove('mini-hud-active')
     document.documentElement.classList.remove('mini-hud-active')
@@ -7829,6 +7834,9 @@ function wireTooltips() {
 
   const showInfoPopup = (infoEl) => {
     if (!popupEl) return
+    if (hudEnabled || gameOverlayOn || document.body.classList.contains('mini-hud-active') || document.body.classList.contains('game-overlay-active') || infoEl.closest('#gameoverlay') || infoEl.closest('#minihud')) {
+      return
+    }
     const key = infoEl.getAttribute('data-tooltip-key')
     const text = (key ? t(key) : '') || infoEl.getAttribute('data-tip') || infoEl.getAttribute('title') || ''
     if (!text) return
@@ -7969,6 +7977,9 @@ function initUpdater() {
 }
 
 function showUpdateBanner(info) {
+  if (hudEnabled || gameOverlayOn || document.body.classList.contains('mini-hud-active') || document.body.classList.contains('game-overlay-active')) {
+    return
+  }
   activeUpdateInfo = info
   const banner = $('update-banner')
   const title = $('update-banner-title')
