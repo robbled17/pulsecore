@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "模拟传感器数据已应用",
   "devHardwareAppliedToast": "硬件配置已成功更新",
   "devDiskRemovedToast": "已从配置中移除磁盘",
-  "devDiskAddedToast": "已添加新磁盘至配置"
+  "devDiskAddedToast": "已添加新磁盘至配置",
+  "devResetRealBtn": "↺ 重置为真实电脑",
+  "devResetRealToast": "所有模拟已重置为真实电脑配置与传感器数据"
 }

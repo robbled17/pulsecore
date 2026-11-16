@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "Модельденген датчик көрсеткіштері қолданылды",
   "devHardwareAppliedToast": "Жабдық профилі сәтті жаңартылды",
   "devDiskRemovedToast": "Диск конфигурациядан жойылды",
-  "devDiskAddedToast": "Конфигурацияға жаңа диск қосылды"
+  "devDiskAddedToast": "Конфигурацияға жаңа диск қосылды",
+  "devResetRealBtn": "↺ Нақты ДК-ге қайтару",
+  "devResetRealToast": "Барлық модельдеулер нақты ДК конфигурациясына қайтарылды"
 }

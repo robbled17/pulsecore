@@ -678,6 +678,132 @@ func (a *App) ResetDevMode() DevModeState {
 	return a.GetDevModeState()
 }
 
+// ResetSimulationsToReal mirrors the actual physical hardware and live sensors into the simulator without leaving Dev Mode.
+func (a *App) ResetSimulationsToReal() DevModeState {
+	if a == nil {
+		return DevModeState{}
+	}
+
+	realHw := a.realProvider.GetStaticHardware()
+	vm, _ := a.realProvider.GetRAM()
+	bat := a.realProvider.GetBattery(time.Now())
+	cpuPct, perCore := a.realProvider.GetCPULoad()
+	temp, tempAvail, _, _, _ := a.realProvider.GetCPUTemp(cpuPct)
+	gpuPct, vramUsed, _, vramDed, gpuTemp, gpuTempAvail, gpuName := a.realProvider.GetGPU("overview")
+	realDisks := a.realProvider.GetDisks(time.Now())
+	uptime := a.realProvider.GetUptime()
+
+	a.devMu.Lock()
+	if a.simProvider == nil {
+		a.simProvider = NewSimulatedMetricsProvider()
+	}
+	sim := a.simProvider
+	sim.mu.Lock()
+
+	// Live sensor readings
+	sim.cpuPercent = cpuPct
+	if len(perCore) > 0 {
+		sim.cpuPerCore = append([]float64(nil), perCore...)
+	}
+	sim.cpuTemp = temp
+	sim.cpuTempAvail = tempAvail
+	if vm != nil && vm.Total > 0 {
+		sim.ramTotalMB = vm.Total / (1024 * 1024)
+		sim.ramUsedMB = vm.Used / (1024 * 1024)
+	}
+	sim.gpuPercent = gpuPct
+	sim.vramUsedMB = vramUsed
+	sim.vramTotalMB = vramDed
+	sim.gpuTemp = gpuTemp
+	sim.gpuTempAvail = gpuTempAvail
+	sim.uptimeDuration = uptime
+
+	// Real hardware profile
+	sim.cpuName = realHw.cpuName
+	sim.physicalCores = realHw.physicalCores
+	sim.logicalCores = realHw.logicalCores
+	sim.freqMHz = realHw.frequencyMHz
+	sim.cpuScore = calcCPUPowerScore(realHw.cpuName, realHw.physicalCores, realHw.logicalCores, realHw.frequencyMHz)
+
+	sim.gpuName = gpuName
+	if sim.gpuName == "" {
+		sim.gpuName = realHw.gpuName
+	}
+	sim.gpuVRAMMB = float64(realHw.gpuVRAM) / (1024 * 1024)
+	if sim.gpuVRAMMB <= 0 {
+		sim.gpuVRAMMB = vramDed
+	}
+	sim.isIntegrated = detectIntegratedGPU(sim.gpuName, sim.gpuVRAMMB)
+	sim.gpuScore = calcGPUPowerScore(sim.gpuName, sim.isIntegrated, sim.gpuVRAMMB/1024.0)
+
+	// Real battery / laptop status
+	sim.isLaptop = bat.Available
+	sim.batteryPercent = bat.Percent
+	sim.pluggedIn = bat.PluggedIn
+	sim.wearPercent = bat.WearPercent
+	sim.powerDrawWatts = bat.PowerDrawWatts
+
+	// Real disks
+	realLocalDrives := a.realProvider.GetLocalDrives()
+	var simDisks []SimulatedDisk
+	if len(realLocalDrives) > 0 {
+		for _, ld := range realLocalDrives {
+			letter := ld.Letter
+			if letter == "" {
+				letter = strings.TrimSuffix(strings.TrimSuffix(ld.Mount, `\`), ":")
+			}
+			diskType := "NVMe SSD"
+			if strings.EqualFold(ld.DriveType, "HDD") {
+				diskType = "HDD"
+			} else if strings.EqualFold(ld.DriveType, "SATA SSD") {
+				diskType = "SATA SSD"
+			}
+			model := "Local Disk " + letter
+			if ld.Label != "" {
+				model = ld.Label + " (" + letter + ":)"
+			}
+			simDisks = append(simDisks, SimulatedDisk{
+				Letter:    letter,
+				Type:      diskType,
+				Model:     model,
+				TotalGB:   ld.TotalGB,
+				UsedPct:   ld.UsedPercent,
+				HealthPct: 100.0,
+				TempC:     35.0,
+			})
+		}
+	} else {
+		for _, d := range realDisks {
+			letter := strings.TrimSuffix(strings.TrimSuffix(d.Mount, `\`), ":")
+			if letter == "" {
+				letter = "C"
+			}
+			simDisks = append(simDisks, SimulatedDisk{
+				Letter:    letter,
+				Type:      "NVMe SSD",
+				Model:     "System Drive " + letter,
+				TotalGB:   d.TotalGB,
+				UsedPct:   d.Percent,
+				HealthPct: 100.0,
+				TempC:     35.0,
+			})
+		}
+	}
+	if len(simDisks) == 0 {
+		simDisks = []SimulatedDisk{
+			{Letter: "C", Type: "NVMe SSD", Model: "System Drive", TotalGB: 512, UsedPct: 45, HealthPct: 100, TempC: 35},
+		}
+	}
+	sim.disks = simDisks
+	sim.vampires = nil
+
+	sim.mu.Unlock()
+	a.devMu.Unlock()
+
+	a.collectOnce()
+	return a.GetDevModeState()
+}
+
 // GetRawTelemetry returns the current values from all hardware/sensors with their sources.
 func (a *App) GetRawTelemetry() []RawTelemetryItem {
 	if a == nil {

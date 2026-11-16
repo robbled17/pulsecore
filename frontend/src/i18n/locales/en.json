@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "Simulated sensor metrics applied",
   "devHardwareAppliedToast": "Hardware profile updated successfully",
   "devDiskRemovedToast": "Disk removed from configuration",
-  "devDiskAddedToast": "New disk added to configuration"
+  "devDiskAddedToast": "New disk added to configuration",
+  "devResetRealBtn": "↺ Reset to Real PC",
+  "devResetRealToast": "All simulations reset to physical PC hardware and live sensors"
 }

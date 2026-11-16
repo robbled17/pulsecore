@@ -11,6 +11,7 @@ import {
   SetSimulatedDisks,
   SetSimulatedBattery,
   ResetDevMode,
+  ResetSimulationsToReal,
   GetRawTelemetry,
   UnlockFileDryRun,
   ApplyDiskCleanup,
@@ -155,6 +156,24 @@ function wireHeaderAndNav() {
   if (badge) {
     badge.addEventListener('click', () => {
       if (setActiveTabFn) setActiveTabFn('dev')
+    })
+  }
+
+  const resetRealBtn = $('btn-dev-reset-real')
+  if (resetRealBtn) {
+    resetRealBtn.addEventListener('click', async () => {
+      try {
+        devState = await ResetSimulationsToReal()
+        renderDevSensors()
+        renderDevHardware()
+        renderDevDisks()
+        if (showToastFn) {
+          showToastFn(t('devResetRealToast'), true)
+        }
+        if (refreshFn) refreshFn()
+      } catch (err) {
+        console.error('ResetSimulationsToReal failed:', err)
+      }
     })
   }
 

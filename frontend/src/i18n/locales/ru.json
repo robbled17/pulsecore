@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "Показатели датчиков обновлены",
   "devHardwareAppliedToast": "Конфигурация комплектующих успешно обновлена",
   "devDiskRemovedToast": "Диск удалён из конфигурации",
-  "devDiskAddedToast": "Новый диск добавлен в конфигурацию"
+  "devDiskAddedToast": "Новый диск добавлен в конфигурацию",
+  "devResetRealBtn": "↺ Сбросить к реальному ПК",
+  "devResetRealToast": "Все симуляции сброшены к реальной конфигурации и датчикам ПК"
 }

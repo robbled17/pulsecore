@@ -374,3 +374,30 @@ func TestRealMetricsProviderNormalMode(t *testing.T) {
 		t.Logf("temperature status: %.1f (available=%v)", m.TemperatureC, m.TemperatureAvailable)
 	}
 }
+
+func TestResetSimulationsToReal(t *testing.T) {
+	app := NewApp()
+	app.SetDevMode(true)
+
+	// Apply an extreme preset first (Max Load)
+	app.ApplyDevPreset("max_load")
+	stMax := app.GetDevModeState()
+	if stMax.Sensors.CPUPercent < 90 {
+		t.Fatalf("expected high CPU in max_load, got %.1f", stMax.Sensors.CPUPercent)
+	}
+
+	// Reset simulations to mirror real PC without leaving Dev Mode
+	stReal := app.ResetSimulationsToReal()
+	if !stReal.DevMode {
+		t.Fatal("DevMode should remain true after ResetSimulationsToReal")
+	}
+	if stReal.Hardware.CPUName == "" || stReal.Hardware.CPUName == "-" {
+		t.Fatalf("expected real CPUName, got %q", stReal.Hardware.CPUName)
+	}
+	if stReal.Hardware.CPUCores <= 0 {
+		t.Fatalf("expected real CPU cores, got %d", stReal.Hardware.CPUCores)
+	}
+	if len(stReal.Disks) == 0 {
+		t.Fatal("expected real disks list")
+	}
+}

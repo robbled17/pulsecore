@@ -558,6 +558,10 @@ export function ResetDevMode() {
   return window['go']['main']['App']['ResetDevMode']();
 }
 
+export function ResetSimulationsToReal() {
+  return window['go']['main']['App']['ResetSimulationsToReal']();
+}
+
 export function ResetIntelligenceProfile() {
   return window['go']['main']['App']['ResetIntelligenceProfile']();
 }

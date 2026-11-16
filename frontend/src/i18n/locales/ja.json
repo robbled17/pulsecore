@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "シミュレートされたセンサー指標が適用されました",
   "devHardwareAppliedToast": "ハードウェアプロファイルが正常に更新されました",
   "devDiskRemovedToast": "構成からディスクが削除されました",
-  "devDiskAddedToast": "構成に新しいディスクが追加されました"
+  "devDiskAddedToast": "構成に新しいディスクが追加されました",
+  "devResetRealBtn": "↺ 実機PCにリセット",
+  "devResetRealToast": "すべてのシミュレーションが実機PCの構成とセンサーにリセットされました"
 }

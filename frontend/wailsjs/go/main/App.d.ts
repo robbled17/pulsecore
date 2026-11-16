@@ -281,6 +281,8 @@ export function RenameGame(arg1:string,arg2:string):Promise<void>;
 
 export function ResetDevMode():Promise<main.DevModeState>;
 
+export function ResetSimulationsToReal():Promise<main.DevModeState>;
+
 export function ResetIntelligenceProfile():Promise<void>;
 
 export function ResizeMiniHUD(arg1:number,arg2:number):Promise<void>;

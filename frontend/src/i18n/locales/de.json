@@ -1095,5 +1095,7 @@
   "devSensorsAppliedToast": "Simulierte Sensormesswerte angewendet",
   "devHardwareAppliedToast": "Hardwareprofil erfolgreich aktualisiert",
   "devDiskRemovedToast": "Festplatte aus Konfiguration entfernt",
-  "devDiskAddedToast": "Neue Festplatte zur Konfiguration hinzugefügt"
+  "devDiskAddedToast": "Neue Festplatte zur Konfiguration hinzugefügt",
+  "devResetRealBtn": "↺ Auf echten PC zurücksetzen",
+  "devResetRealToast": "Alle Simulationen wurden auf die echte PC-Hardware zurückgesetzt"
 }
