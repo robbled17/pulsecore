@@ -62,6 +62,12 @@ export async function initDevMode({ showToast, setActiveTab, refresh, escapeHtml
     const isDev = await IsDevMode()
     if (isDev) {
       await enableDevModeUI(false)
+    } else {
+      const badge = $('dev-mode-badge')
+      if (badge) badge.classList.add('hidden')
+      document.querySelectorAll('.dev-mode-nav').forEach((nav) => {
+        nav.classList.add('hidden')
+      })
     }
   } catch (err) {
     console.error('Failed to check Dev Mode state:', err)
@@ -69,35 +75,26 @@ export async function initDevMode({ showToast, setActiveTab, refresh, escapeHtml
 }
 
 function wireVersionClickTrigger() {
-  const triggerElements = [
-    $('about-app-name'),
-    document.querySelector('.brand-ver'),
-    $('brand-link'),
-  ].filter(Boolean)
+  const trigger = $('about-app-name')
+  if (!trigger) return
 
-  triggerElements.forEach((el) => {
-    el.addEventListener('click', async (e) => {
-      if (el.id === 'brand-link' && !e.altKey && !e.ctrlKey) {
-        if (!e.target.closest('.brand-ver')) return
+  trigger.addEventListener('click', async () => {
+    clearTimeout(versionClickTimer)
+    versionClickCount++
+
+    if (versionClickCount >= 4 && versionClickCount < 7) {
+      const remaining = 7 - versionClickCount
+      if (showToastFn) {
+        showToastFn(t('devModeClicksRemaining', { count: remaining }))
       }
+    } else if (versionClickCount >= 7) {
+      versionClickCount = 0
+      await enableDevModeUI(true)
+    }
 
-      clearTimeout(versionClickTimer)
-      versionClickCount++
-
-      if (versionClickCount >= 4 && versionClickCount < 7) {
-        const remaining = 7 - versionClickCount
-        if (showToastFn) {
-          showToastFn(t('devModeClicksRemaining', { count: remaining }))
-        }
-      } else if (versionClickCount >= 7) {
-        versionClickCount = 0
-        await enableDevModeUI(true)
-      }
-
-      versionClickTimer = setTimeout(() => {
-        versionClickCount = 0
-      }, 2500)
-    })
+    versionClickTimer = setTimeout(() => {
+      versionClickCount = 0
+    }, 2500)
   })
 }
 
@@ -117,7 +114,7 @@ async function enableDevModeUI(isUserTrigger = false) {
 
   await loadCatalogAndState()
 
-  if (setActiveTabFn) {
+  if (isUserTrigger && setActiveTabFn) {
     setActiveTabFn('dev')
   }
 

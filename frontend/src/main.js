@@ -8544,7 +8544,7 @@ function boot() {
   loadBehavior()
   SetLanguage(lang).catch(() => {})
   syncElevatedUI().catch(() => {})
-  IsDevMode().then((isDev) => { setActiveTab(isDev ? 'dev' : 'home') }).catch(() => { setActiveTab('home') })
+  setActiveTab('home')
   loadGames()
   pollMetrics()
   setTimeout(() => { refreshAllDiskSmart(false).catch(() => {}) }, 1500)

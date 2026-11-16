@@ -717,6 +717,27 @@ func (a *App) buildSnapshot(now time.Time, cpuPct float64, perCore []float64, vm
 		tempSrc = "simulated"
 		tempLblRu = "Симулятор Dev Mode"
 		tempLblEn = "Dev Mode Simulator"
+	} else if staticHW.cpuName == "" {
+		if a.metricsProvider != nil {
+			staticHW = a.metricsProvider.GetStaticHardware()
+		} else {
+			staticHW = collectStaticHardware()
+		}
+		a.mu.Lock()
+		a.staticHW = staticHW
+		if a.cpuName == "" {
+			a.cpuName = staticHW.cpuName
+		}
+		if a.gpuName == "" {
+			a.gpuName = staticHW.gpuName
+			a.gpuTotalVRAM = staticHW.gpuVRAM
+		}
+		a.mu.Unlock()
+		cpuName = staticHW.cpuName
+		gpuName = staticHW.gpuName
+		if staticHW.gpuVRAM > 0 {
+			vramTotal = float64(staticHW.gpuVRAM) / (1024 * 1024)
+		}
 	}
 	hw := buildHardwareInfo(staticHW, cpuPct, perCore, gpuPct, vramUsed, vramShared, vramDedicated, vm, bat)
 	hw.GPU.TemperatureC = gpuTemp

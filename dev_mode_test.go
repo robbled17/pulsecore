@@ -346,3 +346,31 @@ func TestQuickPresets(t *testing.T) {
 		t.Fatalf("long_uptime preset failed, got uptime hours=%.1f", st7.Sensors.UptimeHours)
 	}
 }
+
+func TestRealMetricsProviderNormalMode(t *testing.T) {
+	app := NewApp()
+	if app.IsDevMode() {
+		t.Fatal("DevMode must be false by default")
+	}
+	// Test that without manual initialization, collectOnce populates real hardware
+	app.collectOnce()
+	m := app.GetMetrics()
+	if m.CPUName == "" || m.CPUName == "-" {
+		t.Fatalf("expected real CPUName, got %q", m.CPUName)
+	}
+	if m.Hardware.CPU.Name == "" || m.Hardware.CPU.Name == "-" {
+		t.Fatalf("expected real CPU.Name, got %q", m.Hardware.CPU.Name)
+	}
+	if m.Hardware.CPU.PhysicalCores <= 0 {
+		t.Fatalf("expected positive physical cores, got %d", m.Hardware.CPU.PhysicalCores)
+	}
+	if m.Hardware.RAM.TotalMB <= 0 {
+		t.Fatalf("expected positive RAM total MB, got %d", m.Hardware.RAM.TotalMB)
+	}
+	if len(m.Disks) == 0 {
+		t.Fatal("expected at least one disk")
+	}
+	if !m.TemperatureAvailable || m.TemperatureC <= 0 {
+		t.Logf("temperature status: %.1f (available=%v)", m.TemperatureC, m.TemperatureAvailable)
+	}
+}

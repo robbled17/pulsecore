@@ -43,13 +43,19 @@ func (r *RealMetricsProvider) GetCPUTemp(cpuPct float64) (float64, bool, string,
 		return rd.TempC, rd.OK, rd.Source, rd.LabelRu, rd.LabelEn
 	}
 	r.app.mu.RLock()
-	cached := r.app.cachedTemp
+	tab := r.app.activeTab
+	r.app.mu.RUnlock()
+	if tab == "" {
+		tab = "overview"
+	}
+	temp := r.app.tempCached(time.Now(), cpuPct, tab)
+	r.app.mu.RLock()
 	src := r.app.cachedTempSource
 	ru := r.app.cachedTempLabelRu
 	en := r.app.cachedTempLabelEn
-	avail := cached > 0 && !r.app.tempUnavailable
+	avail := temp > 0 && !r.app.tempUnavailable
 	r.app.mu.RUnlock()
-	return cached, avail, src, ru, en
+	return temp, avail, src, ru, en
 }
 
 func (r *RealMetricsProvider) GetRAM() (*mem.VirtualMemoryStat, *mem.SwapMemoryStat) {
@@ -81,7 +87,16 @@ func (r *RealMetricsProvider) GetDisks(now time.Time) []DiskMetrics {
 	if tab == "" {
 		tab = "overview"
 	}
-	return r.app.disksForTab(tab, now)
+	disks := r.app.disksForTab(tab, now)
+	if len(disks) == 0 {
+		r.app.mu.RLock()
+		cached := append([]DiskMetrics(nil), r.app.cachedDisks...)
+		r.app.mu.RUnlock()
+		if len(cached) > 0 {
+			return cached
+		}
+	}
+	return disks
 }
 
 func (r *RealMetricsProvider) GetDiskHealth(driveLetter string) (DiskHealthReport, bool) {
