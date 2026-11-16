@@ -7,6 +7,8 @@ export function AddGameExclusion(arg1:string):Promise<void>;
 
 export function AddIntelligenceExclusion(arg1:string):Promise<void>;
 
+export function ApplyDevPreset(arg1:string):Promise<main.DevModeState>;
+
 export function ApplyDiskCleanup(arg1:Array<string>):Promise<main.CleanupResult>;
 
 export function ApplyDiskCleanupForDrive(arg1:string,arg2:Array<string>):Promise<main.CleanupResult>;
@@ -99,6 +101,10 @@ export function GetConnectedDevices():Promise<Array<main.PeripheralItem>>;
 
 export function GetConnectedPeripherals():Promise<Array<main.PeripheralItem>>;
 
+export function GetDevHardwareCatalog():Promise<main.DevHardwareCatalog>;
+
+export function GetDevModeState():Promise<main.DevModeState>;
+
 export function GetDiskWatchInfo(arg1:string):Promise<main.DiskWatchInfo>;
 
 export function GetDriveScanCache(arg1:string):Promise<main.DriveScanCache>;
@@ -147,6 +153,8 @@ export function GetNetworkMonitor():Promise<main.NetworkMonitorSnapshot>;
 
 export function GetProcessAnomalies():Promise<Array<main.ProcessAnomaly>>;
 
+export function GetRawTelemetry():Promise<Array<main.RawTelemetryItem>>;
+
 export function GetRecycleBinInfo():Promise<main.RecycleBinStatus>;
 
 export function GetSmartFixPlan():Promise<main.SmartFixPlan>;
@@ -181,7 +189,11 @@ export function InvalidateDriveScanCache(arg1:string):Promise<void>;
 
 export function IsConflictWatcherEnabled():Promise<boolean>;
 
+export function IsDevMode():Promise<boolean>;
+
 export function IsDiskWatching(arg1:string):Promise<boolean>;
+
+export function IsDryRun():Promise<boolean>;
 
 export function IsElevated():Promise<boolean>;
 
@@ -267,6 +279,8 @@ export function RemoveBrokenStartupEntries():Promise<main.StartupDisableResult>;
 
 export function RenameGame(arg1:string,arg2:string):Promise<void>;
 
+export function ResetDevMode():Promise<main.DevModeState>;
+
 export function ResetIntelligenceProfile():Promise<void>;
 
 export function ResizeMiniHUD(arg1:number,arg2:number):Promise<void>;
@@ -321,9 +335,13 @@ export function SetBehaviorSettings(arg1:main.appPrefs):Promise<void>;
 
 export function SetConflictWatcherEnabled(arg1:boolean):Promise<void>;
 
+export function SetDevMode(arg1:boolean):Promise<main.DevModeState>;
+
 export function SetDiskWatching(arg1:string,arg2:boolean):Promise<boolean>;
 
 export function SetDisplayRefreshRate(arg1:string,arg2:number):Promise<Record<string, any>>;
+
+export function SetDryRun(arg1:boolean):Promise<void>;
 
 export function SetGameExclusions(arg1:Array<string>):Promise<void>;
 
@@ -334,6 +352,14 @@ export function SetMiniHUDOpacity(arg1:number):Promise<void>;
 export function SetPollInterval(arg1:number):Promise<void>;
 
 export function SetPowerProfile(arg1:string):Promise<void>;
+
+export function SetSimulatedBattery(arg1:boolean,arg2:number,arg3:boolean,arg4:number):Promise<main.DevModeState>;
+
+export function SetSimulatedDisks(arg1:Array<main.SimulatedDisk>):Promise<main.DevModeState>;
+
+export function SetSimulatedHardware(arg1:string,arg2:number,arg3:number,arg4:number,arg5:number,arg6:string,arg7:number,arg8:boolean,arg9:number,arg10:number):Promise<main.DevModeState>;
+
+export function SetSimulatedSensors(arg1:number,arg2:number,arg3:number,arg4:number,arg5:number,arg6:number,arg7:number,arg8:number):Promise<main.DevModeState>;
 
 export function SetStartupItemEnabled(arg1:string,arg2:boolean):Promise<main.StartupDisableResult>;
 
@@ -370,6 +396,8 @@ export function TriggerThermalCheck(arg1:number):Promise<void>;
 export function TrimMemoryWorkingSet():Promise<main.HomeActionResult>;
 
 export function UninstallWithCleanup(arg1:string):Promise<main.UninstallAppResult>;
+
+export function UnlockFileDryRun(arg1:string):Promise<main.UnlockDryRunResult>;
 
 export function UpdateTrayIconNow():Promise<void>;
 

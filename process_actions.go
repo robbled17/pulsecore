@@ -21,6 +21,9 @@ type HardwareTopProcesses struct {
 
 // KillProcess terminates a process by PID.
 func (a *App) KillProcess(pid int) error {
+	if a != nil && a.IsDryRun() {
+		return nil
+	}
 	if pid <= 4 {
 		return fmt.Errorf("cannot terminate system process")
 	}
@@ -29,6 +32,9 @@ func (a *App) KillProcess(pid int) error {
 
 // KillProcessByName terminates all instances of a process by executable name.
 func (a *App) KillProcessByName(name string) error {
+	if a != nil && a.IsDryRun() {
+		return nil
+	}
 	clean := strings.TrimSpace(name)
 	if idx := strings.Index(clean, " ("); idx > 0 {
 		clean = clean[:idx]

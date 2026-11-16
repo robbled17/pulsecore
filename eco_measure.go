@@ -34,6 +34,7 @@ type EcoFail struct {
 // EcoApplyResult is the Stage-2 before/after feedback payload.
 type EcoApplyResult struct {
 	OK            bool      `json:"ok"`
+	DryRun        bool      `json:"dryRun,omitempty"`
 	AppliedCount  int       `json:"appliedCount"`
 	Failed        []EcoFail `json:"failed"`
 	Confirmed     bool      `json:"confirmed"` // EcoQoS and/or IDLE priority verified
@@ -116,6 +117,28 @@ func (a *App) RevertEcoSession(sessionID string) EcoApplyResult {
 }
 
 func (a *App) applyEcoMeasured(name string, singlePID int32, enable bool) EcoApplyResult {
+	if a != nil && a.IsDryRun() {
+		procName := strings.TrimSpace(name)
+		if procName == "" && singlePID > 0 {
+			procName = processNameByPID(int(singlePID))
+		}
+		if procName == "" {
+			procName = "app.exe"
+		}
+		return EcoApplyResult{
+			OK:           true,
+			DryRun:       true,
+			AppliedCount: 1,
+			Confirmed:    true,
+			MessageRu:    fmt.Sprintf("[DRY-RUN] Было бы применено ограничение к процессу %s", procName),
+			MessageEn:    fmt.Sprintf("[DRY-RUN] Would apply efficiency mode to process %s", procName),
+			CPUBefore:    5.0,
+			CPUAfter:     1.0,
+			RAMBeforeMB:  250.0,
+			RAMAfterMB:   180.0,
+			EffectNoted:  true,
+		}
+	}
 	if !enable {
 		return EcoApplyResult{OK: false, MessageRu: "Ожидается включение Eco Mode", MessageEn: "Eco Mode enable expected"}
 	}

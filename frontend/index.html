@@ -9,6 +9,7 @@
 <body>
   <div id="titlebar" class="titlebar">
     <button type="button" class="titlebar-brand" id="titlebar-brand" title="GitHub">PulseCore</button>
+    <button type="button" id="dev-mode-badge" class="dev-mode-badge hidden" data-i18n-title="devModeBadgeTip" title="Dev Mode">DEV MODE</button>
     <div class="titlebar-actions">
       <div class="theme-switch" role="radiogroup" aria-label="Theme">
         <button type="button" class="theme-opt" data-theme="dark" data-i18n-title="titleThemeDark" title="Dark">🌙</button>
@@ -61,6 +62,7 @@
         <button type="button" class="nav-item" data-tab="lag" data-i18n="tabLagShort">Лаги</button>
         <button type="button" class="nav-item" data-tab="games" data-i18n="tabGames">Игры</button>
         <button type="button" class="nav-item nav-settings" data-tab="settings" data-i18n="tabSettings">Настройки</button>
+        <button type="button" class="nav-item dev-mode-nav hidden" data-tab="dev" data-i18n="tabDevMode">Dev Mode</button>
       </nav>
       <div class="sidebar-foot">
         <div class="muted" id="cpu-name">CPU</div>
@@ -672,6 +674,301 @@
           <div id="update-progress-wrap" class="update-progress-wrap hidden">
             <div class="update-progress-label" id="update-progress-text"></div>
             <div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-dev" class="tab tab-pane">
+        <header class="section-head dev-head">
+          <div class="dev-head-title-wrap">
+            <h1 data-i18n="devModeTitle">Режим разработчика</h1>
+            <span class="dev-badge-inline">DEV MODE</span>
+          </div>
+          <div class="dev-head-actions">
+            <div class="dev-dryrun-toggle-wrap">
+              <label class="toggle-switch" data-i18n-title="devDryRunDesc">
+                <input type="checkbox" id="toggle-dev-dryrun" checked />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="dev-dryrun-label" data-i18n="devDryRunLabel">Безопасный режим Dry-Run</span>
+            </div>
+            <button type="button" class="btn danger compact" id="btn-dev-disable" data-i18n="devModeDisableBtn">Выключить Dev Mode</button>
+          </div>
+        </header>
+        <p class="section-lead" data-i18n="devModeSubtitle">Конструктор комплектующих, ручной симулятор датчиков и безопасное тестирование</p>
+
+        <!-- 1. Quick Presets -->
+        <div class="panel dev-panel">
+          <div class="panel-title" data-i18n="devSectionPresets">Готовые сценарии в один клик</div>
+          <div class="dev-presets-grid">
+            <button type="button" class="dev-preset-card" data-preset="all_good">
+              <div class="dev-preset-icon">✨</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetAllGood">Всё хорошо</div>
+                <div class="dev-preset-desc" data-i18n="presetAllGoodDesc">100 баллов здоровья, идеальные датчики и быстрый NVMe SSD</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="max_load">
+              <div class="dev-preset-icon">🔥</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetMaxLoad">Потолок CPU / RAM / GPU</div>
+                <div class="dev-preset-desc" data-i18n="presetMaxLoadDesc">Нагрузка 99% по всем компонентам одновременно</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="disk_full">
+              <div class="dev-preset-icon">💾</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetDiskFull">Диск почти полон</div>
+                <div class="dev-preset-desc" data-i18n="presetDiskFullDesc">Системный диск занят на 96%, проверка предупреждений очистки</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="overheat">
+              <div class="dev-preset-icon">🌡️</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetOverheat">Перегрев</div>
+                <div class="dev-preset-desc" data-i18n="presetOverheatDesc">CPU 94°C, GPU 91°C для проверки тепловых триггеров</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="dying_ssd">
+              <div class="dev-preset-icon">⚠️</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetDyingSSD">Умирающий SSD</div>
+                <div class="dev-preset-desc" data-i18n="presetDyingSSDDesc">Здоровье SMART 15%, критический износ накопителя</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="vampire_hog">
+              <div class="dev-preset-icon">🦇</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetVampireHog">Вампир нагружает CPU</div>
+                <div class="dev-preset-desc" data-i18n="presetVampireHogDesc">Фоновый процесс-потребитель в списке обнаружения лагов</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="long_uptime">
+              <div class="dev-preset-icon">⏱️</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetLongUptime">Долгий аптайм</div>
+                <div class="dev-preset-desc" data-i18n="presetLongUptimeDesc">14 дней непрерывной работы без перезагрузки для проверки SmartFix</div>
+              </div>
+            </button>
+            <button type="button" class="dev-preset-card" data-preset="reset_real">
+              <div class="dev-preset-icon">🔄</div>
+              <div class="dev-preset-info">
+                <div class="dev-preset-title" data-i18n="presetResetReal">Сбросить к умолчанию</div>
+                <div class="dev-preset-desc" data-i18n="presetResetRealDesc">Сбросить симулированные датчики к сбалансированным значениям</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Manual Sensors Simulator -->
+        <div class="panel dev-panel">
+          <div class="panel-title-row">
+            <div class="panel-title" data-i18n="devSectionSensors">Ручной симулятор датчиков</div>
+            <button type="button" class="btn primary compact" id="btn-dev-apply-sensors" data-i18n="devApplySensors">Применить датчики</button>
+          </div>
+          <div class="dev-sensors-grid">
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devCpuLoadLabel">Загрузка CPU:</span>
+                <b id="dev-cpu-load-val">12%</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-cpu-load" min="0" max="100" value="12" />
+            </div>
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devCpuTempLabel">Температура CPU:</span>
+                <b id="dev-cpu-temp-val">48°C</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-cpu-temp" min="30" max="105" value="48" />
+            </div>
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devRamTotalLabel">Общий объём ОЗУ:</span>
+                <select id="dev-select-ram-total" class="glass-control glass-select compact">
+                  <option value="4">4 ГБ</option>
+                  <option value="8">8 ГБ</option>
+                  <option value="16">16 ГБ</option>
+                  <option value="32" selected>32 ГБ</option>
+                  <option value="64">64 ГБ</option>
+                </select>
+              </div>
+              <div class="dev-sensor-subrow">
+                <span data-i18n="devRamLoadLabel">Загрузка ОЗУ:</span>
+                <b id="dev-ram-used-val">6.0 ГБ (19%)</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-ram-used" min="0" max="100" value="19" />
+            </div>
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devGpuLoadLabel">Загрузка чипа GPU:</span>
+                <b id="dev-gpu-load-val">5%</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-gpu-load" min="0" max="100" value="5" />
+            </div>
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devVramLoadLabel">Загрузка видеопамяти (VRAM):</span>
+                <b id="dev-vram-load-val">2.3 ГБ (15%)</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-vram-used" min="0" max="100" value="15" />
+            </div>
+            <div class="dev-sensor-row">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devGpuTempLabel">Температура GPU:</span>
+                <b id="dev-gpu-temp-val">42°C</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-gpu-temp" min="30" max="105" value="42" />
+            </div>
+            <div class="dev-sensor-row dev-sensor-row-wide">
+              <div class="dev-sensor-label-col">
+                <span data-i18n="devUptimeLabel">Аптайм системы без перезагрузки:</span>
+                <b id="dev-uptime-val">4.5 ч (0 дней)</b>
+              </div>
+              <input type="range" class="dev-range" id="dev-range-uptime" min="1" max="720" value="5" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Hardware Constructor -->
+        <div class="panel dev-panel">
+          <div class="panel-title-row">
+            <div class="panel-title" data-i18n="devSectionHardware">Конструктор комплектующих ПК</div>
+            <button type="button" class="btn primary compact" id="btn-dev-apply-hw" data-i18n="devApplyHardware">Применить комплектующие</button>
+          </div>
+          <div class="dev-hw-grid">
+            <!-- CPU Builder -->
+            <div class="dev-hw-card">
+              <div class="dev-hw-card-title" data-i18n="devCpuTitle">Процессор (CPU)</div>
+              <label class="dev-input-label">
+                <select id="dev-hw-cpu-select" class="glass-control glass-select">
+                  <option value="custom" data-i18n="devCustomInput">Пользовательский ввод / Custom</option>
+                </select>
+              </label>
+              <div class="dev-fields-grid">
+                <input type="text" id="dev-hw-cpu-name" class="glass-control" placeholder="CPU Name" />
+                <div class="dev-fields-mini">
+                  <input type="number" id="dev-hw-cpu-cores" class="glass-control" placeholder="Cores" min="1" max="64" />
+                  <input type="number" id="dev-hw-cpu-threads" class="glass-control" placeholder="Threads" min="1" max="128" />
+                  <input type="number" id="dev-hw-cpu-freq" class="glass-control" placeholder="MHz" min="500" max="8000" />
+                </div>
+              </div>
+            </div>
+
+            <!-- GPU Builder -->
+            <div class="dev-hw-card">
+              <div class="dev-hw-card-title" data-i18n="devGpuTitle">Видеокарта (GPU)</div>
+              <label class="dev-input-label">
+                <select id="dev-hw-gpu-select" class="glass-control glass-select">
+                  <option value="custom" data-i18n="devCustomInput">Пользовательский ввод / Custom</option>
+                </select>
+              </label>
+              <div class="dev-fields-grid">
+                <input type="text" id="dev-hw-gpu-name" class="glass-control" placeholder="GPU Name" />
+                <div class="dev-fields-mini">
+                  <input type="number" id="dev-hw-gpu-vram" class="glass-control" placeholder="VRAM GB" min="0" max="48" step="1" />
+                  <label class="dev-check-label">
+                    <input type="checkbox" id="dev-hw-gpu-igpu" />
+                    <span>iGPU</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Laptop Battery Simulator -->
+            <div class="dev-hw-card dev-hw-card-wide">
+              <div class="dev-hw-card-title" data-i18n="devDeviceTypeTitle">Тип устройства и Батарея</div>
+              <div class="dev-device-type-toggle">
+                <label class="dev-radio-label">
+                  <input type="radio" name="dev-device-type" id="dev-device-desktop" value="desktop" checked />
+                  <span data-i18n="devTypeDesktop">Настольный ПК (без АКБ)</span>
+                </label>
+                <label class="dev-radio-label">
+                  <input type="radio" name="dev-device-type" id="dev-device-laptop" value="laptop" />
+                  <span data-i18n="devTypeLaptop">Ноутбук (с батареей)</span>
+                </label>
+              </div>
+              <div id="dev-laptop-controls" class="dev-laptop-controls hidden">
+                <div class="dev-laptop-row">
+                  <div class="dev-sensor-label-col">
+                    <span data-i18n="devBatChargeLabel">Заряд аккумулятора:</span>
+                    <b id="dev-bat-pct-val">85%</b>
+                  </div>
+                  <input type="range" class="dev-range" id="dev-range-bat-pct" min="0" max="100" value="85" />
+                </div>
+                <div class="dev-laptop-row">
+                  <div class="dev-sensor-label-col">
+                    <span data-i18n="devBatWearLabel">Износ аккумулятора:</span>
+                    <b id="dev-bat-wear-val">12%</b>
+                  </div>
+                  <input type="range" class="dev-range" id="dev-range-bat-wear" min="0" max="80" value="12" />
+                </div>
+                <div class="dev-laptop-row">
+                  <span data-i18n="devBatPowerStateLabel">Режим питания:</span>
+                  <select id="dev-select-bat-power" class="glass-control glass-select compact">
+                    <option value="ac" data-i18n="devPowerAC">Работает от сети (заряжается)</option>
+                    <option value="dc" data-i18n="devPowerDC">Работает от батареи (разряд)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Disks Constructor -->
+            <div class="dev-hw-card dev-hw-card-wide">
+              <div class="panel-title-row">
+                <div class="dev-hw-card-title" data-i18n="devDisksTitle">Конструктор дисков</div>
+                <button type="button" class="btn soft compact" id="btn-dev-add-disk" data-i18n="devAddDiskBtn">+ Добавить диск</button>
+              </div>
+              <div id="dev-disks-container" class="dev-disks-container"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Raw Telemetry & Debug -->
+        <div class="panel dev-panel">
+          <div class="panel-title" data-i18n="devSectionDebug">Телеметрия и Отладка</div>
+          
+          <div class="dev-debug-grid">
+            <!-- Raw Telemetry Inspector -->
+            <div class="dev-debug-card">
+              <div class="panel-title-row">
+                <div class="dev-hw-card-title" data-i18n="devRawTelemetryTitle">Инспектор сырых данных телеметрии</div>
+                <button type="button" class="btn soft compact" id="btn-dev-refresh-telemetry" data-i18n="devRefreshBtn">Обновить данные</button>
+              </div>
+              <div class="table-wrap dev-table-wrap">
+                <table class="dev-telemetry-table" id="dev-telemetry-table">
+                  <thead>
+                    <tr>
+                      <th data-i18n="devColMetric">Датчик / Метрика</th>
+                      <th data-i18n="devColValue">Текущее значение</th>
+                      <th data-i18n="devColSource">Источник данных</th>
+                      <th data-i18n="devColUpdated">Обновлено</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dev-telemetry-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- i18n Debug & Dry-Run Tests -->
+            <div class="dev-debug-card">
+              <div class="dev-hw-card-title" data-i18n="devI18nDebugTitle">Отладка локализации (i18n Debug)</div>
+              <div class="dev-i18n-toggle-row">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-i18n-debug" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span data-i18n="devI18nDebugLabel">Подсветка непереведённых строк в интерфейсе</span>
+              </div>
+              <div id="dev-i18n-status" class="dev-i18n-status" data-i18n="devI18nMissingZero">Все ключи локализации переведены (пропусков нет)</div>
+              <div id="dev-i18n-missing-list" class="dev-i18n-missing-list hidden"></div>
+
+              <div class="dev-hw-card-title dev-mt-large" data-i18n="devDryRunTestTitle">Проверка безопасности Dry-Run</div>
+              <div class="btn-row dev-test-btn-row">
+                <button type="button" class="btn soft compact" id="btn-test-dryrun-clean" data-i18n="devDryRunTestClean">Тест очистки диска</button>
+                <button type="button" class="btn soft compact" id="btn-test-dryrun-eco" data-i18n="devDryRunTestEco">Тест заморозки процесса</button>
+                <button type="button" class="btn soft compact" id="btn-test-dryrun-unlock" data-i18n="devDryRunTestUnlock">Тест разблокировки файла</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>

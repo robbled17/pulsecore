@@ -451,6 +451,9 @@ export namespace main {
 	}
 	export class CleanupResult {
 	    ok: boolean;
+	    dryRun: boolean;
+	    dryRunMessageRu: string;
+	    dryRunMessageEn: string;
 	    freedBytes: number;
 	    actualCleanedBytes: number;
 	    lockedBytes: number;
@@ -469,6 +472,9 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
+	        this.dryRun = source["dryRun"];
+	        this.dryRunMessageRu = source["dryRunMessageRu"];
+	        this.dryRunMessageEn = source["dryRunMessageEn"];
 	        this.freedBytes = source["freedBytes"];
 	        this.actualCleanedBytes = source["actualCleanedBytes"];
 	        this.lockedBytes = source["lockedBytes"];
@@ -623,6 +629,231 @@ export namespace main {
 	        this.message = source["message"];
 	    }
 	}
+	export class DevCatalogItem {
+	    name: string;
+	    tier: string;
+	    cores?: number;
+	    threads?: number;
+	    freqMHz?: number;
+	    vramGB?: number;
+	    isIntegrated?: boolean;
+	    score: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DevCatalogItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.tier = source["tier"];
+	        this.cores = source["cores"];
+	        this.threads = source["threads"];
+	        this.freqMHz = source["freqMHz"];
+	        this.vramGB = source["vramGB"];
+	        this.isIntegrated = source["isIntegrated"];
+	        this.score = source["score"];
+	    }
+	}
+	export class DevHardwareCatalog {
+	    cpus: DevCatalogItem[];
+	    gpus: DevCatalogItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DevHardwareCatalog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cpus = this.convertValues(source["cpus"], DevCatalogItem);
+	        this.gpus = this.convertValues(source["gpus"], DevCatalogItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class DevHardwareState {
+	    cpuName: string;
+	    cpuCores: number;
+	    cpuThreads: number;
+	    cpuFreqMHz: number;
+	    cpuScore: number;
+	    gpuName: string;
+	    gpuVRAMGB: number;
+	    gpuIsIGPU: boolean;
+	    gpuScore: number;
+	    ramTotalGB: number;
+	    isLaptop: boolean;
+	    batteryPercent: number;
+	    batteryPlugged: boolean;
+	    batteryWearPct: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DevHardwareState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cpuName = source["cpuName"];
+	        this.cpuCores = source["cpuCores"];
+	        this.cpuThreads = source["cpuThreads"];
+	        this.cpuFreqMHz = source["cpuFreqMHz"];
+	        this.cpuScore = source["cpuScore"];
+	        this.gpuName = source["gpuName"];
+	        this.gpuVRAMGB = source["gpuVRAMGB"];
+	        this.gpuIsIGPU = source["gpuIsIGPU"];
+	        this.gpuScore = source["gpuScore"];
+	        this.ramTotalGB = source["ramTotalGB"];
+	        this.isLaptop = source["isLaptop"];
+	        this.batteryPercent = source["batteryPercent"];
+	        this.batteryPlugged = source["batteryPlugged"];
+	        this.batteryWearPct = source["batteryWearPct"];
+	    }
+	}
+	export class VampireProcess {
+	    pid: number;
+	    pids: number[];
+	    count: number;
+	    name: string;
+	    friendlyName: string;
+	    cpuPercent: number;
+	    diskMBps: number;
+	    score: number;
+	    ecoMode: boolean;
+	    frozen: boolean;
+	    reasonRu: string;
+	    reasonEn: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VampireProcess(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pid = source["pid"];
+	        this.pids = source["pids"];
+	        this.count = source["count"];
+	        this.name = source["name"];
+	        this.friendlyName = source["friendlyName"];
+	        this.cpuPercent = source["cpuPercent"];
+	        this.diskMBps = source["diskMBps"];
+	        this.score = source["score"];
+	        this.ecoMode = source["ecoMode"];
+	        this.frozen = source["frozen"];
+	        this.reasonRu = source["reasonRu"];
+	        this.reasonEn = source["reasonEn"];
+	    }
+	}
+	export class SimulatedDisk {
+	    letter: string;
+	    type: string;
+	    model: string;
+	    totalGB: number;
+	    usedPct: number;
+	    healthPct: number;
+	    tempC: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SimulatedDisk(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.letter = source["letter"];
+	        this.type = source["type"];
+	        this.model = source["model"];
+	        this.totalGB = source["totalGB"];
+	        this.usedPct = source["usedPct"];
+	        this.healthPct = source["healthPct"];
+	        this.tempC = source["tempC"];
+	    }
+	}
+	export class DevSensorsState {
+	    cpuPercent: number;
+	    cpuTempC: number;
+	    ramTotalGB: number;
+	    ramUsedPct: number;
+	    ramUsedGB: number;
+	    gpuPercent: number;
+	    vramUsedPct: number;
+	    vramUsedGB: number;
+	    gpuTempC: number;
+	    uptimeHours: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DevSensorsState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cpuPercent = source["cpuPercent"];
+	        this.cpuTempC = source["cpuTempC"];
+	        this.ramTotalGB = source["ramTotalGB"];
+	        this.ramUsedPct = source["ramUsedPct"];
+	        this.ramUsedGB = source["ramUsedGB"];
+	        this.gpuPercent = source["gpuPercent"];
+	        this.vramUsedPct = source["vramUsedPct"];
+	        this.vramUsedGB = source["vramUsedGB"];
+	        this.gpuTempC = source["gpuTempC"];
+	        this.uptimeHours = source["uptimeHours"];
+	    }
+	}
+	export class DevModeState {
+	    devMode: boolean;
+	    dryRun: boolean;
+	    sensors: DevSensorsState;
+	    hardware: DevHardwareState;
+	    disks: SimulatedDisk[];
+	    vampires: VampireProcess[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DevModeState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.devMode = source["devMode"];
+	        this.dryRun = source["dryRun"];
+	        this.sensors = this.convertValues(source["sensors"], DevSensorsState);
+	        this.hardware = this.convertValues(source["hardware"], DevHardwareState);
+	        this.disks = this.convertValues(source["disks"], SimulatedDisk);
+	        this.vampires = this.convertValues(source["vampires"], VampireProcess);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class DiagnosticExport {
 	    ok: boolean;
 	    format: string;
@@ -1289,6 +1520,7 @@ export namespace main {
 	}
 	export class EcoApplyResult {
 	    ok: boolean;
+	    dryRun?: boolean;
 	    appliedCount: number;
 	    failed: EcoFail[];
 	    confirmed: boolean;
@@ -1310,6 +1542,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
+	        this.dryRun = source["dryRun"];
 	        this.appliedCount = source["appliedCount"];
 	        this.failed = this.convertValues(source["failed"], EcoFail);
 	        this.confirmed = source["confirmed"];
@@ -2734,6 +2967,24 @@ export namespace main {
 	
 	
 	
+	export class RawTelemetryItem {
+	    metric: string;
+	    value: string;
+	    source: string;
+	    updated: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RawTelemetryItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.metric = source["metric"];
+	        this.value = source["value"];
+	        this.source = source["source"];
+	        this.updated = source["updated"];
+	    }
+	}
 	export class RecycleBinStatus {
 	    bytes: number;
 	    items: number;
@@ -2748,6 +2999,7 @@ export namespace main {
 	        this.items = source["items"];
 	    }
 	}
+	
 	export class SleepReport {
 	    ok: boolean;
 	    sleepOK: boolean;
@@ -3226,40 +3478,6 @@ export namespace main {
 		    return a;
 		}
 	}
-	export class VampireProcess {
-	    pid: number;
-	    pids: number[];
-	    count: number;
-	    name: string;
-	    friendlyName: string;
-	    cpuPercent: number;
-	    diskMBps: number;
-	    score: number;
-	    ecoMode: boolean;
-	    frozen: boolean;
-	    reasonRu: string;
-	    reasonEn: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new VampireProcess(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.pid = source["pid"];
-	        this.pids = source["pids"];
-	        this.count = source["count"];
-	        this.name = source["name"];
-	        this.friendlyName = source["friendlyName"];
-	        this.cpuPercent = source["cpuPercent"];
-	        this.diskMBps = source["diskMBps"];
-	        this.score = source["score"];
-	        this.ecoMode = source["ecoMode"];
-	        this.frozen = source["frozen"];
-	        this.reasonRu = source["reasonRu"];
-	        this.reasonEn = source["reasonEn"];
-	    }
-	}
 	export class SystemMetrics {
 	    timestamp: string;
 	    cpuName: string;
@@ -3431,6 +3649,30 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class UnlockDryRunResult {
+	    ok: boolean;
+	    dryRun: boolean;
+	    path: string;
+	    processCount: number;
+	    processes: string[];
+	    messageRu: string;
+	    messageEn: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UnlockDryRunResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.dryRun = source["dryRun"];
+	        this.path = source["path"];
+	        this.processCount = source["processCount"];
+	        this.processes = source["processes"];
+	        this.messageRu = source["messageRu"];
+	        this.messageEn = source["messageEn"];
+	    }
 	}
 	export class UpdateInfo {
 	    available: boolean;

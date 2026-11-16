@@ -114,6 +114,13 @@ type App struct {
 	lastDisk           time.Time
 	cachedDisks        []DiskMetrics
 	diskCollecting     atomic.Bool
+
+	metricsProvider MetricsProvider
+	realProvider    *RealMetricsProvider
+	simProvider     *SimulatedMetricsProvider
+	devMode         bool
+	dryRun          bool
+	devMu           sync.RWMutex
 	lastVamp           time.Time
 
 	sessionStart      time.Time
@@ -242,7 +249,7 @@ type VampireProcess struct {
 
 // NewApp constructs the application shell.
 func NewApp() *App {
-	return &App{
+	app := &App{
 		pollInterval:  time.Duration(defaultPollMS) * time.Millisecond,
 		powerMode:     "balanced",
 		language:      "ru",
@@ -259,6 +266,16 @@ func NewApp() *App {
 		sessionHits:   make(map[string]*sessionHit),
 		bb:            newBlackBox(),
 	}
+	app.realProvider = NewRealMetricsProvider(app)
+	app.simProvider = NewSimulatedMetricsProvider()
+	if appDevMode {
+		app.devMode = true
+		app.dryRun = true
+		app.metricsProvider = app.simProvider
+	} else {
+		app.metricsProvider = app.realProvider
+	}
+	return app
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -413,12 +430,16 @@ func (a *App) collectOnce() {
 	}
 
 	now := time.Now()
-	cpuPct, perCore := sampleCPULoad()
-	vm, _ := mem.VirtualMemory()
-	var sm *mem.SwapMemoryStat
-	if s, err := mem.SwapMemory(); err == nil {
-		sm = s
+	provider := a.metricsProvider
+	if provider == nil {
+		provider = a.realProvider
 	}
+	if provider == nil {
+		provider = NewRealMetricsProvider(a)
+	}
+
+	cpuPct, perCore := provider.GetCPULoad()
+	vm, sm := provider.GetRAM()
 
 	a.mu.RLock()
 	tab := a.activeTab
@@ -427,13 +448,10 @@ func (a *App) collectOnce() {
 		tab = "overview"
 	}
 
-	disks := a.disksForTab(tab, now)
-	bat := a.batteryCached(now)
-	gpuPct, vramUsed, vramShared, vramDedicated := a.gpuCached(now, tab)
-	temp := a.tempCached(now, cpuPct, tab)
-	a.mu.RLock()
-	tempReal := temp > 0 && !a.tempUnavailable
-	a.mu.RUnlock()
+	disks := provider.GetDisks(now)
+	bat := provider.GetBattery(now)
+	gpuPct, vramUsed, vramShared, vramDedicated, simGPUTemp, simGPUTempOK, _ := provider.GetGPU(tab)
+	temp, tempReal, _, _, _ := provider.GetCPUTemp(cpuPct)
 	if tempReal {
 		a.TriggerThermalCheck(temp)
 	}
@@ -447,7 +465,12 @@ func (a *App) collectOnce() {
 	a.mu.RUnlock()
 	var vamps []VampireProcess
 	ranVamps := false
-	if tab == "lag" && vampDue {
+	if a.IsDevMode() {
+		vamps = provider.GetVampires()
+		a.mu.Lock()
+		a.vampires = vamps
+		a.mu.Unlock()
+	} else if tab == "lag" && vampDue {
 		vamps = a.GetVampireProcesses()
 		a.mu.Lock()
 		a.vampires = vamps
@@ -482,6 +505,10 @@ func (a *App) collectOnce() {
 		intervalSec = 10
 	}
 	gpuTemp, gpuTempOK, _, _, _, _ := a.gpuExtras()
+	if a.IsDevMode() {
+		gpuTemp = simGPUTemp
+		gpuTempOK = simGPUTempOK
+	}
 	if !gpuTempOK {
 		gpuTemp = 0
 	}
@@ -497,8 +524,8 @@ func (a *App) collectOnce() {
 		diskBusy = math.Min(100, rw*2.5)
 	}
 	a.mu.RLock()
-	tempOK := temp > 0 && !a.tempUnavailable
-	gpuOK := !a.nvidiaMissing
+	tempOK := temp > 0 && tempReal
+	gpuOK := !a.nvidiaMissing || a.IsDevMode()
 	a.mu.RUnlock()
 	ramPct := 0.0
 	swapPct := 0.0
@@ -674,6 +701,23 @@ func (a *App) buildSnapshot(now time.Time, cpuPct float64, perCore []float64, vm
 	tempLblRu := a.cachedTempLabelRu
 	tempLblEn := a.cachedTempLabelEn
 	a.mu.RUnlock()
+	if a.IsDevMode() && a.metricsProvider != nil {
+		staticHW = a.metricsProvider.GetStaticHardware()
+		cpuName = staticHW.cpuName
+		gpuName = staticHW.gpuName
+		if staticHW.gpuVRAM > 0 {
+			vramTotal = float64(staticHW.gpuVRAM) / (1024 * 1024)
+		}
+		if a.simProvider != nil {
+			a.simProvider.mu.RLock()
+			gpuTemp = a.simProvider.gpuTemp
+			gpuTempOK = a.simProvider.gpuTempAvail
+			a.simProvider.mu.RUnlock()
+		}
+		tempSrc = "simulated"
+		tempLblRu = "Симулятор Dev Mode"
+		tempLblEn = "Dev Mode Simulator"
+	}
 	hw := buildHardwareInfo(staticHW, cpuPct, perCore, gpuPct, vramUsed, vramShared, vramDedicated, vm, bat)
 	hw.GPU.TemperatureC = gpuTemp
 	hw.GPU.TempAvailable = gpuTempOK

@@ -1012,6 +1012,11 @@ func (a *App) CheckDiskHealthForce(driveLetter string) DiskHealthReport {
 }
 
 func (a *App) checkDiskHealth(driveLetter string, force bool) DiskHealthReport {
+	if a != nil && a.IsDevMode() && a.metricsProvider != nil {
+		if report, ok := a.metricsProvider.GetDiskHealth(driveLetter); ok {
+			return report
+		}
+	}
 	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
 	letter = strings.TrimSuffix(letter, `:\`)
 	letter = strings.TrimSuffix(letter, ":")

@@ -17,5 +17,8 @@ type LocalDriveInfo struct {
 
 // GetLocalDrives returns all active fixed/local storage drives.
 func (a *App) GetLocalDrives() []LocalDriveInfo {
+	if a != nil && a.IsDevMode() && a.metricsProvider != nil {
+		return a.metricsProvider.GetLocalDrives()
+	}
 	return getLocalDrivesNative()
 }

@@ -132,6 +132,27 @@ func (a *App) BuildDiagnosticReport() DiagnosticReport {
 		gpuName = m.GPUName
 	}
 
+	// Strict isolation: if Dev Mode is enabled, reconstruct report from real hardware and real sensors
+	if a != nil && a.IsDevMode() {
+		if a.realProvider != nil {
+			realHW := a.realProvider.GetStaticHardware()
+			cpuName = realHW.cpuName
+			gpuName = realHW.gpuName
+			realVM, _ := a.realProvider.GetRAM()
+			if realVM != nil {
+				m.RAMTotalMB = realVM.Total / (1024 * 1024)
+				m.RAMUsedMB = realVM.Used / (1024 * 1024)
+			}
+			realTemp, realTempOK, _, _, _ := a.realProvider.GetCPUTemp(0)
+			m.TemperatureC = realTemp
+			tempMissing = !realTempOK
+			gpuMissing = a.nvidiaMissing
+		} else {
+			cpuName = a.staticHW.cpuName
+			gpuName = a.staticHW.gpuName
+		}
+	}
+
 	unavail := []string{}
 	notes := []string{}
 	tempOK := m.TemperatureC > 0 && !tempMissing

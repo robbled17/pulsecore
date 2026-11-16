@@ -105,7 +105,7 @@ func (a *App) buildSmartFixInput() SmartFixInput {
 			DiskBad: diskBad, DiskCaution: diskCaution, DiskBadLetter: diskLetter, DiskReason: diskReason,
 		},
 		StartupItems: items,
-		UptimeDays:   int(uptimeDuration().Hours() / 24),
+		UptimeDays:   int(a.uptimeDuration().Hours() / 24),
 	}
 
 	// Optional detectors — skip scenario on failure.
@@ -391,6 +391,13 @@ func smartFixMin(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (a *App) uptimeDuration() time.Duration {
+	if a != nil && a.IsDevMode() && a.metricsProvider != nil {
+		return a.metricsProvider.GetUptime()
+	}
+	return time.Duration(getTickCount64()) * time.Millisecond
 }
 
 func uptimeDuration() time.Duration {

@@ -144,6 +144,9 @@ func expandEcoCandidates(name string) []string {
 // ToggleEcoMode enables/disables Windows EcoQoS + IDLE priority for a process.
 // Unlike NtSuspendProcess this never freezes mutexes or hangs UI threads.
 func (a *App) ToggleEcoMode(pid int, enable bool) error {
+	if a != nil && a.IsDryRun() {
+		return nil
+	}
 	if pid <= 0 {
 		return fmt.Errorf("invalid pid")
 	}
@@ -222,6 +225,9 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 
 // FreezeProcess enables EcoQoS efficiency mode (safe replacement for NtSuspendProcess).
 func (a *App) FreezeProcess(pid int) error {
+	if a != nil && a.IsDryRun() {
+		return nil
+	}
 	return a.ToggleEcoMode(pid, true)
 }
 

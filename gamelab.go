@@ -1019,6 +1019,16 @@ func (a *App) buildSystemPowerProfile() SystemPowerProfile {
 
 	gpuScore := calcGPUPowerScore(gpuName, integrated, vramGB)
 	cpuScore := calcCPUPowerScore(cpuName, cores, threads, freq)
+	if a != nil && a.IsDevMode() && a.simProvider != nil {
+		a.simProvider.mu.RLock()
+		if a.simProvider.cpuScore > 0 {
+			cpuScore = a.simProvider.cpuScore
+		}
+		if a.simProvider.gpuScore > 0 {
+			gpuScore = a.simProvider.gpuScore
+		}
+		a.simProvider.mu.RUnlock()
+	}
 
 	return SystemPowerProfile{
 		GPUName:       gpuName,

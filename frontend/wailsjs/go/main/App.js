@@ -10,6 +10,10 @@ export function AddIntelligenceExclusion(arg1) {
   return window['go']['main']['App']['AddIntelligenceExclusion'](arg1);
 }
 
+export function ApplyDevPreset(arg1) {
+  return window['go']['main']['App']['ApplyDevPreset'](arg1);
+}
+
 export function ApplyDiskCleanup(arg1) {
   return window['go']['main']['App']['ApplyDiskCleanup'](arg1);
 }
@@ -194,6 +198,14 @@ export function GetConnectedPeripherals() {
   return window['go']['main']['App']['GetConnectedPeripherals']();
 }
 
+export function GetDevHardwareCatalog() {
+  return window['go']['main']['App']['GetDevHardwareCatalog']();
+}
+
+export function GetDevModeState() {
+  return window['go']['main']['App']['GetDevModeState']();
+}
+
 export function GetDiskWatchInfo(arg1) {
   return window['go']['main']['App']['GetDiskWatchInfo'](arg1);
 }
@@ -290,6 +302,10 @@ export function GetProcessAnomalies() {
   return window['go']['main']['App']['GetProcessAnomalies']();
 }
 
+export function GetRawTelemetry() {
+  return window['go']['main']['App']['GetRawTelemetry']();
+}
+
 export function GetRecycleBinInfo() {
   return window['go']['main']['App']['GetRecycleBinInfo']();
 }
@@ -358,8 +374,16 @@ export function IsConflictWatcherEnabled() {
   return window['go']['main']['App']['IsConflictWatcherEnabled']();
 }
 
+export function IsDevMode() {
+  return window['go']['main']['App']['IsDevMode']();
+}
+
 export function IsDiskWatching(arg1) {
   return window['go']['main']['App']['IsDiskWatching'](arg1);
+}
+
+export function IsDryRun() {
+  return window['go']['main']['App']['IsDryRun']();
 }
 
 export function IsElevated() {
@@ -530,6 +554,10 @@ export function RenameGame(arg1, arg2) {
   return window['go']['main']['App']['RenameGame'](arg1, arg2);
 }
 
+export function ResetDevMode() {
+  return window['go']['main']['App']['ResetDevMode']();
+}
+
 export function ResetIntelligenceProfile() {
   return window['go']['main']['App']['ResetIntelligenceProfile']();
 }
@@ -638,12 +666,20 @@ export function SetConflictWatcherEnabled(arg1) {
   return window['go']['main']['App']['SetConflictWatcherEnabled'](arg1);
 }
 
+export function SetDevMode(arg1) {
+  return window['go']['main']['App']['SetDevMode'](arg1);
+}
+
 export function SetDiskWatching(arg1, arg2) {
   return window['go']['main']['App']['SetDiskWatching'](arg1, arg2);
 }
 
 export function SetDisplayRefreshRate(arg1, arg2) {
   return window['go']['main']['App']['SetDisplayRefreshRate'](arg1, arg2);
+}
+
+export function SetDryRun(arg1) {
+  return window['go']['main']['App']['SetDryRun'](arg1);
 }
 
 export function SetGameExclusions(arg1) {
@@ -664,6 +700,22 @@ export function SetPollInterval(arg1) {
 
 export function SetPowerProfile(arg1) {
   return window['go']['main']['App']['SetPowerProfile'](arg1);
+}
+
+export function SetSimulatedBattery(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['SetSimulatedBattery'](arg1, arg2, arg3, arg4);
+}
+
+export function SetSimulatedDisks(arg1) {
+  return window['go']['main']['App']['SetSimulatedDisks'](arg1);
+}
+
+export function SetSimulatedHardware(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
+  return window['go']['main']['App']['SetSimulatedHardware'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+}
+
+export function SetSimulatedSensors(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['SetSimulatedSensors'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function SetStartupItemEnabled(arg1, arg2) {
@@ -736,6 +788,10 @@ export function TrimMemoryWorkingSet() {
 
 export function UninstallWithCleanup(arg1) {
   return window['go']['main']['App']['UninstallWithCleanup'](arg1);
+}
+
+export function UnlockFileDryRun(arg1) {
+  return window['go']['main']['App']['UnlockFileDryRun'](arg1);
 }
 
 export function UpdateTrayIconNow() {

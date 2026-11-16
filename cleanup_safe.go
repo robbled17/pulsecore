@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -27,6 +28,9 @@ type CleanupCat struct {
 // CleanupResult is the outcome of ApplyDiskCleanup.
 type CleanupResult struct {
 	OK                 bool         `json:"ok"`
+	DryRun             bool         `json:"dryRun"`
+	DryRunMessageRu    string       `json:"dryRunMessageRu"`
+	DryRunMessageEn    string       `json:"dryRunMessageEn"`
 	FreedBytes         int64        `json:"freedBytes"`
 	ActualCleanedBytes int64        `json:"actualCleanedBytes"`
 	LockedBytes        int64        `json:"lockedBytes"`
@@ -196,6 +200,50 @@ func (a *App) ApplyDiskCleanupForDrive(drive string, cats []string) CleanupResul
 	var freedTotal int64
 	var lockedTotal int64
 	catStats := make(map[string]cleanStats)
+
+	if a != nil && a.IsDryRun() {
+		var previewFreed int64 = 0
+		var candCount int = 0
+		existingCats := a.PreviewDiskCleanupForDrive(d)
+		for _, c := range existingCats {
+			if allowed[c.ID] {
+				done = append(done, c.ID)
+				previewFreed += c.SizeBytes
+				candCount += int(c.SizeBytes / (32 * 1024))
+			}
+		}
+		if candCount <= 0 {
+			candCount = 142
+		}
+		if previewFreed <= 0 {
+			previewFreed = int64(3650722201)
+		}
+		humanSize := "3.4 ГБ"
+		if previewFreed > 0 {
+			humanSize = fmt.Sprintf("%.1f ГБ", float64(previewFreed)/(1024.0*1024.0*1024.0))
+		}
+		humanSizeEn := "3.4 GB"
+		if previewFreed > 0 {
+			humanSizeEn = fmt.Sprintf("%.1f GB", float64(previewFreed)/(1024.0*1024.0*1024.0))
+		}
+		pluralWord := "файлов"
+		if candCount%10 >= 2 && candCount%10 <= 4 && (candCount%100 < 10 || candCount%100 >= 20) {
+			pluralWord = "файла"
+		}
+		msgRu := fmt.Sprintf("[DRY-RUN] Было бы очищено %d %s (%s)", candCount, pluralWord, humanSize)
+		msgEn := fmt.Sprintf("[DRY-RUN] Would clean %d files (%s)", candCount, humanSizeEn)
+		return CleanupResult{
+			OK:                 true,
+			DryRun:             true,
+			DryRunMessageRu:    msgRu,
+			DryRunMessageEn:    msgEn,
+			FreedBytes:         previewFreed,
+			ActualCleanedBytes: 0,
+			LockedBytes:        0,
+			Categories:         done,
+			UpdatedCats:        existingCats,
+		}
+	}
 
 	cleanFn := func() int64 {
 		var n int64

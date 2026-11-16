@@ -254,6 +254,11 @@ import {
   buildDiskPillsHTML,
   driveLetter as diskDriveLetter,
 } from './disks/renderDisks.js'
+import {
+  initDevMode,
+  renderDevTab,
+  isDevModeActive,
+} from './devMode.js'
 
 const MIT_LICENSE = `PulseCore v1.1.0
 
@@ -1017,6 +1022,9 @@ function setActiveTab(name) {
   }
   if (target === 'settings') {
     /* startup moved out */
+  }
+  if (target === 'dev') {
+    renderDevTab().catch(() => {})
   }
   SetActiveTab(backendTab).catch(() => {})
 }
@@ -5998,6 +6006,10 @@ async function renderDiskCleanCache(body, cachedCats = null) {
       return
     }
 
+    if (res?.dryRun) {
+      const dryMsg = (lang === 'ru' ? res.dryRunMessageRu : res.dryRunMessageEn) || res.dryRunMessageRu || res.dryRunMessageEn || '[DRY-RUN]'
+      showToast(dryMsg, true)
+    }
     renderDiskCleanDrives().catch(() => {})
     try { await RefreshDiskMetricsEx() } catch (_) {}
     window.__lastCleanCompare = {
@@ -8528,10 +8540,11 @@ function boot() {
   wireContextMenu()
   initUpdater()
   initKeyboardNavigation()
+  initDevMode({ showToast, setActiveTab, refresh, escapeHtml }).catch(() => {})
   loadBehavior()
   SetLanguage(lang).catch(() => {})
   syncElevatedUI().catch(() => {})
-  setActiveTab('home')
+  IsDevMode().then((isDev) => { setActiveTab(isDev ? 'dev' : 'home') }).catch(() => { setActiveTab('home') })
   loadGames()
   pollMetrics()
   setTimeout(() => { refreshAllDiskSmart(false).catch(() => {}) }, 1500)
