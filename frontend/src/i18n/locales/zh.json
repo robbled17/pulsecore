@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "已从配置中移除磁盘",
   "devDiskAddedToast": "已添加新磁盘至配置",
   "devResetRealBtn": "↺ 重置为真实电脑",
-  "devResetRealToast": "所有模拟已重置为真实电脑配置与传感器数据"
+  "devResetRealToast": "所有模拟已重置为真实电脑配置与传感器数据",
+  "startupEmptyTitle": "开机启动列表为空",
+  "startupEmptyDesc": "没有随 Windows 启动的应用程序",
+  "devCpuNamePlaceholder": "CPU 名称（例如 Ryzen 5 5600）",
+  "devCoresPlaceholder": "核心数",
+  "devThreadsPlaceholder": "线程数",
+  "devFreqPlaceholder": "频率 MHz",
+  "devGpuNamePlaceholder": "GPU 名称（例如 RTX 4060）",
+  "devVramPlaceholder": "显存 GB"
 }

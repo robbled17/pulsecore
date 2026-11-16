@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "Диск удалён из конфигурации",
   "devDiskAddedToast": "Новый диск добавлен в конфигурацию",
   "devResetRealBtn": "↺ Сбросить к реальному ПК",
-  "devResetRealToast": "Все симуляции сброшены к реальной конфигурации и датчикам ПК"
+  "devResetRealToast": "Все симуляции сброшены к реальной конфигурации и датчикам ПК",
+  "startupEmptyTitle": "Список автозагрузки пуст",
+  "startupEmptyDesc": "Программы не запускаются вместе с Windows",
+  "devCpuNamePlaceholder": "Название CPU (например, Ryzen 5 5600)",
+  "devCoresPlaceholder": "Ядер",
+  "devThreadsPlaceholder": "Потоков",
+  "devFreqPlaceholder": "Частота МГц",
+  "devGpuNamePlaceholder": "Название GPU (например, RTX 4060)",
+  "devVramPlaceholder": "VRAM ГБ"
 }

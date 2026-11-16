@@ -846,11 +846,11 @@
                 </select>
               </label>
               <div class="dev-fields-grid">
-                <input type="text" id="dev-hw-cpu-name" class="glass-control" placeholder="CPU Name" />
+                <input type="text" id="dev-hw-cpu-name" class="glass-control" placeholder="CPU Name" data-i18n-placeholder="devCpuNamePlaceholder" />
                 <div class="dev-fields-mini">
-                  <input type="number" id="dev-hw-cpu-cores" class="glass-control" placeholder="Cores" min="1" max="64" />
-                  <input type="number" id="dev-hw-cpu-threads" class="glass-control" placeholder="Threads" min="1" max="128" />
-                  <input type="number" id="dev-hw-cpu-freq" class="glass-control" placeholder="MHz" min="500" max="8000" />
+                  <input type="number" id="dev-hw-cpu-cores" class="glass-control" placeholder="Cores" data-i18n-placeholder="devCoresPlaceholder" min="1" max="64" />
+                  <input type="number" id="dev-hw-cpu-threads" class="glass-control" placeholder="Threads" data-i18n-placeholder="devThreadsPlaceholder" min="1" max="128" />
+                  <input type="number" id="dev-hw-cpu-freq" class="glass-control" placeholder="MHz" data-i18n-placeholder="devFreqPlaceholder" min="500" max="8000" />
                 </div>
               </div>
             </div>
@@ -864,9 +864,9 @@
                 </select>
               </label>
               <div class="dev-fields-grid">
-                <input type="text" id="dev-hw-gpu-name" class="glass-control" placeholder="GPU Name" />
+                <input type="text" id="dev-hw-gpu-name" class="glass-control" placeholder="GPU Name" data-i18n-placeholder="devGpuNamePlaceholder" />
                 <div class="dev-fields-mini">
-                  <input type="number" id="dev-hw-gpu-vram" class="glass-control" placeholder="VRAM GB" min="0" max="48" step="1" />
+                  <input type="number" id="dev-hw-gpu-vram" class="glass-control" placeholder="VRAM GB" data-i18n-placeholder="devVramPlaceholder" min="0" max="48" step="1" />
                   <label class="dev-check-label">
                     <input type="checkbox" id="dev-hw-gpu-igpu" />
                     <span>iGPU</span>

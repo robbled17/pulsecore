@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "Диск конфигурациядән бетерелде",
   "devDiskAddedToast": "Конфигурациягә яңа диск өстәлде",
   "devResetRealBtn": "↺ Реаль ПК-га кайтару",
-  "devResetRealToast": "Барлык симуляцияләр реаль ПК конфигурациясенә кайтарылды"
+  "devResetRealToast": "Барлык симуляцияләр реаль ПК конфигурациясенә кайтарылды",
+  "startupEmptyTitle": "Автойөкләү исемлеге буш",
+  "startupEmptyDesc": "Windows белән бергә эшләтеп җибәрелә торган программалар юк",
+  "devCpuNamePlaceholder": "CPU атамасы (мәс., Ryzen 5 5600)",
+  "devCoresPlaceholder": "Үзәкләр",
+  "devThreadsPlaceholder": "Агымнар",
+  "devFreqPlaceholder": "Ешлык МГц",
+  "devGpuNamePlaceholder": "GPU атамасы (мәс., RTX 4060)",
+  "devVramPlaceholder": "VRAM ГБ"
 }

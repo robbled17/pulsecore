@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "Festplatte aus Konfiguration entfernt",
   "devDiskAddedToast": "Neue Festplatte zur Konfiguration hinzugefügt",
   "devResetRealBtn": "↺ Auf echten PC zurücksetzen",
-  "devResetRealToast": "Alle Simulationen wurden auf die echte PC-Hardware zurückgesetzt"
+  "devResetRealToast": "Alle Simulationen wurden auf die echte PC-Hardware zurückgesetzt",
+  "startupEmptyTitle": "Autostart-Liste ist leer",
+  "startupEmptyDesc": "Keine Anwendungen starten mit Windows",
+  "devCpuNamePlaceholder": "CPU-Name (z.B. Ryzen 5 5600)",
+  "devCoresPlaceholder": "Kerne",
+  "devThreadsPlaceholder": "Threads",
+  "devFreqPlaceholder": "Takt MHz",
+  "devGpuNamePlaceholder": "GPU-Name (z.B. RTX 4060)",
+  "devVramPlaceholder": "VRAM GB"
 }

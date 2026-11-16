@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "構成からディスクが削除されました",
   "devDiskAddedToast": "構成に新しいディスクが追加されました",
   "devResetRealBtn": "↺ 実機PCにリセット",
-  "devResetRealToast": "すべてのシミュレーションが実機PCの構成とセンサーにリセットされました"
+  "devResetRealToast": "すべてのシミュレーションが実機PCの構成とセンサーにリセットされました",
+  "startupEmptyTitle": "スタートアップ一覧は空です",
+  "startupEmptyDesc": "Windows起動時に実行されるアプリはありません",
+  "devCpuNamePlaceholder": "CPU名（例：Ryzen 5 5600）",
+  "devCoresPlaceholder": "コア数",
+  "devThreadsPlaceholder": "スレッド数",
+  "devFreqPlaceholder": "クロック MHz",
+  "devGpuNamePlaceholder": "GPU名（例：RTX 4060）",
+  "devVramPlaceholder": "VRAM GB"
 }

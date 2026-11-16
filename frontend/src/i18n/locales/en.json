@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "Disk removed from configuration",
   "devDiskAddedToast": "New disk added to configuration",
   "devResetRealBtn": "↺ Reset to Real PC",
-  "devResetRealToast": "All simulations reset to physical PC hardware and live sensors"
+  "devResetRealToast": "All simulations reset to physical PC hardware and live sensors",
+  "startupEmptyTitle": "Startup list is empty",
+  "startupEmptyDesc": "No applications launch with Windows",
+  "devCpuNamePlaceholder": "CPU Name (e.g. Ryzen 5 5600)",
+  "devCoresPlaceholder": "Cores",
+  "devThreadsPlaceholder": "Threads",
+  "devFreqPlaceholder": "Freq MHz",
+  "devGpuNamePlaceholder": "GPU Name (e.g. RTX 4060)",
+  "devVramPlaceholder": "VRAM GB"
 }

@@ -1097,5 +1097,13 @@
   "devDiskRemovedToast": "Диск конфигурациядан жойылды",
   "devDiskAddedToast": "Конфигурацияға жаңа диск қосылды",
   "devResetRealBtn": "↺ Нақты ДК-ге қайтару",
-  "devResetRealToast": "Барлық модельдеулер нақты ДК конфигурациясына қайтарылды"
+  "devResetRealToast": "Барлық модельдеулер нақты ДК конфигурациясына қайтарылды",
+  "startupEmptyTitle": "Автоқосу тізімі бос",
+  "startupEmptyDesc": "Windows-пен бірге іске қосылатын бағдарламалар жоқ",
+  "devCpuNamePlaceholder": "CPU атауы (мыс., Ryzen 5 5600)",
+  "devCoresPlaceholder": "Ядролар",
+  "devThreadsPlaceholder": "Ағындар",
+  "devFreqPlaceholder": "Жиілік МГц",
+  "devGpuNamePlaceholder": "GPU атауы (мыс., RTX 4060)",
+  "devVramPlaceholder": "VRAM ГБ"
 }

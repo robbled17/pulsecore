@@ -1376,7 +1376,14 @@ async function renderStartupList() {
       </div>`
     : ''
   if ((!items || !items.length) && !brokenN) {
-    box.innerHTML = ''
+    box.innerHTML = `<div class="incident-card empty-state-card">
+      <div class="incident-body">
+        <div class="incident-title" style="display:flex;align-items:center;gap:8px;">
+          <span>🚀</span> <span>${t('startupEmptyTitle')}</span>
+        </div>
+        <div class="meta">${t('startupEmptyDesc')}</div>
+      </div>
+    </div>`
     return
   }
   const rows = (items || []).map((it) => {
