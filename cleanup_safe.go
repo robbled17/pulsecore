@@ -516,6 +516,23 @@ func IsSafeBrowserCachePath(p string) bool {
 
 func isSafeCleanupPath(p string) bool {
 	p = strings.ToLower(filepath.Clean(p))
+
+	// Strict Windows OS core directory protection: never touch Windows, System32, SysWOW64, boot files
+	winDir := strings.ToLower(filepath.Clean(os.Getenv("SystemRoot")))
+	if winDir == "" {
+		winDir = `c:\windows`
+	}
+	if p == winDir || strings.HasPrefix(p, winDir+string(os.PathSeparator)) || strings.HasPrefix(p, winDir+"\\") {
+		// Only explicit WER error reports are allowed under Windows directory
+		if !strings.HasSuffix(p, `\wer`) && !strings.Contains(p, `\wer\`) {
+			return false
+		}
+	}
+	if strings.HasSuffix(p, "pagefile.sys") || strings.HasSuffix(p, "swapfile.sys") || strings.HasSuffix(p, "hiberfil.sys") ||
+		strings.Contains(p, `\system32`) || strings.Contains(p, `\syswow64`) || strings.Contains(p, `\boot`) {
+		return false
+	}
+
 	for _, b := range forbiddenBrowserPatterns {
 		if strings.Contains(p, b) {
 			return false

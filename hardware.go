@@ -285,11 +285,18 @@ func readWMIGPU() (name string, vram uint64, driver string) {
 		if strings.Contains(lower, "microsoft basic") || strings.Contains(lower, "remote desktop") {
 			continue
 		}
-		if ram >= vram {
+		isCurInt := detectIntegratedGPU(name, float64(vram)/(1024*1024))
+		isNewInt := detectIntegratedGPU(n, float64(ram)/(1024*1024))
+
+		// If current is integrated and new is discrete, discrete always wins
+		if isCurInt && !isNewInt {
 			vram = ram
 			name = n
 			driver = drv
-		} else if name == "Unknown GPU" {
+		} else if isNewInt && !isCurInt && name != "Unknown GPU" {
+			// Keep existing discrete GPU
+		} else if ram >= vram || name == "Unknown GPU" {
+			vram = ram
 			name = n
 			driver = drv
 		}
@@ -427,14 +434,17 @@ func comRelease(obj uintptr) {
 	if obj == 0 {
 		return
 	}
-	vtbl := *(*uintptr)(unsafe.Pointer(obj))
-	release := *(*uintptr)(unsafe.Pointer(vtbl + 2*unsafe.Sizeof(uintptr(0))))
+	vtbl := *(*uintptr)(uintPtrToUnsafe(obj))
+	release := *(*uintptr)(unsafe.Add(uintPtrToUnsafe(vtbl), 2*unsafe.Sizeof(uintptr(0))))
 	_, _, _ = syscall.SyscallN(release, obj)
 }
 
 func vtblFunc(obj uintptr, index uintptr) uintptr {
-	vtbl := *(*uintptr)(unsafe.Pointer(obj))
-	return *(*uintptr)(unsafe.Pointer(vtbl + index*unsafe.Sizeof(uintptr(0))))
+	if obj == 0 {
+		return 0
+	}
+	vtbl := *(*uintptr)(uintPtrToUnsafe(obj))
+	return *(*uintptr)(unsafe.Add(uintPtrToUnsafe(vtbl), index*unsafe.Sizeof(uintptr(0))))
 }
 
 // readDXGIVRAM reads DXGI_ADAPTER_DESC.DedicatedVideoMemory (full 64-bit, not the 4 GB WMI cap).

@@ -14,6 +14,9 @@ var criticalWindowsProcs = map[string]struct{}{
 	"services.exe": {}, "lsass.exe": {}, "svchost.exe": {},
 	"winlogon.exe": {}, "fontdrvhost.exe": {}, "dwm.exe": {},
 	"explorer.exe": {}, "memcompression": {},
+	"sihost.exe": {}, "taskhostw.exe": {}, "spoolsv.exe": {},
+	"audiodg.exe": {}, "securityhealthservice.exe": {}, "msmpeng.exe": {},
+	"werfault.exe": {}, "searchindexer.exe": {}, "runtimebroker.exe": {},
 }
 
 func isCriticalSystemProc(name string) bool {

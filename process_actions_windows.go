@@ -16,6 +16,14 @@ import (
 )
 
 func killProcessNative(pid int) error {
+	if pid <= 4 || pid == os.Getpid() {
+		return fmt.Errorf("cannot terminate system or own process %d", pid)
+	}
+	name := processNameByPID(pid)
+	if name != "" && (isCriticalSystemProc(name) || isPPLProtected(name) || isSelfOrWebView(name)) {
+		return fmt.Errorf("process %s (PID %d) is protected by system security policy", name, pid)
+	}
+
 	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid))
 	if err == nil {
 		defer windows.CloseHandle(h)
@@ -30,6 +38,9 @@ func killProcessByNameNative(name string) error {
 	base := filepath.Base(name)
 	if !strings.HasSuffix(strings.ToLower(base), ".exe") {
 		base += ".exe"
+	}
+	if isCriticalSystemProc(base) || isPPLProtected(base) || isSelfOrWebView(base) {
+		return fmt.Errorf("process %s is protected by system security policy", base)
 	}
 	return RunHiddenCommand("taskkill.exe", "/F", "/T", "/IM", base).Run()
 }

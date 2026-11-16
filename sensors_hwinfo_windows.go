@@ -106,7 +106,7 @@ func readTempFromHWiNFO() externalTempReading {
 	}
 	defer unmapView.Call(addr)
 
-	hdr := (*hwinfoHeader)(unsafe.Pointer(addr))
+	hdr := (*hwinfoHeader)(uintPtrToUnsafe(addr))
 	if hdr.Signature != hwinfoSig || hdr.NumReadingElements == 0 || hdr.SizeOfReadingElement == 0 {
 		hwinfoLastRead = externalTempReading{}
 		return hwinfoLastRead
@@ -126,7 +126,7 @@ func readTempFromHWiNFO() externalTempReading {
 	}
 	var best cand
 	for i := 0; i < n; i++ {
-		p := unsafe.Pointer(off + uintptr(i)*size)
+		p := uintPtrToUnsafe(off + uintptr(i)*size)
 		// Safe only if element size >= sizeof(hwinfoReading); older layouts still have Value at same offset after labels.
 		if size < unsafe.Sizeof(hwinfoReading{}) {
 			continue

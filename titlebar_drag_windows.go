@@ -69,6 +69,11 @@ func hwndBelongsToUs(hwnd windows.HWND) bool {
 	return wpid == windows.GetCurrentProcessId()
 }
 
+var (
+	enumFoundHWND   windows.HWND
+	enumFoundHWNDMu sync.Mutex
+)
+
 var enumMainHWNDCb = windows.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
 	vis, _, _ := procIsWindowVisible.Call(hwnd)
 	if vis == 0 {
@@ -81,20 +86,20 @@ var enumMainHWNDCb = windows.NewCallback(func(hwnd uintptr, lparam uintptr) uint
 	}
 	// Prefer the root owner window for the process.
 	root, _, _ := procGetAncestor.Call(hwnd, gaRoot)
-	if lparam != 0 {
-		if root != 0 {
-			*(*uintptr)(unsafe.Pointer(lparam)) = root
-		} else {
-			*(*uintptr)(unsafe.Pointer(lparam)) = hwnd
-		}
+	if root != 0 {
+		enumFoundHWND = windows.HWND(root)
+	} else {
+		enumFoundHWND = windows.HWND(hwnd)
 	}
 	return 0
 })
 
 func findOurMainHWND() windows.HWND {
-	var found uintptr
-	_, _, _ = procEnumWindows.Call(enumMainHWNDCb, uintptr(unsafe.Pointer(&found)))
-	return windows.HWND(found)
+	enumFoundHWNDMu.Lock()
+	defer enumFoundHWNDMu.Unlock()
+	enumFoundHWND = 0
+	_, _, _ = procEnumWindows.Call(enumMainHWNDCb, 0)
+	return enumFoundHWND
 }
 
 // appMainHWND returns PulseCore's own top-level HWND only.

@@ -300,9 +300,9 @@ type epicManifest struct {
 	CatalogItemId        string   `json:"CatalogItemId"`
 	AppCategories        []string `json:"AppCategories"`
 	Category             string   `json:"Category"`
-	bIsIncomplete        bool     `json:"bIsIncomplete"`
-	bIsApplication       *bool    `json:"bIsApplication"`
-	bIsIncompleteInstall bool     `json:"bIsIncompleteInstall"`
+	BIsIncomplete        bool     `json:"bIsIncomplete"`
+	BIsApplication       *bool    `json:"bIsApplication"`
+	BIsIncompleteInstall bool     `json:"bIsIncompleteInstall"`
 }
 
 func collectInstalledEpicGames() []GameInfo {
@@ -323,11 +323,11 @@ func collectInstalledEpicGames() []GameInfo {
 			continue
 		}
 		name := strings.TrimSpace(m.DisplayName)
-		if name == "" || m.bIsIncomplete || m.bIsIncompleteInstall {
+		if name == "" || m.BIsIncomplete || m.BIsIncompleteInstall {
 			continue
 		}
 		// Tooling / non-application Epic entries often omit LaunchExecutable.
-		if m.LaunchExecutable == "" && (m.bIsApplication == nil || !*m.bIsApplication) {
+		if m.LaunchExecutable == "" && (m.BIsApplication == nil || !*m.BIsApplication) {
 			continue
 		}
 		appName := strings.TrimSpace(m.AppName)
@@ -355,7 +355,7 @@ func collectInstalledEpicGames() []GameInfo {
 			InstallPath:      g.InstallPath,
 			EpicNamespace:    m.CatalogNamespace,
 			EpicAppName:      appName,
-			EpicIsApp:        m.bIsApplication,
+			EpicIsApp:        m.BIsApplication,
 			EpicCategoryHint: catHint,
 		}
 		if !keepInstalledGame(g, excl) {

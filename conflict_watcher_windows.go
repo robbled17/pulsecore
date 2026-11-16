@@ -173,10 +173,18 @@ var (
 	dismissCooldownUntil time.Time
 )
 
+// uintPtrToUnsafe converts a foreign OS memory address (Win32 / COM / MapViewOfFile) to unsafe.Pointer.
+func uintPtrToUnsafe(p uintptr) unsafe.Pointer {
+	return *(*unsafe.Pointer)(unsafe.Pointer(&p))
+}
+
 // callCOM invokes a virtual method from an interface pointer using stdcall conventions.
 func callCOM(obj uintptr, methodIndex int, args ...uintptr) uintptr {
-	vtablePtr := *(*uintptr)(unsafe.Pointer(obj))
-	methodPtr := *(*uintptr)(unsafe.Pointer(vtablePtr + uintptr(methodIndex)*unsafe.Sizeof(uintptr(0))))
+	if obj == 0 {
+		return 1
+	}
+	vtablePtr := *(*uintptr)(uintPtrToUnsafe(obj))
+	methodPtr := *(*uintptr)(unsafe.Add(uintPtrToUnsafe(vtablePtr), uintptr(methodIndex)*unsafe.Sizeof(uintptr(0))))
 	allArgs := append([]uintptr{obj}, args...)
 	r, _, _ := syscall.SyscallN(methodPtr, allArgs...)
 	return r
