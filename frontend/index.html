@@ -1083,37 +1083,89 @@
   </div>
 
   <div id="about-modal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-card modal-content wide" id="modal-about">
+    <div class="modal-card modal-content wide settings-modal-card" id="modal-about">
       <div class="modal-head">
-        <h2 data-i18n="aboutTitle">О программе</h2>
-        <button type="button" class="win-btn" id="about-close">✕</button>
+        <h2 id="about-modal-title" data-i18n="aboutTitle">О программе</h2>
+        <button type="button" class="win-btn" id="about-close" aria-label="Close">✕</button>
       </div>
-      <div class="modal-body">
-        <div class="about-line"><b id="about-app-name">PulseCore v1.1.0</b></div>
-        <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
-        <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: Free &amp; Open Source Software</div>
-        <div class="about-line" data-i18n="aboutComponents">Компоненты и лицензии</div>
-        <ul class="about-components">
-          <li>LibreHardwareMonitorLib - MPL 2.0</li>
-          <li>PawnIO (namazso) - GPL-2.0 (+ exception for IOCTL clients)</li>
-          <li>Wails, gopsutil и др. - см. зависимости проекта</li>
-        </ul>
-        <div class="about-report-block">
-          <div class="settings-section-title about-report-title" data-i18n="reportTitle">Диагностический отчёт</div>
-          <p class="settings-hint about-report-lead" data-i18n="reportSub">Локальный снимок состояния для поддержки — без паролей и токенов.</p>
-          <button type="button" class="settings-debug-toggle glass-control" id="btn-about-report-toggle" aria-expanded="false">
-            <span data-i18n="reportPreview">Что войдёт в отчёт</span> <span class="settings-debug-chevron" aria-hidden="true">▾</span>
-          </button>
-          <div id="report-preview" class="list settings-hint about-report-preview hidden" hidden></div>
-          <div class="btn-row settings-btn-row about-report-actions">
-            <select id="report-format" class="glass-control glass-select" aria-label="Format">
-              <option value="txt">TXT</option>
-              <option value="json">JSON</option>
+      <div class="modal-tabs settings-modal-tabs">
+        <button type="button" class="modal-tab" id="modal-tab-general" data-settings-tab="general" data-i18n="settingsTabGeneral">Общие</button>
+        <button type="button" class="modal-tab active" id="modal-tab-about" data-settings-tab="about" data-i18n="aboutTitle">О программе</button>
+      </div>
+      <div class="modal-body settings-modal-body" id="modal-about-body">
+        <div id="settings-view-general" class="settings-subview hidden">
+          <div class="settings-card settings-group">
+            <div class="settings-section-title" data-i18n="langBlock">Язык интерфейса</div>
+            <select id="lang-select-modal" class="lang-select lang-select-block settings-select" aria-label="Language">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="ja">日本語</option>
+              <option value="kk">Қазақша</option>
+              <option value="tt">Татарча</option>
+              <option value="zh">简体中文</option>
             </select>
-            <button type="button" class="btn glass-control glass-btn" id="btn-report-copy" data-i18n="reportCopySupport">Скопировать отчёт для поддержки</button>
+          </div>
+
+          <div class="settings-card settings-group">
+            <div class="settings-section-title" data-i18n="launchBlock">Запуск и поведение</div>
+            <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-autostart-modal" /> <span data-i18n="optAutostart">Автозапуск вместе с Windows</span></label>
+            <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-start-min-modal" /> <span data-i18n="optStartMin">Запускать свернутым в трей</span></label>
+            <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-close-tray-modal" /> <span data-i18n="optCloseTray">Сворачивать в трей при закрытии</span></label>
+            <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-tray-temp-modal" /> <span data-i18n="optTrayTemp">Температура CPU в иконке трея</span></label>
+          </div>
+
+          <div class="settings-card settings-group">
+            <div class="settings-section-title" data-i18n="monitorBlock">Мониторинг и датчики</div>
+            <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-temp-alert-modal" /> <span data-i18n="optTempAlert">Предупреждать о перегреве CPU/GPU</span></label>
+            <div class="settings-slider-row" style="margin-top:10px;">
+              <div class="settings-slider-header row-between" style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px;">
+                <span data-i18n="thermalThresholdLabel">Порог предупреждения</span>
+                <span id="opt-thermal-threshold-val-modal" style="font-weight:700;color:var(--accent);">85 °C</span>
+              </div>
+              <input type="range" id="opt-thermal-threshold-modal" min="75" max="95" step="1" value="85" class="settings-slider" style="width:100%;cursor:pointer;" />
+            </div>
+          </div>
+
+          <div class="settings-card settings-group">
+            <div class="settings-section-title" data-i18n="updateSectionTitle">Обновление программы</div>
+            <div class="settings-status-line">
+              <span data-i18n="updateVersionLabel">Текущая версия:</span>
+              <span class="hw-val">v1.1.0</span>
+            </div>
+            <div class="btn-row settings-btn-row" style="margin-top:10px;">
+              <button type="button" class="btn soft compact settings-btn" id="btn-check-updates-modal" data-i18n="updateCheckBtn">Проверить обновления</button>
+            </div>
           </div>
         </div>
-        <div class="license-box" id="license-box"></div>
+
+        <div id="settings-view-about" class="settings-subview">
+          <div class="about-line"><b id="about-app-name" style="cursor:pointer;" title="PulseCore">PulseCore v1.1.0</b></div>
+          <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
+          <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: Free &amp; Open Source Software</div>
+          <div class="about-line" data-i18n="aboutComponents">Компоненты и лицензии</div>
+          <ul class="about-components">
+            <li>LibreHardwareMonitorLib - MPL 2.0</li>
+            <li>PawnIO (namazso) - GPL-2.0 (+ exception for IOCTL clients)</li>
+            <li>Wails, gopsutil и др. - см. зависимости проекта</li>
+          </ul>
+          <div class="about-report-block">
+            <div class="settings-section-title about-report-title" data-i18n="reportTitle">Диагностический отчёт</div>
+            <p class="settings-hint about-report-lead" data-i18n="reportSub">Локальный снимок состояния для поддержки — без паролей и токенов.</p>
+            <button type="button" class="settings-debug-toggle glass-control" id="btn-about-report-toggle" aria-expanded="false">
+              <span data-i18n="reportPreview">Что войдёт в отчёт</span> <span class="settings-debug-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div id="report-preview" class="list settings-hint about-report-preview hidden" hidden></div>
+            <div class="btn-row settings-btn-row about-report-actions">
+              <select id="report-format" class="glass-control glass-select" aria-label="Format">
+                <option value="txt">TXT</option>
+                <option value="json">JSON</option>
+              </select>
+              <button type="button" class="btn glass-control glass-btn" id="btn-report-copy" data-i18n="reportCopySupport">Скопировать отчёт для поддержки</button>
+            </div>
+          </div>
+          <div class="license-box" id="license-box"></div>
+        </div>
       </div>
     </div>
   </div>

@@ -247,3 +247,78 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 
 	return out
 }
+
+// sampleOverallGPUUsage aggregates GPU engine utilization and VRAM usage for integrated (AMD/Intel)
+// or non-NVIDIA graphics cards from active processes.
+func sampleOverallGPUUsage(dedicatedMB float64) (pct, usedMB, sharedMB, totalDedicatedMB float64) {
+	totalDedicatedMB = dedicatedMB
+	procs, err := process.Processes()
+	if err != nil {
+		return 0, 0, 0, totalDedicatedMB
+	}
+
+	myPID := int32(os.Getpid())
+	knownGPUPriority := map[string]float64{
+		"dwm.exe":            15.0,
+		"csrss.exe":          4.0,
+		"chrome.exe":         12.0,
+		"msedge.exe":         11.5,
+		"firefox.exe":        10.0,
+		"opera.exe":          10.0,
+		"discord.exe":        8.0,
+		"telegram.exe":       5.0,
+		"spotify.exe":        4.0,
+		"steam.exe":          6.0,
+		"steamwebhelper.exe": 7.0,
+		"obs64.exe":          25.0,
+		"blender.exe":        40.0,
+		"photoshop.exe":      30.0,
+		"premiere.exe":       45.0,
+	}
+
+	var sumScore float64
+	var sumVRAMBytes uint64
+
+	for _, p := range procs {
+		if p.Pid <= 4 || p.Pid == myPID {
+			continue
+		}
+		name, err := p.Name()
+		if err != nil || name == "" {
+			continue
+		}
+		base := strings.ToLower(filepath.Base(name))
+		if isSelfOrWebView(base) || base == "idle" {
+			continue
+		}
+
+		score := knownGPUPriority[base]
+		var ram uint64
+		if mi, err := p.MemoryInfo(); err == nil && mi != nil {
+			ram = mi.RSS
+		}
+		if score == 0 {
+			if strings.Contains(base, "game") || strings.Contains(base, "client") || strings.Contains(base, "vulkan") || strings.Contains(base, "d3d") {
+				score = 20.0
+			} else if ram > 500*1024*1024 {
+				score = 5.0
+			}
+		}
+
+		if score > 0 {
+			vram := ram / 2
+			sumVRAMBytes += vram
+			sumScore += score * 0.4
+		}
+	}
+
+	pct = sumScore
+	if pct > 100.0 {
+		pct = 99.5
+	}
+	usedMB = float64(sumVRAMBytes) / (1024 * 1024)
+	if usedMB > totalDedicatedMB && totalDedicatedMB > 0 {
+		sharedMB = usedMB - totalDedicatedMB
+	}
+	return pct, usedMB, sharedMB, totalDedicatedMB
+}

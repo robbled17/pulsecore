@@ -401,6 +401,18 @@ func (a *App) UninstallWithCleanup(appID string) UninstallAppResult {
 	}
 
 	time.Sleep(600 * time.Millisecond)
+
+	// If user cancelled uninstallation or app files were retained
+	if isAppStillRetained(target, beforeSize) {
+		return UninstallAppResult{
+			OK:            false,
+			Message:       "cancelled_or_retained",
+			Leftovers:     nil,
+			LeftoverBytes: 0,
+			FreedBytes:    0,
+		}
+	}
+
 	leftovers := findAppLeftovers(target.DisplayName, target.InstallLocation)
 	var leftBytes int64
 	for _, l := range leftovers {
@@ -426,6 +438,59 @@ func (a *App) UninstallWithCleanup(appID string) UninstallAppResult {
 		LeftoverBytes: leftBytes,
 		FreedBytes:    freed,
 	}
+}
+
+// isAppStillRetained reports whether the application folder or uninstall key is still intact,
+// indicating the user cancelled the vendor uninstaller or files were retained.
+func isAppStillRetained(target *InstalledApp, beforeSize int64) bool {
+	if target == nil {
+		return false
+	}
+
+	loc := strings.Trim(strings.TrimSpace(target.InstallLocation), `"'`)
+	if loc != "" {
+		if fi, err := os.Stat(loc); err == nil && fi.IsDir() {
+			sz := dirSizeBudget(loc, time.Now().Add(1200*time.Millisecond), 4)
+			// Heavy threshold: > 50 MB or > 20% of original beforeSize
+			isHeavy := sz > 50*1024*1024 || (beforeSize > 0 && float64(sz) > float64(beforeSize)*0.20)
+			if isHeavy {
+				return true
+			}
+		}
+	}
+
+	if target.RegistryRoot != "" && target.RegistryPath != "" {
+		if checkRegistryKeyExists(target.RegistryRoot, target.RegistryPath) {
+			if loc != "" {
+				if fi, err := os.Stat(loc); err == nil && fi.IsDir() {
+					sz := dirSizeBudget(loc, time.Now().Add(500*time.Millisecond), 3)
+					if sz > 10*1024*1024 {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func checkRegistryKeyExists(rootStr, pathStr string) bool {
+	var root registry.Key
+	switch strings.ToUpper(strings.TrimSpace(rootStr)) {
+	case "HKLM":
+		root = registry.LOCAL_MACHINE
+	case "HKCU":
+		root = registry.CURRENT_USER
+	default:
+		return false
+	}
+	k, err := registry.OpenKey(root, pathStr, registry.QUERY_VALUE)
+	if err == nil {
+		k.Close()
+		return true
+	}
+	return false
 }
 
 // RemoveAppLeftovers deletes residual folders reported after uninstall.

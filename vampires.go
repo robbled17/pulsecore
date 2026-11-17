@@ -130,7 +130,7 @@ func (a *App) GetVampireProcesses() []VampireProcess {
 			continue
 		}
 		lower := strings.ToLower(filepath.Base(name))
-		if isSelfOrWebView(lower) || lower == "system" || lower == "idle" {
+		if isSelfOrWebView(lower) || lower == "system" || lower == "idle" || isTransientConsoleUtility(lower) {
 			continue
 		}
 

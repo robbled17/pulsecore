@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -616,11 +615,13 @@ func (a *App) gpuCached(now time.Time, tab string) (pct, used, shared, dedicated
 	a.mu.RLock()
 	pct, used, shared, dedicated = a.cachedGPUPct, a.cachedVRAMUsed, a.cachedVRAMShare, a.cachedVRAMDed
 	last := a.lastGPU
-	missing := a.nvidiaMissing
 	mini := a.miniHUD
 	a.mu.RUnlock()
-	need := tab == "overview" || tab == "hardware" || mini
-	if missing || !need || (!last.IsZero() && now.Sub(last) < 5*time.Second) {
+	need := tab == "overview" || tab == "hardware" || tab == "home" || mini
+	if !need && !last.IsZero() {
+		return pct, used, shared, dedicated
+	}
+	if !last.IsZero() && now.Sub(last) < 2*time.Second {
 		return pct, used, shared, dedicated
 	}
 	pct, used, shared, dedicated = a.collectGPUUsage()
@@ -1485,18 +1486,15 @@ func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
 		"--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
 		"--format=csv,noheader,nounits")
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			a.mu.Lock()
-			a.nvidiaMissing = true
-			a.cachedGPUTempOK = false
-			a.cachedGPUPowerOK = false
-			a.mu.Unlock()
-		}
-		return 0, 0, 0, dedicatedMB
+		a.mu.Lock()
+		a.cachedGPUTempOK = false
+		a.cachedGPUPowerOK = false
+		a.mu.Unlock()
+		return sampleOverallGPUUsage(dedicatedMB)
 	}
 	parts := strings.Split(strings.TrimSpace(string(out)), ",")
 	if len(parts) < 3 {
-		return 0, 0, 0, dedicatedMB
+		return sampleOverallGPUUsage(dedicatedMB)
 	}
 	fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
 	fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)

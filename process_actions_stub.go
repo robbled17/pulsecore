@@ -15,3 +15,7 @@ func restartProcessNative(pid int) error {
 func sampleGPUTopProcesses() []HardwareProcessItem {
 	return nil
 }
+
+func sampleOverallGPUUsage(dedicatedMB float64) (pct, usedMB, sharedMB, totalDedicatedMB float64) {
+	return 0, 0, 0, dedicatedMB
+}

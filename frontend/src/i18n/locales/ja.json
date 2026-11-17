@@ -1105,5 +1105,14 @@
   "devThreadsPlaceholder": "スレッド数",
   "devFreqPlaceholder": "クロック MHz",
   "devGpuNamePlaceholder": "GPU名（例：RTX 4060）",
-  "devVramPlaceholder": "VRAM GB"
+  "devVramPlaceholder": "VRAM GB",
+  "actionInProgress": "実行中...",
+  "actionCompleted": "✓ 完了",
+  "settingsTabGeneral": "一般",
+  "startupDisabling": "無効化中...",
+  "startupEnabling": "有効化中...",
+  "startupDelaying": "遅延設定中...",
+  "uninstallCancelledNotice": "アンインストールがキャンセルされました (ファイルは残っています)",
+  "procSearchWeb": "プロセス情報をオンラインで検索",
+  "procSearchQuery": "プロセス {proc} とは"
 }

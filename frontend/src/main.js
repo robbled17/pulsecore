@@ -1,4 +1,4 @@
-﻿import {
+import {
   GetMetrics,
   GetSystemMetrics,
   SetActiveTab,
@@ -221,7 +221,30 @@ function updateDeleteProgress(ev) {
   }
   if (ev?.phase === 'error') {
     isDeletingActive = false
-    if (text) text.textContent = ev?.message || t('deleteProgressFail')
+    const isCancelled = ev?.message === 'cancelled_or_retained'
+    const msg = isCancelled ? t('uninstallCancelledNotice') : (ev?.message || t('deleteProgressFail'))
+    if (text) text.textContent = msg
+    if (isCancelled) {
+      showToast(t('uninstallCancelledNotice'), false, { holdMs: 6000 })
+    }
+    setTimeout(() => {
+      $('delete-progress-modal')?.classList.add('hidden')
+    }, 1800)
+    const id = ev?.appId || window.__dcPendingDeleteId || ''
+    if (id) {
+      const row = document.querySelector(`.dc-app-row[data-app-id="${CSS.escape(id)}"]`)
+      if (row) {
+        row.classList.remove('deleting')
+        row.querySelector('.dc-row-loader')?.classList.add('hidden')
+        const btn = row.querySelector('.dc-uninstall')
+        if (btn) {
+          btn.disabled = false
+          btn.textContent = t('diskCleanUninstall')
+        }
+      }
+    }
+    window.__dcPendingDeleteId = null
+    window.__dcRefreshAfterDelete = null
     return
   }
   if (text) {
@@ -2269,7 +2292,7 @@ async function renderLagIncidents() {
         <div class="incident-body">
           <div class="incident-title">${escapeHtml(c.time || '')} ${demo}</div>
           <div class="incident-explain">${escapeHtml(c.verdictText || t('verdictUnknown'))}</div>
-          <div class="meta">${t('culprit')}: ${escapeHtml(culpritLabel)}</div>
+          <div class="meta">${t('culprit')}: <span>${escapeHtml(culpritLabel)}</span>${c.culprit && c.culprit !== 'many_processes' ? `<button type="button" class="btn compact ghost btn-proc-search" data-proc-search="${escapeHtml(c.culprit)}" title="${escapeHtml(t('procSearchWeb'))}" aria-label="${escapeHtml(t('procSearchWeb'))}">🔍</button>` : ''}</div>
           <div class="incident-evidence">${humanBlock}</div>
         </div>
         <div class="row-actions">
@@ -2509,7 +2532,7 @@ async function renderRadarPanel() {
       return `
         <div class="incident-card">
           <div class="incident-body">
-            <div class="incident-title">${escapeHtml(a.friendly || a.process || '-')}</div>
+            <div class="incident-title"><span>${escapeHtml(a.friendly || a.process || '-')}</span>${proc ? `<button type="button" class="btn compact ghost btn-proc-search" data-proc-search="${escapeHtml(proc)}" title="${escapeHtml(t('procSearchWeb'))}" aria-label="${escapeHtml(t('procSearchWeb'))}">🔍</button>` : ''}</div>
             <div class="incident-explain">${escapeHtml(text || '')}</div>
             ${when}
           </div>
@@ -2530,7 +2553,7 @@ async function renderRadarPanel() {
       return `
         <div class="incident-card">
           <div class="incident-body">
-            <div class="incident-title">${escapeHtml(c.friendly || c.process || '-')} · ${memVerdictLabel(c.verdict)}</div>
+            <div class="incident-title"><span>${escapeHtml(c.friendly || c.process || '-')} · ${memVerdictLabel(c.verdict)}</span>${proc ? `<button type="button" class="btn compact ghost btn-proc-search" data-proc-search="${escapeHtml(proc)}" title="${escapeHtml(t('procSearchWeb'))}" aria-label="${escapeHtml(t('procSearchWeb'))}">🔍</button>` : ''}</div>
             <div class="incident-explain">${escapeHtml(text || '')}</div>
           </div>
           ${proc ? `
@@ -2616,7 +2639,7 @@ function renderLag(m) {
       return `
         <div class="row">
           <div class="row-main">
-            <div class="name"><span>${escapeHtml(v.friendlyName || v.name)}</span>${badge}${ecoBadge}</div>
+            <div class="name"><span>${escapeHtml(v.friendlyName || v.name)}</span>${badge}${ecoBadge}<button type="button" class="btn compact ghost btn-proc-search" data-proc-search="${escapeHtml(v.name)}" title="${escapeHtml(t('procSearchWeb'))}" aria-label="${escapeHtml(t('procSearchWeb'))}">🔍</button></div>
             <div class="meta">${escapeHtml(v.name)} · CPU ${fmt(v.cpuPercent)}% · disk ~${fmt(v.diskMBps)} MB/s</div>
             ${reason ? `<div class="vamp-reason">${escapeHtml(reason)}</div>` : ''}
           </div>
@@ -6945,12 +6968,16 @@ function wireUI() {
       danger: !enable,
     })
     if (!ok) return
+    const origHtml = btn.innerHTML
     btn.disabled = true
+    btn.innerHTML = `<span class="spinner-inline" aria-hidden="true"></span> ${enable ? (t('startupEnabling') || t('actionInProgress')) : (t('startupDisabling') || t('actionInProgress'))}`
     try {
       const res = await SetStartupItemEnabled(id, enable)
       showToast(resultMsg(res), !!res?.ok, { holdMs: 5000 })
     } catch (err) {
       showToast(String(err), false, { holdMs: 5000 })
+      btn.disabled = false
+      btn.innerHTML = origHtml
     }
     renderStartupList().catch(() => {})
   })
@@ -6982,7 +7009,9 @@ function wireUI() {
     if (delayBtn) {
       const id = delayBtn.getAttribute('data-boot-id')
       if (!id) return
+      const origHtml = delayBtn.innerHTML
       delayBtn.disabled = true
+      delayBtn.innerHTML = `<span class="spinner-inline" aria-hidden="true"></span> ${t('startupDelaying') || t('actionInProgress')}`
       try {
         const res = await SetStartupItemMode(id, 'delayed')
         showToast(resultMsg(res) || t('bootDelayedSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
@@ -6990,6 +7019,7 @@ function wireUI() {
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
         delayBtn.disabled = false
+        delayBtn.innerHTML = origHtml
       }
       return
     }
@@ -6998,7 +7028,9 @@ function wireUI() {
     if (normalBtn) {
       const id = normalBtn.getAttribute('data-boot-id')
       if (!id) return
+      const origHtml = normalBtn.innerHTML
       normalBtn.disabled = true
+      normalBtn.innerHTML = `<span class="spinner-inline" aria-hidden="true"></span> ${t('startupEnabling') || t('actionInProgress')}`
       try {
         const res = await SetStartupItemMode(id, 'enabled')
         showToast(resultMsg(res) || t('bootNormalSuccess') || t('bootEnabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
@@ -7006,6 +7038,7 @@ function wireUI() {
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
         normalBtn.disabled = false
+        normalBtn.innerHTML = origHtml
       }
       return
     }
@@ -7014,7 +7047,9 @@ function wireUI() {
     if (disableBtn) {
       const id = disableBtn.getAttribute('data-boot-id')
       if (!id) return
+      const origHtml = disableBtn.innerHTML
       disableBtn.disabled = true
+      disableBtn.innerHTML = `<span class="spinner-inline" aria-hidden="true"></span> ${t('startupDisabling') || t('actionInProgress')}`
       try {
         const res = await SetStartupItemMode(id, 'disabled')
         showToast(resultMsg(res) || t('bootDisabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
@@ -7022,6 +7057,7 @@ function wireUI() {
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
         disableBtn.disabled = false
+        disableBtn.innerHTML = origHtml
       }
       return
     }
@@ -7030,7 +7066,9 @@ function wireUI() {
     if (enableBtn) {
       const id = enableBtn.getAttribute('data-boot-id')
       if (!id) return
+      const origHtml = enableBtn.innerHTML
       enableBtn.disabled = true
+      enableBtn.innerHTML = `<span class="spinner-inline" aria-hidden="true"></span> ${t('startupEnabling') || t('actionInProgress')}`
       try {
         const res = await SetStartupItemMode(id, 'enabled')
         showToast(resultMsg(res) || t('bootEnabledSuccess'), !res || res?.ok !== false, { holdMs: 3000 })
@@ -7038,6 +7076,7 @@ function wireUI() {
       } catch (err) {
         showToast(String(err), false, { holdMs: 4000 })
         enableBtn.disabled = false
+        enableBtn.innerHTML = origHtml
       }
       return
     }
@@ -7911,8 +7950,8 @@ function wireTooltips() {
     floatEl.style.transform = rect.left < 24 ? 'translateX(10px)' : 'none'
     requestAnimationFrame(() => {
       const h = floatEl.offsetHeight || 60
-      let top = rect.top - h - 8
-      if (top < 8) top = rect.bottom + 8
+      let top = rect.top - h - 10
+      if (top < 10) top = rect.bottom + 10
       floatEl.style.top = `${top}px`
     })
   }
@@ -7939,10 +7978,10 @@ function wireTooltips() {
       if (left < 12) left = 12
       if (left + popW > window.innerWidth - 12) left = window.innerWidth - popW - 12
 
-      // Auto-flip: prefer top, flip to bottom if top clipped
-      let top = rect.top - popH - 8
-      if (top < 8) {
-        top = rect.bottom + 8
+      // Auto-flip: prefer top, flip to bottom if top clipped with safe 10px offset
+      let top = rect.top - popH - 10
+      if (top < 10) {
+        top = rect.bottom + 10
       }
 
       popupEl.style.left = `${left}px`
@@ -7987,6 +8026,21 @@ function wireTooltips() {
   })
 
   document.addEventListener('click', (ev) => {
+    const searchBtn = ev.target.closest('.btn-proc-search')
+    if (searchBtn) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      const proc = searchBtn.getAttribute('data-proc-search') || ''
+      if (proc) {
+        const query = t('procSearchQuery', { proc })
+        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
+        try { BrowserOpenURL(url) } catch (_) {
+          try { window.open(url, '_blank') } catch (__) {}
+        }
+      }
+      return
+    }
+
     const infoEl = ev.target.closest('.info-tip')
     if (infoEl) {
       ev.stopPropagation()

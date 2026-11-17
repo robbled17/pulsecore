@@ -150,33 +150,25 @@ func (a *App) StartUninstallWithCleanup(appID string) map[string]interface{} {
 		a.emitDeleteProgress(deleteProgress{
 			JobID: jobID, Phase: "uninstall", Percent: 20, Label: appName, AppID: appID, OK: true,
 		})
-		var reported int64
+		res := a.UninstallWithCleanup(appID)
+		if !res.OK || res.Message == "cancelled_or_retained" {
+			a.cancelExternalUninstallWatch(appID)
+			a.emitDeleteProgress(deleteProgress{
+				JobID: jobID, Phase: "error", Percent: 100, Label: appName, AppID: appID,
+				OK: false, Message: "cancelled_or_retained", FreedBytes: 0,
+			})
+			return
+		}
+
+		a.emitDeleteProgress(deleteProgress{
+			JobID: jobID, Phase: "cleanup", Percent: 55, Label: appName, AppID: appID, OK: true,
+			Message: res.Message, Path: installLoc,
+		})
+
+		var reported int64 = res.FreedBytes
 		drive := driveLetterFromPath(installLoc)
 		_, rec := a.MeasureAndRecordClean(drive, "AppUninstall", func() int64 {
-			res := a.UninstallWithCleanup(appID)
-			a.emitDeleteProgress(deleteProgress{
-				JobID: jobID, Phase: "cleanup", Percent: 55, Label: appName, AppID: appID, OK: res.OK,
-				Message: res.Message, Path: installLoc,
-			})
-			reported = res.FreedBytes
-
-			// Force-wipe install folder if vendor uninstaller left a giant tree (RDR2 etc.).
-			if loc := strings.TrimSpace(installLoc); loc != "" {
-				if _, err := os.Stat(loc); err == nil && isDeletableInstallPath(loc) {
-					a.emitDeleteProgress(deleteProgress{
-						JobID: jobID, Phase: "cleanup", Percent: 75, Label: appName, AppID: appID,
-						OK: true, Path: loc, Message: "force-delete",
-					})
-					sz := dirSizeBudget(loc, time.Now().Add(1200*time.Millisecond), 4)
-					if err := ForceDeleteAll(loc); err == nil {
-						if _, err2 := os.Stat(loc); os.IsNotExist(err2) {
-							reported += sz
-						}
-					}
-				}
-			}
-
-			paths := make([]string, 0, len(res.Leftovers)+1)
+			paths := make([]string, 0, len(res.Leftovers))
 			for _, l := range res.Leftovers {
 				paths = append(paths, l.Path)
 			}

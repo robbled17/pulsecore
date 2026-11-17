@@ -1105,5 +1105,14 @@
   "devThreadsPlaceholder": "Ағындар",
   "devFreqPlaceholder": "Жиілік МГц",
   "devGpuNamePlaceholder": "GPU атауы (мыс., RTX 4060)",
-  "devVramPlaceholder": "VRAM ГБ"
+  "devVramPlaceholder": "VRAM ГБ",
+  "actionInProgress": "Орындалуда...",
+  "actionCompleted": "✓ Орындалды",
+  "settingsTabGeneral": "Жалпы",
+  "startupDisabling": "Өшіру...",
+  "startupEnabling": "Қосу...",
+  "startupDelaying": "Кейінге қалдыру...",
+  "uninstallCancelledNotice": "Жою тоқтатылды (файлдар дискіде қалды)",
+  "procSearchWeb": "Процесс туралы желіден іздеу",
+  "procSearchQuery": "{proc} процесі деген не"
 }

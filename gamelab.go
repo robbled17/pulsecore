@@ -1011,10 +1011,15 @@ func (a *App) buildSystemPowerProfile() SystemPowerProfile {
 		integrated = detectIntegratedGPU(gpuName, hw.GPU.DedicatedMB)
 	}
 	vramGB := hw.GPU.VRAMGB
-	if integrated {
-		vramGB = 0
-	} else if vramGB <= 0 && hw.GPU.DedicatedMB > 0 {
+	if vramGB <= 0 && hw.GPU.DedicatedMB > 0 {
 		vramGB = hw.GPU.DedicatedMB / 1024.0
+	}
+	if integrated && vramGB <= 0 {
+		if hw.RAM.TotalMB >= 8192 {
+			vramGB = 1.0
+		} else {
+			vramGB = 0.5
+		}
 	}
 
 	gpuScore := calcGPUPowerScore(gpuName, integrated, vramGB)

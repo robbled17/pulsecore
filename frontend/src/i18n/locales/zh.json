@@ -1105,5 +1105,14 @@
   "devThreadsPlaceholder": "线程数",
   "devFreqPlaceholder": "频率 MHz",
   "devGpuNamePlaceholder": "GPU 名称（例如 RTX 4060）",
-  "devVramPlaceholder": "显存 GB"
+  "devVramPlaceholder": "显存 GB",
+  "actionInProgress": "正在执行...",
+  "actionCompleted": "✓ 已完成",
+  "settingsTabGeneral": "通用",
+  "startupDisabling": "正在禁用...",
+  "startupEnabling": "正在启用...",
+  "startupDelaying": "正在设置延迟...",
+  "uninstallCancelledNotice": "卸载已取消 (文件保留在磁盘上)",
+  "procSearchWeb": "在线搜索进程信息",
+  "procSearchQuery": "{proc} 是什么进程"
 }

@@ -13,21 +13,38 @@ import (
 var singleInstanceMutex windows.Handle
 
 func acquireSingleInstance() bool {
-	name, _ := windows.UTF16PtrFromString(`Global\PulseCoreSingleInstanceMutex`)
+	name, _ := windows.UTF16PtrFromString(`Global\PulseCore_SingleInstance_Mutex`)
 	h, err := windows.CreateMutex(nil, false, name)
-	if err != nil {
-		nameLocal, _ := windows.UTF16PtrFromString(`Local\PulseCoreSingleInstanceMutex`)
-		h, err = windows.CreateMutex(nil, false, nameLocal)
-	}
-	if err == windows.ERROR_ALREADY_EXISTS {
+	if err == windows.ERROR_ALREADY_EXISTS || (h != 0 && windows.GetLastError() == windows.ERROR_ALREADY_EXISTS) {
 		if h != 0 {
 			_ = windows.CloseHandle(h)
 		}
 		bringExistingInstanceToFront()
 		return false
 	}
-	singleInstanceMutex = h
+	if err != nil && h == 0 {
+		// If Global namespace is denied due to restricted token, fallback to Local namespace
+		nameLocal, _ := windows.UTF16PtrFromString(`Local\PulseCore_SingleInstance_Mutex`)
+		h, err = windows.CreateMutex(nil, false, nameLocal)
+		if err == windows.ERROR_ALREADY_EXISTS || (h != 0 && windows.GetLastError() == windows.ERROR_ALREADY_EXISTS) {
+			if h != 0 {
+				_ = windows.CloseHandle(h)
+			}
+			bringExistingInstanceToFront()
+			return false
+		}
+	}
+	if h != 0 {
+		singleInstanceMutex = h
+	}
 	return true
+}
+
+func releaseSingleInstance() {
+	if singleInstanceMutex != 0 {
+		_ = windows.CloseHandle(singleInstanceMutex)
+		singleInstanceMutex = 0
+	}
 }
 
 func isMainAppWindowTitle(txt string) bool {
@@ -51,6 +68,7 @@ func isMainAppWindowTitle(txt string) bool {
 
 var (
 	user32DLL               = windows.NewLazySystemDLL("user32.dll")
+	procFindWindowW         = user32DLL.NewProc("FindWindowW")
 	procGetWindowTextW      = user32DLL.NewProc("GetWindowTextW")
 	procShowWindow          = user32DLL.NewProc("ShowWindow")
 	procSetForegroundWindow = user32DLL.NewProc("SetForegroundWindow")
@@ -70,5 +88,14 @@ var bringInstanceCb = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr 
 })
 
 func bringExistingInstanceToFront() {
+	// First attempt quick FindWindowW
+	titlePtr, _ := windows.UTF16PtrFromString("PulseCore")
+	hWnd, _, _ := procFindWindowW.Call(0, uintptr(unsafe.Pointer(titlePtr)))
+	if hWnd != 0 {
+		procShowWindow.Call(hWnd, 9 /* SW_RESTORE */)
+		procSetForegroundWindow.Call(hWnd)
+		return
+	}
+	// Fallback to EnumWindows to find any window starting with PulseCore
 	procEnumWindowsSingle.Call(bringInstanceCb, 0)
 }

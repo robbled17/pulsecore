@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -28,6 +29,7 @@ func main() {
 	if !acquireSingleInstance() {
 		os.Exit(0)
 	}
+	defer releaseSingleInstance()
 	_ = appIcon // keep embed referenced; Wails packages build/windows/icon.ico into the EXE
 	for _, arg := range os.Args[1:] {
 		if strings.EqualFold(arg, "--dev") {
@@ -84,6 +86,15 @@ func main() {
 		OnBeforeClose: app.beforeClose,
 		Bind: []interface{}{
 			app,
+		},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId: "pulsecore-single-instance-lock",
+			OnSecondInstanceLaunch: func(secondInstanceData options.SecondInstanceData) {
+				if app != nil && app.ctx != nil {
+					wailsRuntime.WindowUnminimise(app.ctx)
+					wailsRuntime.WindowShow(app.ctx)
+				}
+			},
 		},
 		Windows: winOptions,
 	})

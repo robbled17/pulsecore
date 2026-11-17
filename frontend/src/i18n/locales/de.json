@@ -1105,5 +1105,14 @@
   "devThreadsPlaceholder": "Threads",
   "devFreqPlaceholder": "Takt MHz",
   "devGpuNamePlaceholder": "GPU-Name (z.B. RTX 4060)",
-  "devVramPlaceholder": "VRAM GB"
+  "devVramPlaceholder": "VRAM GB",
+  "actionInProgress": "Wird ausgeführt...",
+  "actionCompleted": "✓ Erledigt",
+  "settingsTabGeneral": "Allgemein",
+  "startupDisabling": "Deaktivieren...",
+  "startupEnabling": "Aktivieren...",
+  "startupDelaying": "Verzögern...",
+  "uninstallCancelledNotice": "Deinstallation abgebrochen (Dateien verbleiben auf dem Datenträger)",
+  "procSearchWeb": "Online nach Prozessinformationen suchen",
+  "procSearchQuery": "Was ist der Prozess {proc}"
 }

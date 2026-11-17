@@ -39,6 +39,10 @@ var ecoDenylist = map[string]struct{}{
 	"services.exe": {}, "lsass.exe": {}, "svchost.exe": {},
 	"explorer.exe": {}, "dwm.exe": {},
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
+	// Short-lived console utilities (never offer Eco)
+	"tasklist.exe": {}, "conhost.exe": {}, "cmd.exe": {},
+	"powershell.exe": {}, "pwsh.exe": {}, "findstr.exe": {},
+	"dxdiag.exe": {}, "wmic.exe": {}, "cscript.exe": {}, "wscript.exe": {},
 }
 
 // Kernel / PPL protected security stack - EcoQoS cannot be applied.
