@@ -1117,5 +1117,7 @@
   "procSearchQuery": "プロセス {proc} とは",
   "unitsPtsOne": "点",
   "unitsPtsFew": "点",
-  "unitsPtsMany": "点"
+  "unitsPtsMany": "点",
+  "homeActionRunning": "実行中...",
+  "homeActionDone": "完了"
 }

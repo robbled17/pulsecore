@@ -960,8 +960,8 @@ func buildHardwareInfo(static staticHardware, cpuPct float64, perCore []float64,
 		GPU: func() GPUDeepInfo {
 			integrated := detectIntegratedGPU(static.gpuName, vramTotal)
 			vramGB := vramTotal / 1024.0
-			if integrated {
-				vramGB = 0 // no dedicated VRAM on iGPU
+			if integrated && vramTotal == 0 {
+				vramGB = 0 // no dedicated VRAM on iGPU without dedicated carveout
 			}
 			return GPUDeepInfo{
 				Name:          static.gpuName,

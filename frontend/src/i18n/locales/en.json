@@ -1117,5 +1117,7 @@
   "procSearchQuery": "What is process {proc}",
   "unitsPtsOne": "pt",
   "unitsPtsFew": "pts",
-  "unitsPtsMany": "pts"
+  "unitsPtsMany": "pts",
+  "homeActionRunning": "Running...",
+  "homeActionDone": "Done"
 }

@@ -114,7 +114,8 @@ var defaultDevHardwareCatalog = DevHardwareCatalog{
 		{Name: "AMD Ryzen 7 9800X3D", Tier: "high", Cores: 8, Threads: 16, FreqMHz: 4700, Score: 100},
 	},
 	GPUs: []DevCatalogItem{
-		// iGPU & Basic (4)
+		// iGPU & Basic (5)
+		{Name: "AMD Radeon(TM) Graphics (512 МБ)", Tier: "igpu", VRAMGB: 0.5, IsIntegrated: true, Score: 18},
 		{Name: "Intel UHD Graphics 630 (1 ГБ)", Tier: "igpu", VRAMGB: 1, IsIntegrated: true, Score: 12},
 		{Name: "AMD Radeon Vega 8 (2 ГБ)", Tier: "igpu", VRAMGB: 2, IsIntegrated: true, Score: 22},
 		{Name: "NVIDIA GT 1030 (2 ГБ)", Tier: "igpu", VRAMGB: 2, IsIntegrated: false, Score: 20},
@@ -178,6 +179,31 @@ func (a *App) SetDryRun(enabled bool) {
 
 // devUpdateHealthNow immediately forces a fresh System Health evaluation sample in Dev Mode,
 // ensuring Health Index (0-100) and problem deductions reflect simulated values with 0 latency.
+// clearDevLagIncidents isolates Dev Mode scenarios by purging past real lag incidents and memory cards.
+func (a *App) clearDevLagIncidents() {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	a.lagEvents = make([]LagEvent, 0, maxLagEvents)
+	a.stutterEvents = make([]StutterEvent, 0, maxStutterEvents)
+	a.mu.Unlock()
+
+	bb := a.ensureBlackBox()
+	if bb != nil {
+		bb.mu.Lock()
+		bb.incidents = make([]LagIncident, 0, maxLagIncidents)
+		bb.mu.Unlock()
+	}
+
+	w := a.ensureMemWatch()
+	if w != nil {
+		w.mu.Lock()
+		w.cards = nil
+		w.mu.Unlock()
+	}
+}
+
 func (a *App) devUpdateHealthNow() {
 	if a == nil {
 		return
@@ -240,6 +266,7 @@ func (a *App) SetDevMode(enabled bool) DevModeState {
 			a.simProvider = NewSimulatedMetricsProvider()
 		}
 		a.metricsProvider = a.simProvider
+		a.clearDevLagIncidents()
 	} else {
 		a.dryRun = false
 		if a.realProvider == nil {
@@ -435,7 +462,7 @@ func (a *App) SetSimulatedSensors(cpuPct, cpuTemp, ramTotalGB, ramUsedPct, gpuPc
 func (a *App) SetSimulatedHardware(
 	cpuName string, cores, threads int, freqMHz, cpuScore float64,
 	gpuName string, vramGB float64, isIntegrated bool, gpuScore float64,
-	ramTotalGB int,
+	ramTotalGB float64,
 ) DevModeState {
 	if a == nil {
 		return DevModeState{}
@@ -481,7 +508,7 @@ func (a *App) SetSimulatedHardware(
 		sim.gpuScore = calcGPUPowerScore(sim.gpuName, isIntegrated, vramGB)
 	}
 
-	if ramTotalGB >= 4 {
+	if ramTotalGB >= 1 {
 		sim.ramTotalMB = uint64(ramTotalGB * 1024)
 		if sim.ramUsedMB > sim.ramTotalMB {
 			sim.ramUsedMB = uint64(float64(sim.ramTotalMB) * 0.5)
@@ -628,6 +655,8 @@ func (a *App) ApplyDevPreset(presetName string) DevModeState {
 		return DevModeState{}
 	}
 
+	a.clearDevLagIncidents()
+
 	a.devMu.Lock()
 	if a.simProvider == nil {
 		a.simProvider = NewSimulatedMetricsProvider()
@@ -708,6 +737,36 @@ func (a *App) ApplyDevPreset(presetName string) DevModeState {
 				ReasonEn:     "High background CPU load",
 			},
 		}
+		bb := a.ensureBlackBox()
+		if bb != nil {
+			bb.mu.Lock()
+			bb.incidents = []LagIncident{
+				{
+					ID:         fmt.Sprintf("dev-inc-%d", time.Now().UnixNano()),
+					Start:      time.Now().Add(-45 * time.Second),
+					End:        time.Now(),
+					DurationMs: 1500,
+					Kind:       StallConfirmed,
+					Synthetic:  true,
+					Verdict: Verdict{
+						Type:       VerdictCPUHog,
+						Culprit:    "crypto_miner_fake.exe",
+						CulpritPID: 8844,
+						Severity:   "high",
+						Confidence: 0.95,
+						Action:     "eco",
+						SystemProc: false,
+						EcoTargets: []EcoTarget{
+							{Name: "crypto_miner_fake.exe", PID: 8844, CPUPercent: 65.0},
+						},
+						Evidence: []string{
+							"Фоновый процесс crypto_miner_fake.exe удерживает 65% CPU",
+						},
+					},
+				},
+			}
+			bb.mu.Unlock()
+		}
 
 	case "long_uptime", "долгий аптайм":
 		// 14 days without reboot
@@ -725,6 +784,8 @@ func (a *App) ResetDevMode() DevModeState {
 	if a == nil {
 		return DevModeState{}
 	}
+
+	a.clearDevLagIncidents()
 
 	a.devMu.Lock()
 	a.simProvider = NewSimulatedMetricsProvider()

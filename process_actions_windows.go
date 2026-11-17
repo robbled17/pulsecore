@@ -9,7 +9,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
@@ -248,9 +251,175 @@ func sampleGPUTopProcesses() []HardwareProcessItem {
 	return out
 }
 
-// sampleOverallGPUUsage aggregates GPU engine utilization and VRAM usage for integrated (AMD/Intel)
-// or non-NVIDIA graphics cards from active processes.
+var (
+	modpdh                           = syscall.NewLazyDLL("pdh.dll")
+	procPdhOpenQueryW                = modpdh.NewProc("PdhOpenQueryW")
+	procPdhAddEnglishCounterW        = modpdh.NewProc("PdhAddEnglishCounterW")
+	procPdhCollectQueryData          = modpdh.NewProc("PdhCollectQueryData")
+	procPdhGetFormattedCounterArrayW = modpdh.NewProc("PdhGetFormattedCounterArrayW")
+	procPdhCloseQuery                = modpdh.NewProc("PdhCloseQuery")
+)
+
+const (
+	pdhFmtDouble = 0x00000200
+	pdhFmtLarge  = 0x00000400
+)
+
+type pdhItemDouble struct {
+	szName  *uint16
+	cStatus uint32
+	padding uint32
+	value   float64
+}
+
+type pdhItemLarge struct {
+	szName  *uint16
+	cStatus uint32
+	padding uint32
+	value   int64
+}
+
+type pdhGPUQuery struct {
+	mu            sync.Mutex
+	hQuery        uintptr
+	hEngineCtr    uintptr
+	hDedicatedCtr uintptr
+	hSharedCtr    uintptr
+	initialized   bool
+	initFailed    bool
+}
+
+var globalPDHGPU pdhGPUQuery
+
+func (q *pdhGPUQuery) initLocked() bool {
+	if q.initialized {
+		return !q.initFailed
+	}
+	q.initialized = true
+
+	var hQuery uintptr
+	r, _, _ := procPdhOpenQueryW.Call(0, 0, uintptr(unsafe.Pointer(&hQuery)))
+	if r != 0 {
+		q.initFailed = true
+		return false
+	}
+	q.hQuery = hQuery
+
+	pEngine, _ := syscall.UTF16PtrFromString(`\GPU Engine(*)\Utilization Percentage`)
+	pDedicated, _ := syscall.UTF16PtrFromString(`\GPU Adapter Memory(*)\Dedicated Usage`)
+	pShared, _ := syscall.UTF16PtrFromString(`\GPU Adapter Memory(*)\Shared Usage`)
+
+	rEng, _, _ := procPdhAddEnglishCounterW.Call(hQuery, uintptr(unsafe.Pointer(pEngine)), 0, uintptr(unsafe.Pointer(&q.hEngineCtr)))
+	rDed, _, _ := procPdhAddEnglishCounterW.Call(hQuery, uintptr(unsafe.Pointer(pDedicated)), 0, uintptr(unsafe.Pointer(&q.hDedicatedCtr)))
+	rSha, _, _ := procPdhAddEnglishCounterW.Call(hQuery, uintptr(unsafe.Pointer(pShared)), 0, uintptr(unsafe.Pointer(&q.hSharedCtr)))
+
+	if rEng != 0 && rDed != 0 && rSha != 0 {
+		procPdhCloseQuery.Call(q.hQuery)
+		q.hQuery = 0
+		q.initFailed = true
+		return false
+	}
+
+	// Initial baseline sample
+	procPdhCollectQueryData.Call(q.hQuery)
+	return true
+}
+
+func (q *pdhGPUQuery) sample(dedicatedMB float64) (pct, usedMB, sharedMB, totalDedicatedMB float64, ok bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if !q.initLocked() {
+		return 0, 0, 0, dedicatedMB, false
+	}
+
+	r, _, _ := procPdhCollectQueryData.Call(q.hQuery)
+	if r != 0 {
+		return 0, 0, 0, dedicatedMB, false
+	}
+
+	totalDedicatedMB = dedicatedMB
+
+	// 1. GPU Engine Utilization (% across 3D/Compute/Video engines)
+	if q.hEngineCtr != 0 {
+		var bufSize, itemCount uint32
+		procPdhGetFormattedCounterArrayW.Call(q.hEngineCtr, pdhFmtDouble, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), 0)
+		if bufSize > 0 {
+			buf := make([]byte, bufSize)
+			rArr, _, _ := procPdhGetFormattedCounterArrayW.Call(q.hEngineCtr, pdhFmtDouble, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), uintptr(unsafe.Pointer(&buf[0])))
+			if rArr == 0 && itemCount > 0 {
+				items := (*[1 << 20]pdhItemDouble)(unsafe.Pointer(&buf[0]))[:itemCount:itemCount]
+				var sumPct float64
+				for i := 0; i < int(itemCount); i++ {
+					if items[i].cStatus == 0 && items[i].value > 0 {
+						sumPct += items[i].value
+					}
+				}
+				if sumPct > 100.0 {
+					sumPct = 99.5
+				}
+				pct = sumPct
+			}
+		}
+	}
+
+	// 2. Dedicated VRAM Usage (bytes -> MB)
+	if q.hDedicatedCtr != 0 {
+		var bufSize, itemCount uint32
+		procPdhGetFormattedCounterArrayW.Call(q.hDedicatedCtr, pdhFmtLarge, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), 0)
+		if bufSize > 0 {
+			buf := make([]byte, bufSize)
+			rArr, _, _ := procPdhGetFormattedCounterArrayW.Call(q.hDedicatedCtr, pdhFmtLarge, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), uintptr(unsafe.Pointer(&buf[0])))
+			if rArr == 0 && itemCount > 0 {
+				items := (*[1 << 20]pdhItemLarge)(unsafe.Pointer(&buf[0]))[:itemCount:itemCount]
+				var totalBytes int64
+				for i := 0; i < int(itemCount); i++ {
+					if items[i].cStatus == 0 && items[i].value > 0 {
+						totalBytes += items[i].value
+					}
+				}
+				usedMB = float64(totalBytes) / (1024 * 1024)
+			}
+		}
+	}
+
+	// 3. Shared VRAM Usage (bytes -> MB)
+	if q.hSharedCtr != 0 {
+		var bufSize, itemCount uint32
+		procPdhGetFormattedCounterArrayW.Call(q.hSharedCtr, pdhFmtLarge, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), 0)
+		if bufSize > 0 {
+			buf := make([]byte, bufSize)
+			rArr, _, _ := procPdhGetFormattedCounterArrayW.Call(q.hSharedCtr, pdhFmtLarge, uintptr(unsafe.Pointer(&bufSize)), uintptr(unsafe.Pointer(&itemCount)), uintptr(unsafe.Pointer(&buf[0])))
+			if rArr == 0 && itemCount > 0 {
+				items := (*[1 << 20]pdhItemLarge)(unsafe.Pointer(&buf[0]))[:itemCount:itemCount]
+				var totalBytes int64
+				for i := 0; i < int(itemCount); i++ {
+					if items[i].cStatus == 0 && items[i].value > 0 {
+						totalBytes += items[i].value
+					}
+				}
+				sharedMB = float64(totalBytes) / (1024 * 1024)
+			}
+		}
+	}
+
+	if totalDedicatedMB <= 0 && usedMB > 0 {
+		totalDedicatedMB = usedMB
+	}
+
+	return pct, usedMB, sharedMB, totalDedicatedMB, true
+}
+
+// sampleOverallGPUUsage queries real Windows PDH system counters for GPU engine utilization
+// and VRAM usage on integrated (AMD/Intel) or non-NVIDIA GPUs, with a heuristic fallback.
 func sampleOverallGPUUsage(dedicatedMB float64) (pct, usedMB, sharedMB, totalDedicatedMB float64) {
+	if p, u, s, t, ok := globalPDHGPU.sample(dedicatedMB); ok {
+		return p, u, s, t
+	}
+	return sampleOverallGPUUsageFallback(dedicatedMB)
+}
+
+func sampleOverallGPUUsageFallback(dedicatedMB float64) (pct, usedMB, sharedMB, totalDedicatedMB float64) {
 	totalDedicatedMB = dedicatedMB
 	procs, err := process.Processes()
 	if err != nil {

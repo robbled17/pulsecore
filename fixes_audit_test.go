@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBatteryWearNoDuplicate(t *testing.T) {
@@ -228,5 +229,98 @@ func TestRussianPointsInflectionRules(t *testing.T) {
 		if got != tc.expected {
 			t.Errorf("pts=%d minus=%v: expected %q, got %q", tc.pts, tc.minus, tc.expected, got)
 		}
+	}
+}
+
+func TestDevModePresetIncidentIsolation(t *testing.T) {
+	app := NewApp()
+	app.bb = app.ensureBlackBox()
+
+	// Pre-fill with a stale real incident from msedge.exe
+	app.bb.mu.Lock()
+	app.bb.incidents = []LagIncident{
+		{
+			ID:         "real-stale-inc",
+			Start:      time.Now().Add(-5 * time.Minute),
+			End:        time.Now().Add(-4 * time.Minute),
+			DurationMs: 1800,
+			Kind:       StallConfirmed,
+			Verdict: Verdict{
+				Type:     VerdictCPUHog,
+				Culprit:  "msedge.exe",
+				Severity: "high",
+			},
+		},
+	}
+	app.bb.mu.Unlock()
+
+	// Activating Dev Mode must purge old real incidents
+	app.SetDevMode(true)
+	defer app.SetDevMode(false)
+
+	if len(app.GetLagIncidents()) != 0 {
+		t.Fatalf("expected 0 lag incidents after entering dev mode, got %d", len(app.GetLagIncidents()))
+	}
+
+	// Applying 'overheat' preset: no lag incidents, but thermal deduction
+	app.ApplyDevPreset("overheat")
+	if len(app.GetLagIncidents()) != 0 {
+		t.Fatalf("expected 0 lag incidents for 'overheat' preset, got %d", len(app.GetLagIncidents()))
+	}
+
+	healthOverheat := app.GetSystemHealth()
+	if healthOverheat.Score >= 95 {
+		t.Fatalf("expected health score to drop due to overheat (CPU 94°C), got score=%d", healthOverheat.Score)
+	}
+
+	// Applying 'vampire_hog' preset: exactly 1 simulated incident for crypto_miner_fake.exe
+	app.ApplyDevPreset("vampire_hog")
+	vampCards := app.GetLagIncidents()
+	if len(vampCards) != 1 {
+		t.Fatalf("expected exactly 1 lag incident for 'vampire_hog' preset, got %d", len(vampCards))
+	}
+	if vampCards[0].Culprit != "crypto_miner_fake.exe" {
+		t.Fatalf("expected culprit 'crypto_miner_fake.exe', got %q", vampCards[0].Culprit)
+	}
+
+	// Resetting back to 'all_good' preset: clean slate (100 score, 0 incidents)
+	app.ApplyDevPreset("all_good")
+	if len(app.GetLagIncidents()) != 0 {
+		t.Fatalf("expected 0 lag incidents for 'all_good' preset, got %d", len(app.GetLagIncidents()))
+	}
+}
+
+func TestSetSimulatedHardwareIGPU512MB(t *testing.T) {
+	app := NewApp()
+	app.SetDevMode(true)
+	defer app.SetDevMode(false)
+
+	// Set hardware: Ryzen 5 5600U, Radeon Graphics, 0.5 GB VRAM, isIntegrated=true, 16 GB RAM
+	st := app.SetSimulatedHardware(
+		"AMD Ryzen 5 5600U", 6, 12, 4200, 68,
+		"AMD Radeon(TM) Graphics", 0.5, true, 25,
+		16.0,
+	)
+
+	if st.Hardware.GPUName != "AMD Radeon(TM) Graphics" {
+		t.Fatalf("expected simulated GPU name 'AMD Radeon(TM) Graphics', got %q", st.Hardware.GPUName)
+	}
+	if !st.Hardware.GPUIsIGPU {
+		t.Fatal("expected GPUIsIGPU=true")
+	}
+	if st.Hardware.GPUVRAMGB != 0.5 {
+		t.Fatalf("expected GPUVRAMGB=0.5, got %.2f", st.Hardware.GPUVRAMGB)
+	}
+
+	// Verify SystemPowerProfile seen by GamePulse reflects this immediately
+	prof := app.GetSystemPowerProfile()
+	if !prof.IsIntegrated {
+		t.Fatal("expected GamePulse power profile to report isIntegrated=true")
+	}
+	if prof.VRAMGB != 0.5 {
+		t.Fatalf("expected GamePulse power profile VRAMGB=0.5, got %.2f", prof.VRAMGB)
+	}
+	if prof.RAMGB != 16.0 {
+		t.Fatalf("expected GamePulse power profile RAMGB=16.0, got %.2f", prof.RAMGB)
 	}
 }

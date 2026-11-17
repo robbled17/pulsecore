@@ -482,7 +482,7 @@ function wireHardwareConstructor() {
     if (match) {
       if ($('dev-hw-gpu-name')) $('dev-hw-gpu-name').value = match.name
       if ($('dev-hw-gpu-vram')) $('dev-hw-gpu-vram').value = match.vramGB
-      if ($('dev-hw-gpu-igpu')) $('dev-hw-gpu-igpu').checked = !!match.isIGPU
+      if ($('dev-hw-gpu-igpu')) $('dev-hw-gpu-igpu').checked = !!(match.isIntegrated ?? match.isIGPU)
     }
   })
 
@@ -539,6 +539,8 @@ async function applyHardwareConfiguration() {
   const gpuMatch = devCatalog.gpus?.find((g) => g.name === gpuName)
   const gpuScore = gpuMatch?.score || (gpuIgpu ? 30 : Math.round(gpuVRAM * 15))
 
+  const ramTotalGB = Number($('dev-select-ram-total')?.value || 16)
+
   const isLaptop = !!$('dev-device-laptop')?.checked
   const batPct = Number($('dev-range-bat-pct')?.value || 80)
   const batWear = Number($('dev-range-bat-wear')?.value || 10)
@@ -547,7 +549,7 @@ async function applyHardwareConfiguration() {
   syncDisksFromDOM()
 
   try {
-    await SetSimulatedHardware(cpuName, cpuCores, cpuThreads, cpuFreq, cpuScore, gpuName, gpuVRAM, gpuScore, gpuIgpu)
+    await SetSimulatedHardware(cpuName, cpuCores, cpuThreads, cpuFreq, cpuScore, gpuName, gpuVRAM, gpuIgpu, gpuScore, ramTotalGB)
     await SetSimulatedBattery(isLaptop, batPct, batPlugged, batWear)
     devState = await SetSimulatedDisks(devDisks)
     if (showToastFn) {

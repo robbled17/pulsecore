@@ -1117,5 +1117,7 @@
   "procSearchQuery": "{proc} процессы нәрсә ул",
   "unitsPtsOne": "балл",
   "unitsPtsFew": "балл",
-  "unitsPtsMany": "балл"
+  "unitsPtsMany": "балл",
+  "homeActionRunning": "Үтәлә...",
+  "homeActionDone": "Үтәлде"
 }

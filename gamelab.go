@@ -1032,6 +1032,25 @@ func (a *App) buildSystemPowerProfile() SystemPowerProfile {
 		if a.simProvider.gpuScore > 0 {
 			gpuScore = a.simProvider.gpuScore
 		}
+		if a.simProvider.gpuVRAMMB > 0 {
+			vramGB = a.simProvider.gpuVRAMMB / 1024.0
+		}
+		integrated = a.simProvider.isIntegrated
+		if a.simProvider.ramTotalMB > 0 {
+			ramGB = float64(a.simProvider.ramTotalMB) / 1024.0
+		}
+		if a.simProvider.cpuName != "" {
+			cpuName = a.simProvider.cpuName
+		}
+		if a.simProvider.gpuName != "" {
+			gpuName = a.simProvider.gpuName
+		}
+		if a.simProvider.physicalCores > 0 {
+			cores = a.simProvider.physicalCores
+		}
+		if a.simProvider.logicalCores > 0 {
+			threads = a.simProvider.logicalCores
+		}
 		a.simProvider.mu.RUnlock()
 	}
 

@@ -1054,6 +1054,22 @@ function setActiveTab(name) {
 
 let hasInitialHomeStats = false
 
+function isHomeActionCompleted(actionId, arg) {
+  if (!window.__completedHomeActions || !actionId) return false
+  const now = Date.now()
+  const exp = window.__completedHomeActions[`${actionId}:${arg || ''}`] ?? window.__completedHomeActions[actionId]
+  return typeof exp === 'number' && now < exp
+}
+
+function markHomeActionCompleted(actionId, arg, ttlSec = 30) {
+  window.__completedHomeActions = window.__completedHomeActions || {}
+  const exp = Date.now() + ttlSec * 1000
+  window.__completedHomeActions[actionId] = exp
+  if (arg) {
+    window.__completedHomeActions[`${actionId}:${arg}`] = exp
+  }
+}
+
 async function renderHome() {
   const scoreEl = $('home-score')
   const statusEl = $('home-status')
@@ -1192,11 +1208,17 @@ async function renderHome() {
                     <span class="home-deduction-badge">${formatPoints(d.points, true)}</span>
                     <span class="home-deduction-text"><b>${escapeHtml(label)}:</b> ${escapeHtml(detail)}</span>
                   </div>
-                  ${d.actionId && actionLabel ? `
-                    <button type="button" class="btn soft compact home-deduction-action" data-home-action="${escapeHtml(d.actionId)}" data-home-arg="${escapeHtml(d.key || '')}">
-                      ${escapeHtml(actionLabel)}
-                    </button>
-                  ` : ''}
+                  ${d.actionId ? (
+                    isHomeActionCompleted(d.actionId, d.key) ? `
+                      <span class="badge ok home-action-completed-badge" style="color:var(--ok,#4ade80);background:rgba(74,222,128,0.12);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                        ✓ ${escapeHtml(t('homeActionDone'))}
+                      </span>
+                    ` : actionLabel ? `
+                      <button type="button" class="btn soft compact home-deduction-action" data-home-action="${escapeHtml(d.actionId)}" data-home-arg="${escapeHtml(d.key || '')}">
+                        ${escapeHtml(actionLabel)}
+                      </button>
+                    ` : ''
+                  ) : ''}
                 </div>
               `
             }).join('')}
@@ -1267,7 +1289,11 @@ async function renderHome() {
         <div class="problem-why">${escapeHtml(why)}</div>
         ${ecoNote}
         <div class="problem-actions">
-          <button type="button" class="btn primary" data-home-action="${escapeHtml(p.actionId || '')}" data-home-arg="${escapeHtml(p.actionArg || '')}">${escapeHtml(act)}</button>
+          ${isHomeActionCompleted(p.actionId, p.actionArg) ? `
+            <span class="badge ok home-action-completed-badge" style="color:var(--ok,#4ade80);background:rgba(74,222,128,0.12);padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+              ✓ ${escapeHtml(t('homeActionDone'))}
+            </span>
+          ` : `<button type="button" class="btn primary" data-home-action="${escapeHtml(p.actionId || '')}" data-home-arg="${escapeHtml(p.actionArg || '')}">${escapeHtml(act)}</button>`}
           ${moreBtn}
           ${dismissBtn}
           ${gainHtml}
@@ -7397,9 +7423,11 @@ function wireUI() {
     const arg = btn.getAttribute('data-home-arg') || ''
     const actionsHost = btn.closest('.home-prepare-actions') || btn.parentElement
     btn.disabled = true
+    const origHtml = btn.innerHTML
     const labelEl = btn.querySelector('.home-prepare-label')
-    if (action === 'eco_process') {
+    if (action !== 'prepare_game' && action !== 'revert_prepare') {
       btn.classList.add('is-loading')
+      btn.innerHTML = `<span class="spinner-inline" style="display:inline-block;margin-right:6px;">⏳</span>${escapeHtml(t('homeActionRunning'))}`
     }
     if (action === 'prepare_game' || action === 'revert_prepare') {
       // Immediate honest UI: indeterminate progress, no fake %.
@@ -7484,6 +7512,20 @@ function wireUI() {
         }
       }
     }
+    // If action succeeded, mark as completed and show ✓ Done badge
+    if (res?.ok) {
+      markHomeActionCompleted(action, arg, 30)
+      if (btn.classList.contains('home-deduction-action') || btn.closest('.home-deduction-item') || btn.closest('.problem-actions')) {
+        const badge = document.createElement('span')
+        badge.className = 'badge ok home-action-completed-badge'
+        badge.style.cssText = 'color:var(--ok,#4ade80);background:rgba(74,222,128,0.12);padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:4px;'
+        badge.textContent = `✓ ${t('homeActionDone')}`
+        btn.replaceWith(badge)
+      }
+    } else {
+      btn.innerHTML = origHtml
+    }
+
     // Clear in-flight marker so renderHome can rebuild result/restore UI.
     actionsHost?.querySelector('.home-prepare-progress')?.remove()
     btn.classList.remove('is-loading')
