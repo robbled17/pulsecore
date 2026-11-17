@@ -87,18 +87,19 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := client.Do(req)
-	if err != nil {
-		return UpdateInfo{Available: false}, err
+	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		// If GitHub API rate limits (e.g. HTTP 403 / 429) or fails,
+		// seamlessly fallback to direct HEAD check of release asset on CDN
+		return a.checkForUpdatesDirectFallback(exePath)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return UpdateInfo{Available: false}, fmt.Errorf("github api returned status %d", resp.StatusCode)
-	}
-
 	var rel githubRelease
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return UpdateInfo{Available: false}, err
+		return a.checkForUpdatesDirectFallback(exePath)
 	}
 
 	var targetAsset *githubAsset
@@ -110,7 +111,7 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 	}
 
 	if targetAsset == nil || targetAsset.BrowserDownloadURL == "" {
-		return UpdateInfo{Available: false}, nil
+		return a.checkForUpdatesDirectFallback(exePath)
 	}
 
 	currHash, hashErr := fileSHA256(exePath)
@@ -152,6 +153,61 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 		PublishedAt:  rel.PublishedAt,
 		ReleaseNotes: notes,
 		Digest:       targetAsset.Digest,
+	}, nil
+}
+
+// checkForUpdatesDirectFallback queries the release asset directly on GitHub CDN using HEAD request.
+// This avoids GitHub REST API unauthenticated rate limits (HTTP 403 / 429).
+func (a *App) checkForUpdatesDirectFallback(exePath string) (UpdateInfo, error) {
+	directURL := "https://github.com/robbled17/pulsecore/releases/download/latest-dev/pulsecore.exe"
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequestWithContext(a.ctx, "HEAD", directURL, nil)
+	if err != nil {
+		return UpdateInfo{Available: false}, fmt.Errorf("не удалось инициализировать проверку: %w", err)
+	}
+	req.Header.Set("User-Agent", "PulseCore-Updater")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return UpdateInfo{Available: false}, fmt.Errorf("сервер обновлений недоступен: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return UpdateInfo{Available: false}, fmt.Errorf("сервер обновлений вернул статус %d", resp.StatusCode)
+	}
+
+	contentLength := resp.ContentLength
+	if contentLength <= 0 {
+		return UpdateInfo{Available: false}, nil
+	}
+
+	sizeMB := float64(contentLength) / (1024 * 1024)
+	sizeMB = math.Round(sizeMB*10) / 10
+
+	fi, statErr := os.Stat(exePath)
+	isDifferent := false
+	if statErr == nil {
+		if fi.Size() != contentLength {
+			isDifferent = true
+		} else if lastModStr := resp.Header.Get("Last-Modified"); lastModStr != "" {
+			if t, err := time.Parse(time.RFC1123, lastModStr); err == nil {
+				if t.After(fi.ModTime().Add(time.Minute)) {
+					isDifferent = true
+				}
+			}
+		}
+	}
+
+	if !isDifferent {
+		return UpdateInfo{Available: false, SizeMB: sizeMB}, nil
+	}
+
+	return UpdateInfo{
+		Available:    true,
+		DownloadURL:  directURL,
+		SizeMB:       sizeMB,
+		ReleaseNotes: "Автоматическое обновление PulseCore (latest-dev)",
 	}, nil
 }
 
