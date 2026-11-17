@@ -5,6 +5,9 @@ on:
     branches:
       - pulseee/roadmap
       - main
+    tags:
+      - 'latest-dev'
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -74,7 +77,7 @@ jobs:
       - name: Publish GitHub Release (latest-dev)
         uses: softprops/action-gh-release@v2
         continue-on-error: true
-        if: github.ref == 'refs/heads/pulseee/roadmap' || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/pulseee/roadmap' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         with:
           tag_name: latest-dev
           name: "PulseCore Latest Dev Build"
