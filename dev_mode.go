@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -175,6 +176,55 @@ func (a *App) SetDryRun(enabled bool) {
 	a.devMu.Unlock()
 }
 
+// devUpdateHealthNow immediately forces a fresh System Health evaluation sample in Dev Mode,
+// ensuring Health Index (0-100) and problem deductions reflect simulated values with 0 latency.
+func (a *App) devUpdateHealthNow() {
+	if a == nil {
+		return
+	}
+	if a.simProvider != nil {
+		if rep, ok := a.simProvider.GetDiskHealth("C"); ok {
+			a.cacheDiskSMART(rep)
+		}
+	}
+
+	h := a.ensureHealth()
+	h.mu.Lock()
+	now := time.Now()
+	h.lastSample = time.Time{}
+	h.window = nil
+
+	a.mu.RLock()
+	m := a.metrics
+	a.mu.RUnlock()
+
+	diskBusy := 0.0
+	var rw float64
+	for _, d := range m.Disks {
+		rw += d.ReadMBps + d.WriteMBps
+	}
+	if len(m.Disks) > 0 {
+		diskBusy = math.Min(100, rw*2.5)
+	}
+	sysUsed, sysOK := systemDiskUsedPct(m.Disks)
+
+	h.window = append(h.window, healthSample{
+		At:             now,
+		CPUPct:         m.CPUPercent,
+		RAMPct:         m.RAMPercent,
+		SwapPct:        m.RAMPercent,
+		GPUPct:         m.GPUPercent,
+		TempC:          m.TemperatureC,
+		TempOK:         m.TemperatureAvailable && m.TemperatureC > 0,
+		GPUOK:          m.GPUTemperatureAvailable,
+		DiskBusy:       diskBusy,
+		DiskOK:         len(m.Disks) > 0,
+		SystemDiskUsed: sysUsed,
+		SystemDiskOK:   sysOK,
+	})
+	h.mu.Unlock()
+}
+
 // SetDevMode enables or disables Dev Mode.
 // When disabled, all fake values are immediately reset and real telemetry resumes.
 func (a *App) SetDevMode(enabled bool) DevModeState {
@@ -211,6 +261,7 @@ func (a *App) SetDevMode(enabled bool) DevModeState {
 
 	// Immediately collect to synchronize frontend snapshot
 	a.collectOnce()
+	a.devUpdateHealthNow()
 
 	return a.GetDevModeState()
 }
@@ -376,6 +427,7 @@ func (a *App) SetSimulatedSensors(cpuPct, cpuTemp, ramTotalGB, ramUsedPct, gpuPc
 	sim.mu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -445,6 +497,7 @@ func (a *App) SetSimulatedHardware(
 	a.mu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -523,6 +576,7 @@ func (a *App) SetSimulatedDisks(disks []SimulatedDisk) DevModeState {
 	sim.mu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -564,6 +618,7 @@ func (a *App) SetSimulatedBattery(isLaptop bool, percent float64, pluggedIn bool
 	sim.mu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -661,6 +716,7 @@ func (a *App) ApplyDevPreset(presetName string) DevModeState {
 
 	sim.mu.Unlock()
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -675,6 +731,7 @@ func (a *App) ResetDevMode() DevModeState {
 	a.devMu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 
@@ -801,6 +858,7 @@ func (a *App) ResetSimulationsToReal() DevModeState {
 	a.devMu.Unlock()
 
 	a.collectOnce()
+	a.devUpdateHealthNow()
 	return a.GetDevModeState()
 }
 

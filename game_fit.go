@@ -100,24 +100,25 @@ func EvaluateGameFitUnified(sys SystemPowerProfile, game GameInfo, req gameReqSe
 	if recVRAM <= 0 {
 		recVRAM = req.Med.ReqVRAMGB
 	}
-	minRAM := req.ReqRAMGB
-	if minRAM <= 0 {
-		if game.Year > 0 && game.Year <= 2008 {
-			minRAM = 1
-		} else if strings.EqualFold(game.Category, "classic") {
-			minRAM = 1
-		} else if req.Heavy {
-			minRAM = 8
+	recRAM := req.ReqRAMGB
+	if recRAM <= 0 {
+		if req.Heavy {
+			recRAM = 16
+		} else if game.Year > 0 && game.Year <= 2008 || strings.EqualFold(game.Category, "classic") {
+			recRAM = 4
 		} else {
-			minRAM = 4
+			recRAM = 8
 		}
 	}
-	recRAM := minRAM * 2
-	if recRAM < 8 {
-		recRAM = 8
-	}
-	if req.Heavy && recRAM < 16 {
+	if recRAM > 16 && !strings.Contains(strings.ToLower(game.ID), "flight") {
 		recRAM = 16
+	}
+
+	minRAM := recRAM / 2
+	if minRAM < 4 && req.Heavy {
+		minRAM = 8
+	} else if minRAM < 2 && !strings.EqualFold(game.Category, "classic") {
+		minRAM = 4
 	}
 
 	userVRAM := sys.VRAMGB

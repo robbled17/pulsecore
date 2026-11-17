@@ -276,7 +276,7 @@
   "fitInstallTight": "Рекомендация: на самом свободном диске {disk} может не хватить места",
   "fitSize": "Размер: ~{n} ГБ",
   "fitSizeApprox": "~{n} ГБ",
-  "fitVramYou": "VRAM {need} ГБ (у вас {have} ГБ)",
+  "fitVramYou": "VRAM {need} (у вас {have})",
   "fitDiskFree": "Диск {disk}: {free} ГБ свободно",
   "fitSourceBadge": "Сравнение классов CPU/GPU/VRAM с мин./рек. требованиями",
   "fitVerdictExcellent": "Отлично",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "Откладывание...",
   "uninstallCancelledNotice": "Удаление отменено (файлы остались на диске)",
   "procSearchWeb": "Найти информацию о процессе в сети",
-  "procSearchQuery": "Что за процесс {proc}"
+  "procSearchQuery": "Что за процесс {proc}",
+  "unitsPtsOne": "балл",
+  "unitsPtsFew": "балла",
+  "unitsPtsMany": "баллов"
 }

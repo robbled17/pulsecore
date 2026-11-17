@@ -895,7 +895,7 @@
   "diskCleanCreateRP24h": "Қалпына келтіру нүктесі соңғы 24 сағатта жасалған (Windows шектеуі)",
   "diskCleanCreateRPAdmin": "Қалпына келтіру нүктесін жасау үшін әкімші құқығы керек",
   "fitSizeApprox": "~{n} ГБ",
-  "fitVramYou": "VRAM {need} ГБ (сіздікі {have} ГБ)",
+  "fitVramYou": "VRAM {need} (сіздікі {have})",
   "fitDiskFree": "Диск {disk}: {free} ГБ бос",
   "unitsKB": "{n} КБ",
   "fitSizeMB": "~{n} МБ",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "Кейінге қалдыру...",
   "uninstallCancelledNotice": "Жою тоқтатылды (файлдар дискіде қалды)",
   "procSearchWeb": "Процесс туралы желіден іздеу",
-  "procSearchQuery": "{proc} процесі деген не"
+  "procSearchQuery": "{proc} процесі деген не",
+  "unitsPtsOne": "ұпай",
+  "unitsPtsFew": "ұпай",
+  "unitsPtsMany": "ұпай"
 }

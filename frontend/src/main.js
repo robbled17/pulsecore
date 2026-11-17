@@ -1175,7 +1175,7 @@ async function renderHome() {
         subText = t('homeAllGoodSubOptimal')
       } else {
         titleText = t('homeRecommendationsTitle')
-        subText = t('homeDeductionsSub', { pts: lostPts })
+        subText = t('homeDeductionsSub', { pts: formatPoints(lostPts, false) })
       }
 
       let deductionsHtml = ''
@@ -1189,7 +1189,7 @@ async function renderHome() {
               return `
                 <div class="home-deduction-item">
                   <div class="home-deduction-info">
-                    <span class="home-deduction-badge">−${d.points} ${t('unitsPtsShort')}</span>
+                    <span class="home-deduction-badge">${formatPoints(d.points, true)}</span>
                     <span class="home-deduction-text"><b>${escapeHtml(label)}:</b> ${escapeHtml(detail)}</span>
                   </div>
                   ${d.actionId && actionLabel ? `
@@ -1892,6 +1892,42 @@ function animateChart(now) {
   else setTimeout(() => requestAnimationFrame(animateChart), 500)
 }
 
+function formatVRAMAmount(gb) {
+  const num = Number(gb) || 0
+  if (num <= 0) return '?'
+  if (num < 0.95) return t('unitsMB', { n: Math.round(num * 1024) })
+  const rounded = Math.round(num * 10) / 10
+  const n = rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded)
+  return t('unitsGB', { n })
+}
+
+function formatVRAMPair(usedMB, totalMB) {
+  const u = Number(usedMB) || 0
+  let t = Number(totalMB) || 0
+  if (t <= 0) return ''
+  if (u > t) t = u
+  if (t < 1500 || u < 1024) {
+    return `${Math.round(u)} / ${Math.round(t)} MB`
+  }
+  const uGB = (u / 1024).toFixed(1)
+  const tGB = (t / 1024).toFixed(1)
+  return `${uGB} / ${tGB} GB`
+}
+
+function formatPoints(n, withMinus = false) {
+  const num = Math.abs(Math.round(Number(n) || 0))
+  const prefix = withMinus ? '−' : ''
+  const mod10 = num % 10
+  const mod100 = num % 100
+  let wordKey = 'unitsPtsMany'
+  if (mod10 === 1 && mod100 !== 11) {
+    wordKey = 'unitsPtsOne'
+  } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    wordKey = 'unitsPtsFew'
+  }
+  return `${prefix}${num} ${t(wordKey)}`
+}
+
 function formatVRAM(mb) {
   const n = Number(mb)
   if (!Number.isFinite(n) || n <= 0) return '-'
@@ -1972,10 +2008,15 @@ function renderOverview(m) {
 
   setTxt('ov-gpu', `${fmt(m.gpuPercent)}%`)
   const vramUsed = Number(m.vramUsedMB) || 0
-  const vramTotal = Number(m.vramTotalMB) || Number(hw.gpu?.dedicatedMB) || 0
-  const vramLine = vramTotal > 0
-    ? `${formatVRAM(vramUsed)} / ${formatVRAM(vramTotal)}`
-    : ''
+  const vramDedicated = Number(m.vramDedicatedMB) || Number(hw.gpu?.dedicatedMB) || Number(m.vramTotalMB) || 0
+  const vramShared = Number(m.vramSharedMB) || Number(hw.gpu?.sharedMB) || 0
+  let vramTotal = vramDedicated
+  if (vramUsed > vramTotal && vramShared > 0) {
+    vramTotal = Math.max(vramTotal, vramDedicated + vramShared, vramUsed)
+  } else if (vramUsed > vramTotal) {
+    vramTotal = vramUsed
+  }
+  const vramLine = vramTotal > 0 ? formatVRAMPair(vramUsed, vramTotal) : ''
   const gpuTemp = (m.gpuTemperatureAvailable && Number(m.gpuTemperatureC) > 0)
     ? `${fmt(m.gpuTemperatureC, 0)}°C`
     : ''
@@ -5001,23 +5042,19 @@ function formatCompactFitDetails(p, fit) {
   const size = Number(fit?.storageNeedGB) || 0
   const disks = Array.isArray(fit?.disks) ? fit.disks : []
   const best = disks.reduce((acc, d) => ((Number(d?.freeGB) || 0) > (Number(acc?.freeGB) || 0) ? d : acc), null)
-  const formatVram = (gb) => {
-    if (gb <= 0) return '?'
-    if (gb < 1) return fmt(gb * 1024, 0)
-    return String(Math.round(gb))
-  }
+
   let vram = ''
   if (need > 0) {
     if (have < need) {
       vram = t('fitVramYou', {
-        need: formatVram(need),
-        have: formatVram(have),
+        need: formatVRAMAmount(need),
+        have: formatVRAMAmount(have),
       })
     } else {
-      vram = `VRAM ${t('unitsGB', { n: formatVram(have) })}`
+      vram = `VRAM ${formatVRAMAmount(need)}`
     }
   } else if (have > 0) {
-    vram = `VRAM ${t('unitsGB', { n: formatVram(have) })}`
+    vram = `VRAM ${formatVRAMAmount(have)}`
   }
   let sizeBit = ''
   if (size > 0) {
@@ -8601,7 +8638,23 @@ function boot() {
   wireContextMenu()
   initUpdater()
   initKeyboardNavigation()
-  initDevMode({ showToast, setActiveTab, refresh, escapeHtml }).catch(() => {})
+  const refreshGamePulseUI = () => {
+    const host = $('game-grid')
+    if (host) host.dataset.gridSig = ''
+    renderGameGrid()
+    if (selectedGameId && typeof selectGame === 'function') {
+      try { selectGame(selectedGameId) } catch (_) {}
+    }
+  }
+  initDevMode({
+    showToast,
+    setActiveTab,
+    refresh,
+    escapeHtml,
+    renderHome,
+    renderHealthTab,
+    renderGamePulse: refreshGamePulseUI,
+  }).catch(() => {})
   loadBehavior()
   SetLanguage(lang).catch(() => {})
   syncElevatedUI().catch(() => {})

@@ -895,7 +895,7 @@
   "diskCleanCreateRP24h": "过去24小时内已创建过还原点（Windows限制）",
   "diskCleanCreateRPAdmin": "创建还原点需要管理员权限",
   "fitSizeApprox": "~{n} GB",
-  "fitVramYou": "VRAM {need} GB（本机 {have} GB）",
+  "fitVramYou": "VRAM {need}（本机 {have}）",
   "fitDiskFree": "磁盘 {disk}：可用 {free} GB",
   "unitsKB": "{n} KB",
   "fitSizeMB": "~{n} MB",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "正在设置延迟...",
   "uninstallCancelledNotice": "卸载已取消 (文件保留在磁盘上)",
   "procSearchWeb": "在线搜索进程信息",
-  "procSearchQuery": "{proc} 是什么进程"
+  "procSearchQuery": "{proc} 是什么进程",
+  "unitsPtsOne": "分",
+  "unitsPtsFew": "分",
+  "unitsPtsMany": "分"
 }

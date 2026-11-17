@@ -115,3 +115,118 @@ func TestAppStillRetainedThresholds(t *testing.T) {
 		t.Fatal("expected 2 MB remaining to NOT be flagged as heavy")
 	}
 }
+
+func TestRDR2CompatibilityOnRTX4080Super(t *testing.T) {
+	// AMD Ryzen 7 7800X3D + NVIDIA RTX 4080 Super (16 GB) + 16 GB RAM
+	sys := SystemPowerProfile{
+		CPUName:       "AMD Ryzen 7 7800X3D",
+		CPUPowerScore: 92.0,
+		GPUName:       "NVIDIA GeForce RTX 4080 Super",
+		GPUPowerScore: 94.0,
+		VRAMGB:        16.0,
+		RAMGB:         16.0,
+		IsIntegrated:  false,
+	}
+
+	game := GameInfo{
+		ID:       "rdr2",
+		Name:     "Red Dead Redemption 2",
+		Year:     2019,
+		Category: "action",
+	}
+
+	req := gameRequirements["rdr2"]
+	req.ReqRAMGB = 12.0 // Recommended RAM 12 GB
+
+	verdict, cls, labelRu, _, reasonRu, _ := EvaluateGameFitUnified(sys, game, req)
+
+	if verdict != "great" {
+		t.Fatalf("expected verdict 'great' for RTX 4080 Super on RDR2, got verdict=%q (cls=%q, labelRu=%q, reasonRu=%q)",
+			verdict, cls, labelRu, reasonRu)
+	}
+
+	if labelRu != "Отлично" {
+		t.Fatalf("expected labelRu 'Отлично', got %q", labelRu)
+	}
+}
+
+func TestRDR2CompatibilityOnIGPU512MB(t *testing.T) {
+	// Integrated AMD Radeon 512 MB VRAM
+	sys := SystemPowerProfile{
+		CPUName:       "AMD Ryzen 5 5600U",
+		CPUPowerScore: 65.0,
+		GPUName:       "AMD Radeon(TM) Graphics",
+		GPUPowerScore: 28.0,
+		VRAMGB:        0.5,
+		RAMGB:         16.0,
+		IsIntegrated:  true,
+	}
+
+	game := GameInfo{
+		ID:       "rdr2",
+		Name:     "Red Dead Redemption 2",
+		Year:     2019,
+		Category: "action",
+	}
+
+	req := gameRequirements["rdr2"]
+	req.ReqRAMGB = 12.0
+
+	verdict, cls, labelRu, _, _, _ := EvaluateGameFitUnified(sys, game, req)
+
+	if verdict != "deficit" {
+		t.Fatalf("expected verdict 'deficit' for 512MB iGPU on RDR2, got verdict=%q (cls=%q, labelRu=%q)",
+			verdict, cls, labelRu)
+	}
+
+	if labelRu != "Не хватит" {
+		t.Fatalf("expected labelRu 'Не хватит', got %q", labelRu)
+	}
+}
+
+func TestRussianPointsInflectionRules(t *testing.T) {
+	formatPointsRu := func(num int, withMinus bool) string {
+		prefix := ""
+		if withMinus {
+			prefix = "−"
+		}
+		mod10 := num % 10
+		mod100 := num % 100
+		word := "баллов"
+		if mod10 == 1 && mod100 != 11 {
+			word = "балл"
+		} else if mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) {
+			word = "балла"
+		}
+		return fmt.Sprintf("%s%d %s", prefix, num, word)
+	}
+
+	cases := []struct {
+		pts      int
+		minus    bool
+		expected string
+	}{
+		{1, true, "−1 балл"},
+		{2, true, "−2 балла"},
+		{3, true, "−3 балла"},
+		{4, true, "−4 балла"},
+		{5, true, "−5 баллов"},
+		{10, true, "−10 баллов"},
+		{11, true, "−11 баллов"},
+		{12, true, "−12 баллов"},
+		{20, true, "−20 баллов"},
+		{21, true, "−21 балл"},
+		{22, true, "−22 балла"},
+		{25, true, "−25 баллов"},
+		{1, false, "1 балл"},
+		{2, false, "2 балла"},
+		{5, false, "5 баллов"},
+	}
+
+	for _, tc := range cases {
+		got := formatPointsRu(tc.pts, tc.minus)
+		if got != tc.expected {
+			t.Errorf("pts=%d minus=%v: expected %q, got %q", tc.pts, tc.minus, tc.expected, got)
+		}
+	}
+}

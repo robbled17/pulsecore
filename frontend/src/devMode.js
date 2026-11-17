@@ -36,7 +36,21 @@ let versionClickTimer = null
 let showToastFn = null
 let setActiveTabFn = null
 let refreshFn = null
+let renderHomeFn = null
+let renderHealthTabFn = null
+let renderGamePulseFn = null
 let escapeHtmlFn = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+async function triggerLiveDevUpdates() {
+  try {
+    if (refreshFn) await refreshFn()
+    if (renderHomeFn) await renderHomeFn()
+    if (renderHealthTabFn) await renderHealthTabFn()
+    if (renderGamePulseFn) await renderGamePulseFn()
+  } catch (err) {
+    console.error('triggerLiveDevUpdates error:', err)
+  }
+}
 
 const $ = (id) => document.getElementById(id)
 
@@ -44,11 +58,14 @@ export function isDevModeActive() {
   return !!(devState && devState.devMode)
 }
 
-export async function initDevMode({ showToast, setActiveTab, refresh, escapeHtml }) {
+export async function initDevMode({ showToast, setActiveTab, refresh, escapeHtml, renderHome, renderHealthTab, renderGamePulse }) {
   if (showToast) showToastFn = showToast
   if (setActiveTab) setActiveTabFn = setActiveTab
   if (refresh) refreshFn = refresh
   if (escapeHtml) escapeHtmlFn = escapeHtml
+  if (renderHome) renderHomeFn = renderHome
+  if (renderHealthTab) renderHealthTabFn = renderHealthTab
+  if (renderGamePulse) renderGamePulseFn = renderGamePulse
 
   wireVersionClickTrigger()
   wireHeaderAndNav()
@@ -146,9 +163,7 @@ export async function disableDevModeUI() {
     showToastFn(t('devModeDisabledToast'), false)
   }
 
-  if (refreshFn) {
-    try { await refreshFn() } catch (_) {}
-  }
+  await triggerLiveDevUpdates()
 }
 
 function wireHeaderAndNav() {
@@ -170,7 +185,7 @@ function wireHeaderAndNav() {
         if (showToastFn) {
           showToastFn(t('devResetRealToast'), true)
         }
-        if (refreshFn) refreshFn()
+        await triggerLiveDevUpdates()
       } catch (err) {
         console.error('ResetSimulationsToReal failed:', err)
       }
@@ -340,7 +355,7 @@ function wirePresets() {
         if (showToastFn) {
           showToastFn(t('devPresetAppliedToast', { preset }), true)
         }
-        if (refreshFn) await refreshFn()
+        await triggerLiveDevUpdates()
       } catch (err) {
         console.error('Failed to apply preset:', err)
       }
@@ -383,13 +398,8 @@ function wireSensorsSimulator() {
     'dev-range-uptime',
   ]
 
-  rangeIds.forEach((id) => {
-    $(id)?.addEventListener('input', updateSensorLabels)
-  })
-
-  $('dev-select-ram-total')?.addEventListener('change', updateSensorLabels)
-
-  const applySensors = async () => {
+  let sensorDebounceTimer = null
+  const applySensors = async (notify = true) => {
     const cpuPct = Number($('dev-range-cpu-load')?.value || 0)
     const cpuTemp = Number($('dev-range-cpu-temp')?.value || 0)
     const ramTotal = Number($('dev-select-ram-total')?.value || 16)
@@ -401,16 +411,37 @@ function wireSensorsSimulator() {
 
     try {
       devState = await SetSimulatedSensors(cpuPct, cpuTemp, ramTotal, ramUsedPct, gpuPct, vramUsedPct, gpuTemp, uptime)
-      if (showToastFn) {
+      if (notify && showToastFn) {
         showToastFn(t('devSensorsAppliedToast'), true)
       }
-      if (refreshFn) await refreshFn()
+      await triggerLiveDevUpdates()
     } catch (err) {
       console.error('Failed to set sensors:', err)
     }
   }
 
-  $('btn-dev-apply-sensors')?.addEventListener('click', applySensors)
+  const triggerDebouncedSensors = () => {
+    updateSensorLabels()
+    clearTimeout(sensorDebounceTimer)
+    sensorDebounceTimer = setTimeout(() => {
+      applySensors(false)
+    }, 120)
+  }
+
+  rangeIds.forEach((id) => {
+    $(id)?.addEventListener('input', triggerDebouncedSensors)
+    $(id)?.addEventListener('change', () => {
+      clearTimeout(sensorDebounceTimer)
+      applySensors(false)
+    })
+  })
+
+  $('dev-select-ram-total')?.addEventListener('change', () => {
+    updateSensorLabels()
+    applySensors(false)
+  })
+
+  $('btn-dev-apply-sensors')?.addEventListener('click', () => applySensors(true))
 }
 
 function populateHardwareSelectors() {
@@ -522,7 +553,7 @@ async function applyHardwareConfiguration() {
     if (showToastFn) {
       showToastFn(t('devHardwareAppliedToast'), true)
     }
-    if (refreshFn) await refreshFn()
+    await triggerLiveDevUpdates()
   } catch (err) {
     console.error('Failed to apply hardware:', err)
   }

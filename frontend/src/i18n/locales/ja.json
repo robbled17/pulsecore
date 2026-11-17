@@ -895,7 +895,7 @@
   "diskCleanCreateRP24h": "過去24時間以内に復元ポイントが既に作成されています（Windowsの制限）",
   "diskCleanCreateRPAdmin": "復元ポイントの作成には管理者権限が必要です",
   "fitSizeApprox": "~{n} GB",
-  "fitVramYou": "VRAM {need} GB（搭載 {have} GB）",
+  "fitVramYou": "VRAM {need}（搭載 {have}）",
   "fitDiskFree": "ドライブ {disk}: 空き {free} GB",
   "unitsKB": "{n} KB",
   "fitSizeMB": "~{n} MB",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "遅延設定中...",
   "uninstallCancelledNotice": "アンインストールがキャンセルされました (ファイルは残っています)",
   "procSearchWeb": "プロセス情報をオンラインで検索",
-  "procSearchQuery": "プロセス {proc} とは"
+  "procSearchQuery": "プロセス {proc} とは",
+  "unitsPtsOne": "点",
+  "unitsPtsFew": "点",
+  "unitsPtsMany": "点"
 }

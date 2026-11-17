@@ -141,10 +141,10 @@ var gameRequirements = map[string]gameReqSet{
 		Heavy: true,
 	},
 	"rdr2": {
-		Low:   gameReq{50, 48, 36, 3},
-		Med:   gameReq{50, 62, 46, 5},
-		High:  gameReq{55, 72, 55, 8},
-		Ultra: gameReq{52, 85, 65, 10},
+		Low:   gameReq{50, 48, 36, 2},
+		Med:   gameReq{50, 62, 46, 4},
+		High:  gameReq{55, 72, 52, 6},
+		Ultra: gameReq{52, 85, 65, 8},
 		Heavy: true,
 	},
 	"gtav": {

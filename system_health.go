@@ -166,7 +166,7 @@ func (a *App) recordHealthTick(now time.Time, cpuPct, ramPct, swapPct, gpuPct, t
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	a.loadHealthLocked(h)
-	if !h.lastSample.IsZero() && now.Sub(h.lastSample) < healthSampleEvery {
+	if !a.IsDevMode() && !h.lastSample.IsZero() && now.Sub(h.lastSample) < healthSampleEvery {
 		return
 	}
 	h.lastSample = now

@@ -895,7 +895,7 @@
   "diskCleanCreateRP24h": "Ein Wiederherstellungspunkt wurde in den letzten 24 Stunden bereits erstellt (Windows-Einschränkung)",
   "diskCleanCreateRPAdmin": "Zum Erstellen eines Wiederherstellungspunkts sind Administratorrechte noetig",
   "fitSizeApprox": "~{n} GB",
-  "fitVramYou": "VRAM {need} GB (vorhanden {have} GB)",
+  "fitVramYou": "VRAM {need} (vorhanden {have})",
   "fitDiskFree": "Laufwerk {disk}: {free} GB frei",
   "unitsKB": "{n} KB",
   "fitSizeMB": "~{n} MB",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "Verzögern...",
   "uninstallCancelledNotice": "Deinstallation abgebrochen (Dateien verbleiben auf dem Datenträger)",
   "procSearchWeb": "Online nach Prozessinformationen suchen",
-  "procSearchQuery": "Was ist der Prozess {proc}"
+  "procSearchQuery": "Was ist der Prozess {proc}",
+  "unitsPtsOne": "Pkt.",
+  "unitsPtsFew": "Pkt.",
+  "unitsPtsMany": "Pkt."
 }

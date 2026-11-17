@@ -895,7 +895,7 @@
   "diskCleanCreateRP24h": "Кире кайтару ноктасы соңгы 24 сәгатьтә ясалган инде (Windows чикләве)",
   "diskCleanCreateRPAdmin": "Торгызу ноктасы өчен администратор хокуклары кирәк",
   "fitSizeApprox": "~{n} ГБ",
-  "fitVramYou": "VRAM {need} ГБ (сездә {have} ГБ)",
+  "fitVramYou": "VRAM {need} (сездә {have})",
   "fitDiskFree": "Диск {disk}: {free} ГБ буш",
   "unitsKB": "{n} КБ",
   "fitSizeMB": "~{n} МБ",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "Кичектерү...",
   "uninstallCancelledNotice": "Бетерү туктатылды (файллар дискта калды)",
   "procSearchWeb": "Процесс турында челтәрдән эзләү",
-  "procSearchQuery": "{proc} процессы нәрсә ул"
+  "procSearchQuery": "{proc} процессы нәрсә ул",
+  "unitsPtsOne": "балл",
+  "unitsPtsFew": "балл",
+  "unitsPtsMany": "балл"
 }

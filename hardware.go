@@ -1110,6 +1110,12 @@ func (a *App) RefreshAllDiskHealth(letters []string) []DiskHealthReport {
 }
 
 func (a *App) checkDiskHealthSync(letter string) DiskHealthReport {
+	if a != nil && a.IsDevMode() && a.metricsProvider != nil {
+		if rep, ok := a.metricsProvider.GetDiskHealth(letter); ok {
+			a.cacheDiskSMART(rep)
+			return rep
+		}
+	}
 	if advancedModeEnabled() {
 		if r, ok := diskReportFromHelper(letter); ok {
 			a.applyDiskWatchToReport(&r)
@@ -1660,6 +1666,9 @@ func (a *App) cacheDiskSMART(r DiskHealthReport) {
 func (a *App) cachedSystemDiskSMART() (DiskHealthReport, bool) {
 	if a == nil {
 		return DiskHealthReport{}, false
+	}
+	if a.IsDevMode() && a.metricsProvider != nil {
+		return a.metricsProvider.GetDiskHealth("C")
 	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()

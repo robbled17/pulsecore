@@ -276,7 +276,7 @@
   "fitInstallTight": "Recommendation: freest drive {disk} may not have enough space",
   "fitSize": "Size: ~{n} GB",
   "fitSizeApprox": "~{n} GB",
-  "fitVramYou": "VRAM {need} GB (you have {have} GB)",
+  "fitVramYou": "VRAM {need} (you have {have})",
   "fitDiskFree": "Drive {disk}: {free} GB free",
   "fitSourceBadge": "CPU/GPU/VRAM class vs min/rec requirements",
   "fitVerdictExcellent": "Great",
@@ -1114,5 +1114,8 @@
   "startupDelaying": "Delaying...",
   "uninstallCancelledNotice": "Uninstall cancelled (files remain on disk)",
   "procSearchWeb": "Search for process information online",
-  "procSearchQuery": "What is process {proc}"
+  "procSearchQuery": "What is process {proc}",
+  "unitsPtsOne": "pt",
+  "unitsPtsFew": "pts",
+  "unitsPtsMany": "pts"
 }
