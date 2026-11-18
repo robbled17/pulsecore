@@ -91,6 +91,8 @@ export function GetActiveGameStatus():Promise<main.ActiveGameStatus>;
 
 export function GetAdvancedModeState():Promise<main.AdvancedModeState>;
 
+export function GetAppVersion():Promise<string>;
+
 export function GetBehaviorSettings():Promise<main.appPrefs>;
 
 export function GetBootDiagnostics():Promise<main.BootDiagnostics>;

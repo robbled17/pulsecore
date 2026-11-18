@@ -120,6 +120,7 @@ import {
   CheckForUpdates,
   DownloadAndInstallUpdate,
   GetBootDiagnostics,
+  GetAppVersion,
   SetStartupItemMode,
   DisableFastStartup,
   RebootSystemNow,
@@ -283,7 +284,7 @@ import {
   isDevModeActive,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.1.0
+const MIT_LICENSE = `PulseCore v1.2.0
 
 MIT License
 
@@ -8676,6 +8677,16 @@ function boot() {
     })
   }
   applyI18n()
+  if (typeof GetAppVersion === 'function') {
+    GetAppVersion().then((v) => {
+      if (!v) return
+      document.querySelectorAll('.brand-ver').forEach((el) => { el.textContent = `v${v}` })
+      const aboutName = $('about-app-name')
+      if (aboutName) aboutName.textContent = `PulseCore v${v}`
+      const curVer = $('settings-current-version')
+      if (curVer) curVer.textContent = `v${v}`
+    }).catch(() => {})
+  }
   wireUI()
   wireContextMenu()
   initUpdater()
