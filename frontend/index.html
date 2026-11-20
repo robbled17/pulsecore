@@ -10,37 +10,27 @@
   <div id="titlebar" class="titlebar">
     <div class="titlebar-brand">PulseCore</div>
     <div class="titlebar-actions">
-      <label class="lang-select-wrap" title="Language">
-        <select id="lang-select" class="lang-select" aria-label="Language">
-          <option value="ru">🇷🇺 Русский</option>
-          <option value="en">🇬🇧 English</option>
-          <option value="kk">🇰🇿 Қазақша</option>
-          <option value="tt">🇷🇺 Татарча</option>
-          <option value="de">🇩🇪 Deutsch</option>
-          <option value="ja">🇯🇵 日本語</option>
-          <option value="zh">🇨🇳 简体中文</option>
-        </select>
-      </label>
-      <button type="button" class="win-btn" id="btn-min" title="Minimize">─</button>
-      <button type="button" class="win-btn" id="btn-fs" title="Fullscreen (F11)">⛶</button>
-      <button type="button" class="win-btn" id="btn-close" title="Hide to tray">✕</button>
+      <button type="button" class="win-btn" id="btn-hud-title" title="Mini-HUD" aria-label="Mini-HUD">⧉</button>
+      <button type="button" class="win-btn" id="btn-min" title="Minimize" aria-label="Minimize">─</button>
+      <button type="button" class="win-btn" id="btn-fs" title="Maximize" aria-label="Maximize">□</button>
+      <button type="button" class="win-btn win-close" id="btn-close" title="Hide to tray" aria-label="Close">✕</button>
     </div>
   </div>
 
   <div id="minihud" class="minihud hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
     <div class="minihud-metrics">
-      <span>CPU <b id="mh-cpu">--</b></span>
-      <span>RAM <b id="mh-ram">--</b></span>
-      <span>GPU <b id="mh-gpu">--</b></span>
+      <span>CPU <b id="mh-cpu" class="metric">—</b></span>
+      <span>RAM <b id="mh-ram" class="metric">—</b></span>
+      <span>GPU <b id="mh-gpu" class="metric">—</b></span>
     </div>
     <button type="button" id="mh-expand" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Expand">↗</button>
   </div>
 
   <div id="gameoverlay" class="gameoverlay hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
     <div class="gameoverlay-metrics">
-      <span>FPS <b id="go-fps">--</b></span>
-      <span>1% <b id="go-low">--</b></span>
-      <span>ms <b id="go-ft">--</b></span>
+      <span>FPS <b id="go-fps" class="metric">—</b></span>
+      <span>1% <b id="go-low" class="metric">—</b></span>
+      <span>ms <b id="go-ft" class="metric">—</b></span>
     </div>
     <button type="button" id="go-close" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Close">✕</button>
   </div>
@@ -56,17 +46,13 @@
       </div>
       <nav class="nav">
         <button type="button" class="nav-item active" data-tab="overview" data-i18n="tabOverview">Обзор</button>
-        <button type="button" class="nav-item" data-tab="lag" data-i18n="tabLag">Лаги и вампиры</button>
+        <button type="button" class="nav-item" data-tab="lag" data-i18n="tabLag">Лаги</button>
         <button type="button" class="nav-item" data-tab="hardware" data-i18n="tabHardware">Железо</button>
         <button type="button" class="nav-item" data-tab="gamelab" data-i18n="tabGameLab">GamePulse</button>
-        <button type="button" class="nav-item" data-tab="settings" data-i18n="tabSettings">Режимы</button>
-        <button type="button" class="nav-item nav-hud" id="btn-hud-side" title="Floating Mini-HUD">
-          <span class="hud-ico">⧉</span>
-          <span data-i18n="miniHudNav">Mini-HUD</span>
-        </button>
+        <button type="button" class="nav-item" data-tab="settings" data-i18n="tabSettings">Настройки</button>
       </nav>
       <div class="sidebar-foot">
-        <div class="temp-chip" id="temp-chip">-- °C</div>
+        <div class="temp-chip metric" id="temp-chip">— °C</div>
         <div class="muted" id="cpu-name">CPU</div>
         <button type="button" class="btn-about" id="btn-about" data-i18n="aboutBtn">О программе</button>
       </div>
@@ -76,193 +62,229 @@
       <section id="tab-overview" class="tab active">
         <header class="section-head">
           <h1 data-i18n="overviewTitle">Обзор системы</h1>
-          <p data-i18n="overviewSub">Живые метрики CPU, GPU, RAM, дисков и батареи</p>
+          <p data-i18n="overviewSub">Живые метрики CPU, GPU, RAM, дисков и питания</p>
         </header>
+
+        <div class="status-strip" id="status-strip" role="status">
+          <div class="status-cell">
+            <span class="status-label" data-i18n="statusLabel">Статус системы</span>
+            <span class="status-value" id="st-status" data-state="ok">Норма</span>
+          </div>
+          <div class="status-cell">
+            <span class="status-label" data-i18n="freeRamLabel">Свободно RAM</span>
+            <span class="status-value metric" id="st-ram">—</span>
+          </div>
+          <div class="status-cell">
+            <span class="status-label" data-i18n="bgProcLabel">Фоновые процессы</span>
+            <span class="status-value metric" id="st-procs">—</span>
+          </div>
+        </div>
+
         <div class="cards">
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
-            <div class="metric-label">CPU</div>
-            <div class="metric-value" id="ov-cpu">--%</div>
-            <div class="metric-sub" id="ov-cpu-sub">-</div>
+            <div class="metric-head">
+              <div class="metric-label">CPU</div>
+              <div class="metric-value metric" id="ov-cpu">—</div>
+            </div>
+            <div class="metric-sub" id="ov-cpu-sub">—</div>
+            <canvas class="sparkline" id="spark-cpu" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-cpu-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="gpu">
-            <div class="metric-label">GPU</div>
-            <div class="metric-value" id="ov-gpu">--%</div>
-            <div class="metric-sub" id="ov-gpu-sub">-</div>
+            <div class="metric-head">
+              <div class="metric-label">GPU</div>
+              <div class="metric-value metric" id="ov-gpu">—</div>
+            </div>
+            <div class="metric-sub" id="ov-gpu-sub">—</div>
+            <canvas class="sparkline" id="spark-gpu" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-gpu-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="ram">
-            <div class="metric-label">RAM</div>
-            <div class="metric-value" id="ov-ram">--%</div>
-            <div class="metric-sub" id="ov-ram-sub">-</div>
+            <div class="metric-head">
+              <div class="metric-label">RAM</div>
+              <div class="metric-value metric" id="ov-ram">—</div>
+            </div>
+            <div class="metric-sub" id="ov-ram-sub">—</div>
+            <canvas class="sparkline" id="spark-ram" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-ram-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="battery">
-            <div class="metric-label" data-i18n="battery">Батарея</div>
-            <div class="metric-value" id="ov-bat">--%</div>
-            <div class="metric-sub" id="ov-bat-sub">-</div>
+            <div class="metric-head">
+              <div class="metric-label" data-i18n="battery">Питание</div>
+              <div class="metric-value metric" id="ov-bat">—</div>
+            </div>
+            <div class="metric-sub" id="ov-bat-sub">—</div>
+            <canvas class="sparkline" id="spark-battery" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-bat-bar"></i></div>
           </button>
         </div>
+
         <div class="panel chart-panel">
           <div class="panel-title" id="chart-title">Динамика CPU</div>
-          <div class="chart-current" id="chart-current">Текущая: --%</div>
+          <div class="chart-current metric" id="chart-current">—</div>
           <canvas id="trend-canvas" width="900" height="180"></canvas>
         </div>
-        <div class="panel">
-          <div class="panel-title row-between">
-            <span data-i18n="weeklyTitle">Фоновые пожиратели за неделю</span>
+
+        <details class="panel expand-panel" open>
+          <summary class="panel-title row-between expand-summary">
+            <span data-i18n="weeklyTitle">Анализ процессов</span>
             <button type="button" class="btn compact" id="btn-weekly-refresh" data-i18n="refresh">Обновить</button>
-          </div>
-          <div id="weekly-list" class="list"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-title row-between">
+          </summary>
+          <div id="weekly-list" class="list dense-table"></div>
+        </details>
+
+        <details class="panel expand-panel" open>
+          <summary class="panel-title row-between expand-summary">
             <span data-i18n="disksTitle">Диски</span>
-            <button type="button" class="btn compact" id="btn-disk-health" data-i18n="diskHealthBtn">Проверить здоровье диска</button>
-          </div>
+            <button type="button" class="btn compact" id="btn-disk-health" data-i18n="diskHealthBtn">S.M.A.R.T.</button>
+          </summary>
           <div id="disk-tabs" class="disk-tabs"></div>
-          <div id="ov-disks" class="disk-list"></div>
-        </div>
+          <div id="ov-disks" class="disk-list dense-table"></div>
+        </details>
       </section>
 
       <section id="tab-lag" class="tab">
         <header class="section-head">
-          <h1 data-i18n="lagTitle">Лаги и вампиры</h1>
-          <p data-i18n="lagSub">Понятный диагноз микролагов, сети и фоновых потребителей</p>
+          <h1 data-i18n="lagTitle">Лаги</h1>
+          <p data-i18n="lagSub">Микролаги, сеть и фоновые потребители</p>
         </header>
         <div class="panel">
           <div class="panel-title">
-            <span data-i18n="flightTitle">Почему лагнуло?</span>
+            <span data-i18n="flightTitle">Журнал микролагов</span>
             <span class="tip" tabindex="0" data-i18n-tip="tipFlight">ⓘ</span>
           </div>
-          <div id="stutter-log" class="list"></div>
+          <div id="stutter-log" class="list dense-table"></div>
         </div>
         <div class="split">
           <div class="panel">
             <div class="panel-title">
-              <span data-i18n="lagLog">Пики нагрузки ядер</span>
+              <span data-i18n="lagLog">Пики ядер</span>
               <span class="tip" tabindex="0" data-i18n-tip="tipLag">ⓘ</span>
             </div>
-            <div id="lag-log" class="list"></div>
+            <div id="lag-log" class="list dense-table"></div>
           </div>
           <div class="panel">
             <div class="panel-title">
-              <span data-i18n="vampires">Фоновые вампиры</span>
+              <span data-i18n="vampires">Фоновые процессы</span>
               <span class="tip" tabindex="0" data-i18n-tip="tipVampires">ⓘ</span>
             </div>
-            <div id="vampire-list" class="list"></div>
+            <div id="vampire-list" class="list dense-table"></div>
           </div>
         </div>
         <div class="panel">
           <div class="panel-title row-between">
-            <span data-i18n="netTitle">Сетевой диагност</span>
-            <button type="button" class="btn compact" id="btn-net-diag" data-i18n="netCheck">Проверить сеть</button>
+            <span data-i18n="netTitle">Сеть</span>
+            <button type="button" class="btn compact" id="btn-net-diag" data-i18n="netCheck">Диагностика</button>
           </div>
-          <div id="net-diag" class="list"><div class="empty" data-i18n="netEmpty">Нажмите «Проверить сеть», чтобы понять: Wi-Fi, провайдер или ПК.</div></div>
+          <div id="net-diag" class="list dense-table"><div class="empty" data-i18n="netEmpty">Запустите диагностику сети.</div></div>
         </div>
         <div class="panel" id="sleep-panel">
           <div class="panel-title row-between">
-            <span data-i18n="sleepTitle">Почему разрядился за ночь</span>
-            <button type="button" class="btn compact" id="btn-sleep" data-i18n="sleepCheck">Проверить сон</button>
+            <span data-i18n="sleepTitle">Блокировки сна</span>
+            <button type="button" class="btn compact" id="btn-sleep" data-i18n="sleepCheck">Проверить</button>
           </div>
-          <div id="sleep-report" class="list"><div class="empty" data-i18n="sleepEmpty">Проверка покажет, что мешает ноутбуку уснуть.</div></div>
+          <div id="sleep-report" class="list dense-table"><div class="empty" data-i18n="sleepEmpty">Проверка блокировок сна Windows.</div></div>
         </div>
       </section>
 
       <section id="tab-hardware" class="tab">
         <header class="section-head">
-          <h1 data-i18n="hwTitle">Hardware Deep Dive</h1>
-          <p data-i18n="hwSub">Полная спецификация процессора, видеокарты, памяти и питания</p>
+          <h1 data-i18n="hwTitle">Железо</h1>
+          <p data-i18n="hwSub">CPU, GPU, RAM и питание</p>
         </header>
-        <div class="panel hw-block">
-          <div class="panel-title" data-i18n="hwCPU">Процессор (CPU)</div>
+
+        <details class="panel hw-block expand-panel" open>
+          <summary class="panel-title expand-summary" data-i18n="hwCPU">Процессор (CPU)</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">-</div></div>
-            <div><span class="muted" data-i18n="lblCores">Ядра / потоки</span><div class="hw-val" id="hw-cpu-cores">-</div></div>
-            <div><span class="muted" data-i18n="lblFreq">Частота</span><div class="hw-val" id="hw-cpu-freq">-</div></div>
-            <div><span class="muted" data-i18n="lblLoad">Нагрузка</span><div class="hw-val" id="hw-cpu-load">-</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">—</div></div>
+            <div><span class="muted" data-i18n="lblCores">Ядра / потоки</span><div class="hw-val metric" id="hw-cpu-cores">—</div></div>
+            <div><span class="muted" data-i18n="lblFreq">Частота</span><div class="hw-val metric" id="hw-cpu-freq">—</div></div>
+            <div><span class="muted" data-i18n="lblLoad">Нагрузка</span><div class="hw-val metric" id="hw-cpu-load">—</div></div>
           </div>
           <div id="core-grid" class="core-grid"></div>
-        </div>
-        <div class="panel hw-block">
-          <div class="panel-title" data-i18n="hwGPU">Видеокарта (GPU)</div>
+        </details>
+
+        <details class="panel hw-block expand-panel" open>
+          <summary class="panel-title expand-summary" data-i18n="hwGPU">Видеокарта (GPU)</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-gpu-name">-</div></div>
-            <div><span class="muted" data-i18n="lblDriver">Драйвер</span><div class="hw-val" id="hw-gpu-driver">-</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-gpu-name">—</div></div>
+            <div><span class="muted" data-i18n="lblDriver">Драйвер</span><div class="hw-val" id="hw-gpu-driver">—</div></div>
             <div>
               <span class="muted">Dedicated VRAM <span class="tip" tabindex="0" data-i18n-tip="tipDedVRAM">ⓘ</span></span>
-              <div class="hw-val" id="hw-gpu-ded">-</div>
+              <div class="hw-val metric" id="hw-gpu-ded">—</div>
             </div>
             <div>
               <span class="muted">Shared VRAM <span class="tip" tabindex="0" data-i18n-tip="tipSharedVRAM">ⓘ</span></span>
-              <div class="hw-val" id="hw-gpu-shared">-</div>
+              <div class="hw-val metric" id="hw-gpu-shared">—</div>
             </div>
           </div>
-        </div>
-        <div class="panel hw-block">
-          <div class="panel-title" data-i18n="hwRAM">Оперативная память (RAM)</div>
-          <div id="hw-ram-channel" class="channel-banner">-</div>
+        </details>
+
+        <details class="panel hw-block expand-panel" open>
+          <summary class="panel-title expand-summary" data-i18n="hwRAM">Оперативная память (RAM)</summary>
+          <div id="hw-ram-channel" class="channel-banner">—</div>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblCapacity">Объём</span><div class="hw-val" id="hw-ram-total">-</div></div>
-            <div><span class="muted" data-i18n="lblTypeFreq">Тип / частота</span><div class="hw-val" id="hw-ram-type">-</div></div>
-            <div><span class="muted" data-i18n="lblSlots">Слоты</span><div class="hw-val" id="hw-ram-slots">-</div></div>
-            <div><span class="muted" data-i18n="lblUsedFree">Занято / свободно</span><div class="hw-val" id="hw-ram-use">-</div></div>
+            <div><span class="muted" data-i18n="lblCapacity">Объём</span><div class="hw-val metric" id="hw-ram-total">—</div></div>
+            <div><span class="muted" data-i18n="lblTypeFreq">Тип / частота</span><div class="hw-val metric" id="hw-ram-type">—</div></div>
+            <div><span class="muted" data-i18n="lblSlots">Слоты</span><div class="hw-val metric" id="hw-ram-slots">—</div></div>
+            <div><span class="muted" data-i18n="lblUsedFree">Занято / свободно</span><div class="hw-val metric" id="hw-ram-use">—</div></div>
           </div>
-        </div>
-        <div class="panel hw-block">
-          <div class="panel-title" data-i18n="hwPower">Питание</div>
+        </details>
+
+        <details class="panel hw-block expand-panel" open>
+          <summary class="panel-title expand-summary" data-i18n="hwPower">Питание</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-pwr-name">-</div></div>
-            <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="hw-pwr-status">-</div></div>
-            <div><span class="muted" data-i18n="lblCharge">Заряд</span><div class="hw-val" id="hw-pwr-pct">-</div></div>
-            <div><span class="muted" data-i18n="lblWear">Износ</span><div class="hw-val" id="hw-pwr-wear">-</div></div>
-            <div><span class="muted" data-i18n="lblCapacityWh">Ёмкость</span><div class="hw-val" id="hw-pwr-cap">-</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-pwr-name">—</div></div>
+            <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="hw-pwr-status">—</div></div>
+            <div><span class="muted" data-i18n="lblCharge">Заряд</span><div class="hw-val metric" id="hw-pwr-pct">—</div></div>
+            <div><span class="muted" data-i18n="lblWear">Износ</span><div class="hw-val metric" id="hw-pwr-wear">—</div></div>
+            <div><span class="muted" data-i18n="lblCapacityWh">Ёмкость</span><div class="hw-val metric" id="hw-pwr-cap">—</div></div>
           </div>
-        </div>
-        <div class="panel hw-block">
-          <div class="panel-title row-between">
-            <span data-i18n="peripheralsTitle">Подключенные устройства</span>
+        </details>
+
+        <details class="panel hw-block expand-panel" open>
+          <summary class="panel-title row-between expand-summary">
+            <span data-i18n="peripheralsTitle">Периферия</span>
             <button type="button" class="btn compact" id="btn-periph-refresh" data-i18n="refresh">Обновить</button>
-          </div>
-          <div id="periph-list" class="periph-list"><div class="empty" data-i18n="periphEmpty">Сканирую периферию...</div></div>
-        </div>
+          </summary>
+          <div id="periph-list" class="periph-list"><div class="empty" data-i18n="periphEmpty">Сканирование…</div></div>
+        </details>
       </section>
 
       <section id="tab-gamelab" class="tab tab-gamelab">
         <header class="section-head gamepulse-head">
           <div class="gamepulse-head-text">
             <h1 data-i18n="gameLabTitle">GamePulse</h1>
-            <p data-i18n="gameLabSub">Предиктор FPS и кадровой плавности</p>
+            <p data-i18n="gameLabSub">Прогноз FPS и пресеты качества</p>
           </div>
           <button type="button" id="btn-toggle-overlay" class="btn-overlay-pill" title="F12">
-            ⚡ <span data-i18n="overlayPill">Оверлей FPS (F12)</span>
+            <span data-i18n="overlayPill">Оверлей FPS (F12)</span>
           </button>
         </header>
         <div class="panel panel-gamelab">
           <div class="game-toolbar">
             <div class="game-search-wrap">
-              <input id="game-search" class="game-search" type="search" data-i18n-placeholder="gameSearchPh" placeholder="Поиск игр..." autocomplete="off" />
+              <input id="game-search" class="game-search" type="search" data-i18n-placeholder="gameSearchPh" placeholder="Поиск игр…" autocomplete="off" />
               <span id="game-search-spinner" class="game-search-spinner hidden" aria-hidden="true"></span>
             </div>
           </div>
           <div id="games-carousel-wrapper" class="games-carousel-wrapper games-grid-container">
             <div id="game-grid" class="game-grid games-grid"></div>
           </div>
-          <div id="fps-result" class="fps-result empty" data-i18n="pickGame">Выберите игру, чтобы увидеть прогноз FPS</div>
+          <div id="fps-result" class="fps-result empty" data-i18n="pickGame">Выберите игру для прогноза FPS</div>
         </div>
       </section>
 
       <section id="tab-settings" class="tab">
         <header class="section-head">
-          <h1 data-i18n="settingsTitle">Режимы</h1>
-          <p data-i18n="settingsSub">Питание, опрос и язык интерфейса</p>
+          <h1 data-i18n="settingsTitle">Настройки</h1>
+          <p data-i18n="settingsSub">Питание, опрос, тема и язык</p>
         </header>
         <div class="panel">
           <div class="panel-title" data-i18n="powerTitle">Профиль питания</div>
           <div class="btn-row">
             <button type="button" class="btn mode" data-mode="silent">
-              <span data-i18n="modeSilent">Тихий ноутбук</span>
+              <span data-i18n="modeSilent">Энергосбережение</span>
               <span class="tip" tabindex="0" data-i18n-tip="tipSilent">ⓘ</span>
             </button>
             <button type="button" class="btn mode active" data-mode="balanced">
@@ -270,9 +292,12 @@
               <span class="tip" tabindex="0" data-i18n-tip="tipBalanced">ⓘ</span>
             </button>
             <button type="button" class="btn mode" data-mode="turbo">
-              <span data-i18n="modeTurbo">Турбо / Максимум</span>
+              <span data-i18n="modeTurbo">Производительность</span>
               <span class="tip" tabindex="0" data-i18n-tip="tipTurbo">ⓘ</span>
             </button>
+          </div>
+          <div class="btn-row settings-reset-row">
+            <button type="button" class="btn compact" id="btn-reset-profile" data-i18n="resetProfile">Сбросить профиль</button>
           </div>
         </div>
         <div class="panel">
@@ -287,15 +312,22 @@
           </div>
         </div>
         <div class="panel">
+          <div class="panel-title" data-i18n="themeTitle">Тема</div>
+          <div class="btn-row">
+            <button type="button" class="btn theme-btn active" data-theme="dark" data-i18n="themeDark">Тёмная</button>
+            <button type="button" class="btn theme-btn" data-theme="light" data-i18n="themeLight">Светлая</button>
+          </div>
+        </div>
+        <div class="panel">
           <div class="panel-title" data-i18n="langTitle">Язык / Language</div>
           <select id="lang-select-settings" class="lang-select lang-select-block" aria-label="Language">
-            <option value="ru">🇷🇺 Русский</option>
-            <option value="en">🇬🇧 English</option>
-            <option value="kk">🇰🇿 Қазақша</option>
-            <option value="tt">🇷🇺 Татарча</option>
-            <option value="de">🇩🇪 Deutsch</option>
-            <option value="ja">🇯🇵 日本語</option>
-            <option value="zh">🇨🇳 简体中文</option>
+            <option value="ru">Русский</option>
+            <option value="en">English</option>
+            <option value="kk">Қазақша</option>
+            <option value="tt">Татарча</option>
+            <option value="de">Deutsch</option>
+            <option value="ja">日本語</option>
+            <option value="zh">简体中文</option>
           </select>
         </div>
       </section>
@@ -305,7 +337,7 @@
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card">
       <div class="modal-head">
-        <h2 id="modal-title" data-i18n="diskHealthTitle">Здоровье диска</h2>
+        <h2 id="modal-title" data-i18n="diskHealthTitle">S.M.A.R.T.</h2>
         <div class="modal-head-actions">
           <button type="button" class="btn compact" id="modal-smart-refresh" title="Refresh">⟳ <span data-i18n="refresh">Обновить</span></button>
           <button type="button" class="win-btn" id="modal-close">✕</button>

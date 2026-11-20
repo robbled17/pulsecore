@@ -53,13 +53,14 @@ const LERP = 0.08
 const EMA_ALPHA = 0.25
 
 const chartThemes = {
-  cpu: { stroke: '#94a3b8', top: 'rgba(148, 163, 184, 0.22)', bottom: 'rgba(148, 163, 184, 0.02)' },
-  gpu: { stroke: '#64748b', top: 'rgba(100, 116, 139, 0.22)', bottom: 'rgba(100, 116, 139, 0.02)' },
-  ram: { stroke: '#cbd5e1', top: 'rgba(203, 213, 225, 0.18)', bottom: 'rgba(203, 213, 225, 0.02)' },
-  battery: { stroke: '#fbbf24', top: 'rgba(251, 191, 36, 0.18)', bottom: 'rgba(251, 191, 36, 0.02)' },
+  cpu: { stroke: '#9aa4b2', top: 'rgba(154, 164, 178, 0.22)', bottom: 'rgba(154, 164, 178, 0.02)' },
+  gpu: { stroke: '#7d8796', top: 'rgba(125, 135, 150, 0.22)', bottom: 'rgba(125, 135, 150, 0.02)' },
+  ram: { stroke: '#c5cbd4', top: 'rgba(197, 203, 212, 0.18)', bottom: 'rgba(197, 203, 212, 0.02)' },
+  battery: { stroke: '#d4a017', top: 'rgba(212, 160, 23, 0.18)', bottom: 'rgba(212, 160, 23, 0.02)' },
 }
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
+let uiTheme = localStorage.getItem('zp_theme') || 'dark'
 let frozen = new Set()
 let activeMetric = 'cpu'
 let selectedDrive = 'C'
@@ -68,6 +69,7 @@ let gameOverlayOn = false
 let latestDisks = []
 let gameCatalog = []
 let selectedGameId = ''
+let lastMetrics = null
 const periphCollapsed = new Set(JSON.parse(localStorage.getItem('zp_periph_collapsed') || '[]'))
 const cachedDiskReport = Object.create(null)
 const whitelist = new Set(JSON.parse(localStorage.getItem('zp_whitelist') || '[]'))
@@ -113,10 +115,25 @@ function applyI18n() {
 }
 
 function syncLangSelects() {
-  ;['lang-select', 'lang-select-settings'].forEach((id) => {
-    const el = $(id)
-    if (el) el.value = lang
+  const el = $('lang-select-settings')
+  if (el) el.value = lang
+}
+
+function applyTheme(theme) {
+  uiTheme = theme === 'light' ? 'light' : 'dark'
+  localStorage.setItem('zp_theme', uiTheme)
+  document.documentElement.setAttribute('data-theme', uiTheme)
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === uiTheme)
   })
+}
+
+function na() {
+  return lang === 'ru' ? 'Н/Д' : 'N/A'
+}
+
+function dash() {
+  return '—'
 }
 
 async function changeLanguage(next) {
@@ -131,7 +148,6 @@ async function changeLanguage(next) {
 
 function setActiveTab(name) {
   document.querySelectorAll('.nav-item').forEach((btn) => {
-    if (btn.classList.contains('nav-hud')) return
     btn.classList.toggle('active', btn.dataset.tab === name)
   })
   document.querySelectorAll('.tab').forEach((tab) => {
@@ -321,21 +337,108 @@ function drawTrendFrame() {
   strokeSmooth(ctx, pts)
 
   const cur = $('chart-current')
-  if (cur) cur.textContent = `${t('currentPct')}: ${fmt(last, 1)}%`
+  if (cur) cur.textContent = `${t('currentPct')}: ${fmtPct(last, 1)}`
 }
 
 function animateChart(now) {
   drainQueues(now)
   lerpSeries()
   drawTrendFrame()
+  renderSparklines()
   sampleFrametime(now)
   requestAnimationFrame(animateChart)
 }
 
 function fmt(n, digits = 1) {
-  const v = Number(n)
-  if (!Number.isFinite(v)) return '--'
+  if (n === null || n === undefined || n === '') return na()
+  const v = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(v)) return na()
   return v.toFixed(digits)
+}
+
+function fmtPct(n, digits = 1) {
+  const s = fmt(n, digits)
+  return s === na() ? s : `${s}%`
+}
+
+function safeNum(n, fallback = 0) {
+  const v = Number(n)
+  return Number.isFinite(v) ? v : fallback
+}
+
+function drawSparkline(canvasId, values, stroke) {
+  const canvas = $(canvasId)
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = window.devicePixelRatio || 1
+  const cssW = canvas.clientWidth || 160
+  const cssH = 36
+  if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
+    canvas.width = Math.floor(cssW * dpr)
+    canvas.height = Math.floor(cssH * dpr)
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, cssW, cssH)
+  const arr = values || []
+  if (arr.length < 2) return
+  const pad = 1
+  const n = Math.max(arr.length - 1, 1)
+  ctx.beginPath()
+  arr.forEach((raw, i) => {
+    const v = Math.min(100, Math.max(0, safeNum(raw, 0)))
+    const x = pad + (i / n) * (cssW - pad * 2)
+    const y = pad + (cssH - pad * 2) - (v / 100) * (cssH - pad * 2)
+    if (i === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  })
+  ctx.strokeStyle = stroke || '#9aa4b2'
+  ctx.lineWidth = 1.25
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.stroke()
+}
+
+function renderSparklines() {
+  drawSparkline('spark-cpu', series.cpu.current, chartThemes.cpu.stroke)
+  drawSparkline('spark-gpu', series.gpu.current, chartThemes.gpu.stroke)
+  drawSparkline('spark-ram', series.ram.current, chartThemes.ram.stroke)
+  drawSparkline('spark-battery', series.battery.current, chartThemes.battery.stroke)
+}
+
+function renderStatusStrip(m) {
+  const st = $('st-status')
+  const ramEl = $('st-ram')
+  const procEl = $('st-procs')
+  if (!st || !ramEl || !procEl) return
+
+  const temp = safeNum(m.temperatureC, NaN)
+  const cpu = safeNum(m.cpuPercent, 0)
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
+  const vamps = m.vampires || []
+  const bgCount = vamps.reduce((sum, v) => sum + (v.count || (v.pids ? v.pids.length : 1) || 1), 0)
+
+  let state = 'ok'
+  let label = t('statusOk')
+  if (Number.isFinite(temp) && temp >= 90) {
+    state = 'hot'
+    label = t('statusHot')
+  } else if ((Number.isFinite(temp) && temp >= 80) || cpu >= 92 || stutters.length || bgCount >= 5) {
+    state = 'warn'
+    label = t('statusWarn')
+  }
+  st.textContent = label
+  st.dataset.state = state
+
+  const total = safeNum(m.ramTotalMB, 0)
+  const used = safeNum(m.ramUsedMB, 0)
+  if (total > 0) {
+    const free = Math.max(0, total - used)
+    ramEl.textContent = `${fmt(free / 1024, 1)} GB`
+  } else {
+    ramEl.textContent = na()
+  }
+  procEl.textContent = String(bgCount)
 }
 
 function batterySeriesValue(m) {
@@ -349,39 +452,46 @@ function driveLetter(mount) {
 }
 
 function renderOverview(m) {
-  $('ov-cpu').textContent = `${fmt(m.cpuPercent)}%`
-  $('ov-cpu-sub').textContent = m.cpuName || '-'
-  $('ov-cpu-bar').style.width = `${Math.min(100, m.cpuPercent || 0)}%`
+  $('ov-cpu').textContent = fmtPct(m.cpuPercent)
+  $('ov-cpu-sub').textContent = m.cpuName || dash()
+  $('ov-cpu-bar').style.width = `${Math.min(100, safeNum(m.cpuPercent, 0))}%`
 
-  $('ov-gpu').textContent = `${fmt(m.gpuPercent)}%`
-  $('ov-gpu-sub').textContent = m.gpuName || '-'
-  $('ov-gpu-bar').style.width = `${Math.min(100, m.gpuPercent || 0)}%`
+  $('ov-gpu').textContent = fmtPct(m.gpuPercent)
+  $('ov-gpu-sub').textContent = m.gpuName || dash()
+  $('ov-gpu-bar').style.width = `${Math.min(100, safeNum(m.gpuPercent, 0))}%`
 
-  $('ov-ram').textContent = `${fmt(m.ramPercent)}%`
-  $('ov-ram-sub').textContent = `${m.ramUsedMB || 0} / ${m.ramTotalMB || 0} MB`
-  $('ov-ram-bar').style.width = `${Math.min(100, m.ramPercent || 0)}%`
+  $('ov-ram').textContent = fmtPct(m.ramPercent)
+  const used = safeNum(m.ramUsedMB, NaN)
+  const total = safeNum(m.ramTotalMB, NaN)
+  $('ov-ram-sub').textContent = (Number.isFinite(used) && Number.isFinite(total) && total > 0)
+    ? `${fmt(used, 0)} / ${fmt(total, 0)} MB`
+    : na()
+  $('ov-ram-bar').style.width = `${Math.min(100, safeNum(m.ramPercent, 0))}%`
 
   const bat = m.battery || {}
   if (bat.available) {
-    $('ov-bat').textContent = `${fmt(bat.percent, 0)}%`
+    $('ov-bat').textContent = fmtPct(bat.percent, 0)
     const wear = bat.wearLabel ? ` · ${bat.wearLabel}` : ''
-    $('ov-bat-sub').textContent = `${bat.statusText || '-'} · ${bat.deviceName || t('batteryPack')}${wear}`
-    $('ov-bat-bar').style.width = `${Math.min(100, bat.percent || 0)}%`
+    $('ov-bat-sub').textContent = `${bat.statusText || dash()} · ${bat.deviceName || t('batteryPack')}${wear}`
+    $('ov-bat-bar').style.width = `${Math.min(100, safeNum(bat.percent, 0))}%`
   } else {
     $('ov-bat').textContent = 'AC'
     $('ov-bat-sub').textContent = bat.wearLabel || bat.statusText || t('desktopPC')
     $('ov-bat-bar').style.width = '100%'
   }
 
-  $('temp-chip').textContent = `${fmt(m.temperatureC)} °C`
+  const temp = fmt(m.temperatureC)
+  $('temp-chip').textContent = temp === na() ? `${na()} °C` : `${temp} °C`
   $('cpu-name').textContent = m.cpuName || 'CPU'
+
+  renderStatusStrip(m)
 
   latestDisks = m.disks || []
   renderDiskTabs(latestDisks)
   const box = $('ov-disks')
   const disks = latestDisks
   if (!disks.length) {
-    box.innerHTML = `<div class="empty">-</div>`
+    box.innerHTML = `<div class="empty">${dash()}</div>`
   } else {
     if (!selectedDrive && disks[0]) selectedDrive = driveLetter(disks[0].mount)
     const activeDisk = disks.find((d) => driveLetter(d.mount) === selectedDrive.toUpperCase()) || disks[0]
@@ -393,7 +503,7 @@ function renderOverview(m) {
           <div class="meta">${fmt(d.usedGB)} / ${fmt(d.totalGB)} GB · ${t('free')} ${fmt(d.freeGB)} GB</div>
           <div class="meta">${t('read')} ${fmt(d.readMBps)} MB/s · ${t('write')} ${fmt(d.writeMBps)} MB/s</div>
         </div>
-        <div class="name">${fmt(d.percent, 0)}%</div>
+        <div class="name metric">${fmtPct(d.percent, 0)}</div>
       </div>
     `
   }
@@ -430,7 +540,7 @@ function lagExplanation(e) {
 }
 
 function renderLag(m) {
-  const stutters = (m.stutterEvents || []).filter((e) => (e.jitterMs || 0) >= 300)
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
   const stutterBox = $('stutter-log')
   if (stutterBox) {
     if (!stutters.length) {
@@ -439,8 +549,8 @@ function renderLag(m) {
       stutterBox.innerHTML = stutters.map((e) => `
         <div class="row">
           <div>
-            <div class="name">${e.timestamp} · ${fmt(e.jitterMs, 0)} ms</div>
-            <div class="meta stutter-cause">${e.cause || ''}</div>
+            <div class="name metric">${e.timestamp || dash()} · ${fmt(e.jitterMs, 0)} ms</div>
+            <div class="meta stutter-cause">${e.cause || dash()}</div>
           </div>
           <div class="row-actions">
             ${e.culprit ? `<button type="button" class="btn compact danger" data-eco-name="${e.culprit}">${t('ecoCulprit')}</button>` : ''}
@@ -457,11 +567,10 @@ function renderLag(m) {
   } else {
     lagBox.innerHTML = lags.map((e) => `
       <div class="incident-card">
-        <div class="incident-ico">${e.icon || '⚙️'}</div>
         <div>
           <div class="incident-title">${e.culpritFriendly || e.culpritProcess || t('unknownProc')}</div>
           <div class="incident-explain">${lagExplanation(e)}</div>
-          <div class="meta">${e.timestamp} · ${e.culpritProcess || ''} · PID ${e.culpritPID || '-'}</div>
+          <div class="meta">${e.timestamp || dash()} · ${e.culpritProcess || dash()} · PID ${e.culpritPID || dash()}</div>
         </div>
         <div class="row-actions">
           ${e.culpritPID ? `<button type="button" class="btn compact danger" data-act="freeze" data-pid="${e.culpritPID}">${t('ecoLower')}</button>` : ''}
@@ -479,12 +588,13 @@ function renderLag(m) {
       const isEco = frozen.has(v.pid) || v.ecoMode || v.frozen
       const count = v.count || (v.pids ? v.pids.length : 1) || 1
       const badge = count > 1 ? `<span class="badge-count">${count} ${t('procCount')}</span>` : ''
+      const activeTag = isEco ? '' : ` <span class="badge-count">${t('statusActive')}</span>`
       return `
         <div class="row">
           <div>
-            <div class="name">${v.friendlyName || v.name}${badge}</div>
-            <div class="meta">${v.name}</div>
-            <div class="meta">CPU ${fmt(v.cpuPercent)}% · disk ~${fmt(v.diskMBps)} MB/s</div>
+            <div class="name">${v.friendlyName || v.name}${badge}${activeTag}</div>
+            <div class="meta">${v.name || dash()}</div>
+            <div class="meta">CPU ${fmtPct(v.cpuPercent)} · disk ~${fmt(v.diskMBps)} MB/s</div>
           </div>
           <div class="row-actions">
             <button type="button" class="btn compact ${isEco ? 'eco-on' : 'danger'}" data-vamp-eco="${v.name}" data-act="${isEco ? 'resume' : 'freeze'}" data-pid="${v.pid}">
@@ -504,32 +614,47 @@ function renderHardware(m) {
   const ram = hw.ram || {}
   const pwr = hw.power || {}
 
-  $('hw-cpu-name').textContent = cpu.name || m.cpuName || '-'
-  $('hw-cpu-cores').textContent = `${cpu.physicalCores || '-'} / ${cpu.logicalCores || '-'}`
-  $('hw-cpu-freq').textContent = cpu.frequencyMHz ? `${fmt(cpu.frequencyMHz / 1000, 2)} GHz` : '-'
-  $('hw-cpu-load').textContent = `${fmt(cpu.percent ?? m.cpuPercent)}%`
+  $('hw-cpu-name').textContent = cpu.name || m.cpuName || dash()
+  const phys = cpu.physicalCores
+  const logic = cpu.logicalCores
+  $('hw-cpu-cores').textContent = (phys || logic)
+    ? `${phys || dash()} / ${logic || dash()}`
+    : na()
+  $('hw-cpu-freq').textContent = cpu.frequencyMHz
+    ? `${fmt(cpu.frequencyMHz / 1000, 2)} GHz`
+    : na()
+  $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
 
   const cores = cpu.perCore || m.cpuPerCore || []
-  $('core-grid').innerHTML = cores.map((c, i) => `
+  $('core-grid').innerHTML = cores.map((c, i) => {
+    const load = safeNum(c, 0)
+    return `
     <div class="core-cell">
       <div class="id">C${i}</div>
-      <div class="val">${fmt(c, 0)}%</div>
-      <div class="mini-bar"><i style="width:${Math.min(100, c)}%"></i></div>
-    </div>
-  `).join('')
+      <div class="val">${fmtPct(c, 0)}</div>
+      <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
+    </div>`
+  }).join('')
 
-  $('hw-gpu-name').textContent = gpu.name || m.gpuName || '-'
-  $('hw-gpu-driver').textContent = gpu.driverVersion || '-'
-  $('hw-gpu-ded').textContent = `${fmt(gpu.dedicatedMB ?? m.vramTotalMB, 0)} MB`
-  $('hw-gpu-shared').textContent = `${fmt(gpu.sharedMB ?? m.vramSharedMB, 0)} MB`
+  $('hw-gpu-name').textContent = gpu.name || m.gpuName || dash()
+  $('hw-gpu-driver').textContent = gpu.driverVersion || dash()
+  const ded = gpu.dedicatedMB ?? m.vramTotalMB
+  const shared = gpu.sharedMB ?? m.vramSharedMB
+  $('hw-gpu-ded').textContent = Number.isFinite(Number(ded)) ? `${fmt(ded, 0)} MB` : na()
+  $('hw-gpu-shared').textContent = Number.isFinite(Number(shared)) ? `${fmt(shared, 0)} MB` : na()
 
-  $('hw-ram-total').textContent = `${ram.totalMB || m.ramTotalMB || 0} MB`
-  $('hw-ram-type').textContent = `${ram.type || 'Unknown'}${ram.speedMHz ? ` · ${ram.speedMHz} MHz` : ''}`
-  $('hw-ram-slots').textContent = `${ram.slotsUsed || 0}/${ram.slotsTotal || 0}`
-  $('hw-ram-use').textContent = `${ram.usedMB || m.ramUsedMB || 0} / ${ram.freeMB || 0} MB`
+  const ramTotal = ram.totalMB || m.ramTotalMB
+  $('hw-ram-total').textContent = ramTotal ? `${ramTotal} MB` : na()
+  $('hw-ram-type').textContent = `${ram.type || dash()}${ram.speedMHz ? ` · ${ram.speedMHz} MHz` : ''}`
+  $('hw-ram-slots').textContent = `${ram.slotsUsed ?? dash()}/${ram.slotsTotal ?? dash()}`
+  const usedMB = ram.usedMB || m.ramUsedMB
+  const freeMB = ram.freeMB
+  $('hw-ram-use').textContent = (usedMB || freeMB)
+    ? `${usedMB || 0} / ${freeMB ?? dash()} MB`
+    : na()
   const channel = $('hw-ram-channel')
   if (channel) {
-    channel.textContent = ram.channelStatus || '-'
+    channel.textContent = ram.channelStatus || dash()
     channel.classList.remove('warn', 'ok')
     if (ram.isSingleChannel) channel.classList.add('warn')
     else if ((ram.slotsUsed || 0) >= 2) channel.classList.add('ok')
@@ -537,18 +662,18 @@ function renderHardware(m) {
 
   if (pwr.hasBattery) {
     $('hw-pwr-name').textContent = pwr.deviceName || t('batteryPack')
-    $('hw-pwr-status').textContent = pwr.statusText || '-'
-    $('hw-pwr-pct').textContent = `${fmt(pwr.percent, 0)}%`
-    $('hw-pwr-wear').textContent = pwr.wearLabel || `${fmt(pwr.wearPercent, 0)}%`
+    $('hw-pwr-status').textContent = pwr.statusText || dash()
+    $('hw-pwr-pct').textContent = fmtPct(pwr.percent, 0)
+    $('hw-pwr-wear').textContent = pwr.wearLabel || fmtPct(pwr.wearPercent, 0)
     $('hw-pwr-cap').textContent = pwr.capacitymWh
       ? `${fmt(pwr.capacitymWh, 0)} / ${fmt(pwr.designCapacitymWh, 0)} mWh`
-      : '-'
+      : na()
   } else {
     $('hw-pwr-name').textContent = t('desktopPC')
     $('hw-pwr-status').textContent = 'AC'
     $('hw-pwr-pct').textContent = 'AC'
     $('hw-pwr-wear').textContent = pwr.wearLabel || t('desktopPC')
-    $('hw-pwr-cap').textContent = '-'
+    $('hw-pwr-cap').textContent = na()
   }
 }
 
@@ -751,9 +876,9 @@ async function runSleepCheck() {
 }
 
 function renderMiniHUD(m) {
-  $('mh-cpu').textContent = `${fmt(m.cpuPercent, 0)}%`
-  $('mh-ram').textContent = `${fmt(m.ramPercent, 0)}%`
-  $('mh-gpu').textContent = `${fmt(m.gpuPercent, 0)}%`
+  $('mh-cpu').textContent = fmtPct(m.cpuPercent, 0)
+  $('mh-ram').textContent = fmtPct(m.ramPercent, 0)
+  $('mh-gpu').textContent = fmtPct(m.gpuPercent, 0)
 }
 
 function syncSettings(m) {
@@ -767,13 +892,14 @@ function syncSettings(m) {
 
 function applyMetrics(m) {
   if (!m) return
+  lastMetrics = m
   if (m.language && m.language !== lang && !localStorage.getItem('zp_lang')) {
     lang = m.language
     applyI18n()
   }
-  pushSample('cpu', m.cpuPercent || 0)
-  pushSample('gpu', m.gpuPercent || 0)
-  pushSample('ram', m.ramPercent || 0)
+  pushSample('cpu', safeNum(m.cpuPercent, 0))
+  pushSample('gpu', safeNum(m.gpuPercent, 0))
+  pushSample('ram', safeNum(m.ramPercent, 0))
   pushSample('battery', batterySeriesValue(m))
   renderOverview(m)
   renderLag(m)
@@ -1134,7 +1260,6 @@ async function refresh() {
 
 function wireUI() {
   document.querySelectorAll('.nav-item').forEach((btn) => {
-    if (btn.classList.contains('nav-hud')) return
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab))
   })
 
@@ -1146,6 +1271,11 @@ function wireUI() {
       document.querySelectorAll('.chart-tab').forEach((c) => c.classList.toggle('active', c === card))
       updateChartTitle()
     })
+  })
+
+  // Keep expand-panel action buttons from toggling <details>
+  document.querySelectorAll('.expand-summary .btn').forEach((btn) => {
+    btn.addEventListener('click', (ev) => ev.stopPropagation())
   })
 
   $('btn-min').addEventListener('click', () => WindowMinimise())
@@ -1168,8 +1298,10 @@ function wireUI() {
     }
   })
 
-  ;['lang-select', 'lang-select-settings'].forEach((id) => {
-    $(id)?.addEventListener('change', (ev) => changeLanguage(ev.target.value))
+  $('lang-select-settings')?.addEventListener('change', (ev) => changeLanguage(ev.target.value))
+
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme))
   })
 
   document.querySelectorAll('.btn.mode').forEach((btn) => {
@@ -1186,6 +1318,18 @@ function wireUI() {
     })
   })
 
+  $('btn-reset-profile')?.addEventListener('click', async () => {
+    try {
+      await SetPowerProfile('balanced')
+      document.querySelectorAll('.btn.mode').forEach((b) => {
+        b.classList.toggle('active', b.dataset.mode === 'balanced')
+      })
+      showToast(t('modeApplied'), true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+
   document.querySelectorAll('.btn.poll').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await SetPollInterval(Number(btn.dataset.poll))
@@ -1194,15 +1338,15 @@ function wireUI() {
   })
 
   const enableHud = async () => {
-    await ToggleMiniHUD(true)
+    try { await ToggleMiniHUD(true) } catch (_) {}
     setHudMode(true)
   }
   const disableHud = async () => {
-    await ToggleMiniHUD(false)
+    try { await ToggleMiniHUD(false) } catch (_) {}
     setHudMode(false)
   }
 
-  $('btn-hud-side').addEventListener('click', enableHud)
+  $('btn-hud-title')?.addEventListener('click', enableHud)
   $('mh-expand').addEventListener('click', disableHud)
   $('btn-toggle-overlay')?.addEventListener('click', toggleGameOverlayPill)
   $('btn-overlay')?.addEventListener('click', enableGameOverlay)
@@ -1401,6 +1545,7 @@ function wireTooltips() {
 }
 
 function boot() {
+  applyTheme(uiTheme)
   applyI18n()
   wireUI()
   SetLanguage(lang).catch(() => {})
