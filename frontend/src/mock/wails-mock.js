@@ -1,6 +1,7 @@
 /**
  * Browser mock for Wails Go bindings + runtime.
  * Loaded only by demo.html / screenshot harness — production Wails path unchanged.
+ * Supports hardware matrix profiles A/B/C for GamePulse + sensor fallback demos.
  */
 
 const listeners = new Map()
@@ -19,6 +20,100 @@ function on(event, cb) {
   return () => listeners.get(event)?.delete(cb)
 }
 
+/** Demo-only hardware matrix (never used by live Wails). */
+const PROFILES = {
+  A: {
+    id: 'A',
+    label: 'Weak',
+    cpuName: 'Intel Core i3-10100',
+    gpuName: 'Intel UHD Graphics 630',
+    physicalCores: 4,
+    logicalCores: 8,
+    frequencyMHz: 3600,
+    ramTotalMB: 8192,
+    dedicatedMB: 0,
+    sharedMB: 2048,
+    isIntegrated: true,
+    isSingleChannel: true,
+    slotsUsed: 1,
+    slotsTotal: 2,
+    ramType: 'DDR4',
+    ramSpeed: 2666,
+    channelStatus: 'Single Channel',
+    diskPct: 95,
+    diskUsed: 456,
+    diskTotal: 480,
+    cpuBase: 72,
+    gpuBase: 55,
+    ramBase: 91,
+    tempMode: 'hot', // ~88–94°C
+    cpuScore: 34,
+    gpuScore: 11,
+    vramGB: 0,
+    ramGB: 8,
+  },
+  B: {
+    id: 'B',
+    label: 'Mid',
+    cpuName: 'AMD Ryzen 5 5600',
+    gpuName: 'NVIDIA GeForce RTX 3060',
+    physicalCores: 6,
+    logicalCores: 12,
+    frequencyMHz: 3900,
+    ramTotalMB: 16384,
+    dedicatedMB: 8192,
+    sharedMB: 0,
+    isIntegrated: false,
+    isSingleChannel: false,
+    slotsUsed: 2,
+    slotsTotal: 4,
+    ramType: 'DDR4',
+    ramSpeed: 3200,
+    channelStatus: 'Dual Channel',
+    diskPct: 58,
+    diskUsed: 552,
+    diskTotal: 952,
+    cpuBase: 42,
+    gpuBase: 58,
+    ramBase: 62,
+    tempMode: 'normal',
+    cpuScore: 68,
+    gpuScore: 61,
+    vramGB: 8,
+    ramGB: 16,
+  },
+  C: {
+    id: 'C',
+    label: 'Top+',
+    cpuName: 'AMD Ryzen 9 7950X',
+    gpuName: 'NVIDIA GeForce RTX 4090',
+    physicalCores: 16,
+    logicalCores: 32,
+    frequencyMHz: 4500,
+    ramTotalMB: 32768,
+    dedicatedMB: 24576,
+    sharedMB: 0,
+    isIntegrated: false,
+    isSingleChannel: false,
+    slotsUsed: 2,
+    slotsTotal: 4,
+    ramType: 'DDR5',
+    ramSpeed: 6000,
+    channelStatus: 'Dual Channel',
+    diskPct: 34,
+    diskUsed: 680,
+    diskTotal: 2000,
+    cpuBase: 28,
+    gpuBase: 45,
+    ramBase: 48,
+    tempMode: 'broken', // null / 0 / NaN sensors
+    cpuScore: 95,
+    gpuScore: 100,
+    vramGB: 24,
+    ramGB: 32,
+  },
+}
+
 let state = {
   language: 'ru',
   powerMode: 'balanced',
@@ -27,6 +122,7 @@ let state = {
   gameOverlay: false,
   fullscreen: false,
   tick: 0,
+  profile: 'B',
 }
 
 function steamArt(id) {
@@ -38,24 +134,193 @@ function steamArt(id) {
 }
 
 const GAMES = [
-  { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', ...steamArt(730) },
-  { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', ...steamArt(271590) },
-  { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', ...steamArt(292030) },
-  { id: 'elden', name: 'ELDEN RING', genre: 'Action RPG', category: 'modern', year: 2022, engine: 'Proprietary', ...steamArt(1245620) },
-  { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', ...steamArt(570) },
+  { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', weight: 0.7, ...steamArt(730) },
+  { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', weight: 0.85, ...steamArt(271590) },
+  { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', weight: 0.8, ...steamArt(292030) },
+  { id: 'elden', name: 'ELDEN RING', genre: 'Action RPG', category: 'modern', year: 2022, engine: 'Proprietary', weight: 1.05, ...steamArt(1245620) },
+  { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', weight: 0.55, ...steamArt(570) },
+  { id: 'cyberpunk', name: 'Cyberpunk 2077', genre: 'RPG', category: 'modern', year: 2020, engine: 'REDengine', weight: 1.25, ...steamArt(1091500) },
 ]
+
+/** Simplified GamePulse req tables (mirrors gamelab.go spirit). */
+const GAME_REQ = {
+  cs2: { low: [90, 28, 30, 2], med: [85, 38, 38, 3], high: [80, 48, 45, 4], ultra: [75, 58, 52, 6], heavy: false, cap: 0 },
+  gta5: { low: [70, 35, 32, 2], med: [65, 48, 42, 4], high: [60, 58, 50, 6], ultra: [55, 68, 58, 8], heavy: false, cap: 0 },
+  witcher3: { low: [60, 32, 30, 2], med: [58, 45, 40, 4], high: [55, 55, 48, 6], ultra: [52, 65, 55, 8], heavy: false, cap: 0 },
+  elden: { low: [55, 48, 40, 4], med: [52, 60, 50, 6], high: [50, 70, 58, 8], ultra: [48, 80, 68, 10], heavy: true, cap: 0 },
+  dota2: { low: [100, 18, 22, 1], med: [95, 26, 28, 2], high: [90, 34, 34, 3], ultra: [85, 42, 40, 4], heavy: false, cap: 0 },
+  cyberpunk: { low: [55, 55, 38, 3], med: [55, 70, 48, 6], high: [60, 68, 58, 8], ultra: [58, 78, 70, 10], heavy: true, cap: 0 },
+}
 
 function wave(base, amp, phase = 0) {
   return Math.max(0, Math.min(100, base + Math.sin(state.tick / 6 + phase) * amp))
 }
 
+function profile() {
+  return PROFILES[state.profile] || PROFILES.B
+}
+
+function setMockProfile(id) {
+  if (!PROFILES[id]) return state.profile
+  state.profile = id
+  emit('metrics:update', buildMetrics())
+  emit('mock:profile', id)
+  return id
+}
+
+function buildSystemPowerProfile() {
+  const p = profile()
+  return {
+    gpuName: p.gpuName,
+    isIntegrated: p.isIntegrated,
+    vramGB: p.vramGB,
+    gpuPowerScore: p.gpuScore,
+    cpuName: p.cpuName,
+    cpuCores: p.physicalCores,
+    cpuThreads: p.logicalCores,
+    cpuFreqMHz: p.frequencyMHz,
+    cpuPowerScore: p.cpuScore,
+    ramGB: p.ramGB,
+    isDualChannel: !p.isSingleChannel,
+  }
+}
+
+function clampFPS(v) {
+  return Math.max(3, Math.min(400, Math.round(v)))
+}
+
+function estimatePreset(sys, base, reqGpu, reqCpu, reqVram, preset, cap) {
+  let gpuRatio = sys.gpuPowerScore / Math.max(0.1, reqGpu)
+  gpuRatio = Math.max(0.05, Math.min(2.5, gpuRatio))
+  let cpuRatio = sys.cpuPowerScore / Math.max(0.1, reqCpu)
+  cpuRatio = Math.max(0.15, Math.min(2.0, cpuRatio))
+  const cpuBlend = 0.70 + 0.30 * Math.min(cpuRatio, 1.25)
+
+  let ramMul = 1
+  if (sys.isIntegrated && !sys.isDualChannel) ramMul = 0.68
+  else if (!sys.isDualChannel) ramMul = 0.88
+  else if (sys.isIntegrated) ramMul = 0.92
+
+  let vramMul = 1
+  let warn = ''
+  if (sys.isIntegrated) {
+    if ((preset === 'high' || preset === 'ultra') && sys.ramGB < reqVram * 2) {
+      vramMul = 0.7
+      warn = 'fpsWarnVRAM'
+    }
+  } else if (reqVram > 0 && sys.vramGB + 0.05 < reqVram) {
+    vramMul = 0.7
+    warn = 'fpsWarnVRAM'
+  }
+
+  let fps = base * Math.min(gpuRatio, 2.5) * cpuBlend * ramMul * vramMul
+  if (sys.cpuCores > 0 && sys.cpuCores < 4 && (preset === 'high' || preset === 'ultra')) {
+    fps *= 0.62
+    if (!warn) warn = 'fpsWarnFewCores'
+  }
+  if (sys.ramGB > 0 && sys.ramGB < 8 && (preset === 'high' || preset === 'ultra')) fps *= 0.85
+  if (cap > 0 && fps > cap) fps = cap
+
+  const avg = clampFPS(fps)
+  const spread = Math.max(2, avg * 0.12)
+  const minV = clampFPS(avg - spread)
+  const maxV = clampFPS(avg + spread)
+  return { avg, range: maxV <= 5 ? '<5' : `${minV}-${maxV}`, warn }
+}
+
+function dynamicVerdict(sys, req, low, med, high) {
+  if (!req.heavy && low >= 90) return ['fpsVerdictSmoothMax', 'ok']
+  if (req.cap > 0 && low >= 55 && med >= 55) return ['fpsVerdictLocked60', 'ok']
+  if (req.heavy && sys.gpuPowerScore <= 28 && high < 30) return ['fpsVerdictWeakHW', 'bad']
+  if (req.heavy && (med < 20 || (low < 22 && sys.isIntegrated))) return ['fpsVerdictNeedGPU', 'bad']
+  if (high >= 55 || med >= 45) return ['fpsVerdictPlayable', 'ok']
+  if (low >= 40) return ['fpsVerdictOKLow', 'warn']
+  if (low >= 25) return ['fpsVerdictBorderline', 'warn']
+  if (sys.isIntegrated) return ['fpsVerdictHeavy', 'warn']
+  return ['fpsVerdictBorderline', 'warn']
+}
+
+function predictFPS(gameID) {
+  const g = GAMES.find((x) => x.id === gameID) || GAMES[0]
+  const sys = buildSystemPowerProfile()
+  const req = GAME_REQ[g.id] || GAME_REQ.gta5
+  const presets = ['low', 'med', 'high', 'ultra']
+  const results = {}
+  const warnings = []
+  for (const preset of presets) {
+    const [base, rg, rc, rv] = req[preset]
+    const r = estimatePreset(sys, base, rg, rc, rv, preset, req.cap)
+    results[preset] = r
+    if (r.warn && !warnings.includes(r.warn)) warnings.push(r.warn)
+  }
+  if (sys.isIntegrated && !sys.isDualChannel) warnings.push('fpsWarnIntegratedSingle')
+  else if (!sys.isDualChannel) warnings.push('fpsWarnSingleChannel')
+  if (sys.cpuCores > 0 && sys.cpuCores < 4) warnings.push('fpsWarnFewCores')
+
+  const { low, med, high, ultra } = results
+  let recommend = 'low'
+  if (ultra.avg >= 55) recommend = 'ultra'
+  else if (high.avg >= 55) recommend = 'high'
+  else if (med.avg >= 55) recommend = 'med'
+
+  const [verdict, verdictLevel] = dynamicVerdict(sys, req, low.avg, med.avg, high.avg)
+
+  return {
+    gameId: g.id,
+    gameName: g.name,
+    genre: g.genre,
+    category: g.category,
+    year: g.year,
+    engine: g.engine,
+    badge: g.genre,
+    posterUrl: g.posterUrl || '',
+    headerUrl: g.headerUrl || '',
+    steamAppId: g.steamAppId || 0,
+    recommend,
+    verdict,
+    verdictLevel,
+    warnings: [...new Set(warnings)],
+    isIntegrated: sys.isIntegrated,
+    dualChannel: sys.isDualChannel,
+    vramGB: sys.vramGB,
+    ramGB: sys.ramGB,
+    cpuCores: sys.cpuCores,
+    gpuScore: sys.gpuPowerScore,
+    cpuScore: sys.cpuPowerScore,
+    lowAvg: low.avg,
+    medAvg: med.avg,
+    highAvg: high.avg,
+    ultraAvg: ultra.avg,
+    lowRange: low.range,
+    medRange: med.range,
+    highRange: high.range,
+    ultraRange: ultra.range,
+  }
+}
+
+function sensorTemp(p) {
+  if (p.tempMode === 'broken') {
+    // Cycle broken readings so UI must never show NaN/-1
+    const cycle = state.tick % 3
+    if (cycle === 0) return null
+    if (cycle === 1) return 0
+    return Number.NaN
+  }
+  if (p.tempMode === 'hot') return Number((88 + Math.sin(state.tick / 8) * 4).toFixed(1))
+  return Number((58 + Math.sin(state.tick / 10) * 4).toFixed(1))
+}
+
 function buildMetrics() {
-  const cpu = wave(38, 12, 0.2)
-  const gpu = wave(52, 18, 1.1)
-  const ramPct = wave(61, 4, 2.0)
-  const ramTotal = 32768
+  const p = profile()
+  const cpu = wave(p.cpuBase, 10, 0.2)
+  const gpu = wave(p.gpuBase, 14, 1.1)
+  const ramPct = wave(p.ramBase, 3, 2.0)
+  const ramTotal = p.ramTotalMB
   const ramUsed = Math.round(ramTotal * (ramPct / 100))
-  const temp = 58 + Math.sin(state.tick / 10) * 4
+  const temp = sensorTemp(p)
+  const freeGB = Math.max(0, p.diskTotal - p.diskUsed)
+
+  const brokenFan = p.tempMode === 'broken' ? null : 1200 + (state.tick % 40) * 5
 
   return {
     cpuPercent: Number(cpu.toFixed(1)),
@@ -63,26 +328,38 @@ function buildMetrics() {
     ramPercent: Number(ramPct.toFixed(1)),
     ramUsedMB: ramUsed,
     ramTotalMB: ramTotal,
-    swapPercent: 2.1,
-    swapUsedMB: 256,
-    swapTotalMB: 8192,
-    vramTotalMB: 8192,
-    vramSharedMB: 0,
-    temperatureC: Number(temp.toFixed(1)),
+    swapPercent: p.id === 'A' ? 28 : 2.1,
+    swapUsedMB: p.id === 'A' ? 1800 : 256,
+    swapTotalMB: p.id === 'A' ? 4096 : 8192,
+    vramTotalMB: p.dedicatedMB,
+    vramSharedMB: p.sharedMB,
+    temperatureC: temp,
+    fanRPM: brokenFan,
     powerMode: state.powerMode,
     pollIntervalMS: state.pollIntervalMS,
     miniHUD: state.miniHUD,
     language: state.language,
     osName: 'Windows 11',
-    cpuName: 'AMD Ryzen 7 5800X',
-    gpuName: 'NVIDIA GeForce RTX 3070',
-    cpuPerCore: Array.from({ length: 16 }, (_, i) => Number(wave(20 + (i % 5) * 8, 15, i * 0.4).toFixed(0))),
+    cpuName: p.cpuName,
+    gpuName: p.gpuName,
+    mockProfile: p.id,
+    cpuPerCore: Array.from({ length: p.logicalCores }, (_, i) => {
+      if (p.tempMode === 'broken' && i === 3) return Number.NaN
+      return Number(wave(20 + (i % 5) * 8, 15, i * 0.4).toFixed(0))
+    }),
     disks: [
-      { mount: 'C:\\', usedGB: 412.4, totalGB: 952.0, percent: 43, readMBps: 18.2, writeMBps: 4.1, freeGB: 539.6 },
-      { mount: 'D:\\', usedGB: 820.0, totalGB: 1863.0, percent: 44, readMBps: 2.0, writeMBps: 0.4, freeGB: 1043.0 },
+      {
+        mount: 'C:\\',
+        usedGB: p.diskUsed,
+        totalGB: p.diskTotal,
+        percent: p.diskPct,
+        readMBps: p.id === 'A' ? 42 : 18.2,
+        writeMBps: p.id === 'A' ? 12 : 4.1,
+        freeGB,
+      },
     ],
     battery: {
-      available: true,
+      available: p.id !== 'C',
       percent: 76,
       pluggedIn: true,
       status: 'charging',
@@ -96,32 +373,38 @@ function buildMetrics() {
     },
     hardware: {
       cpu: {
-        name: 'AMD Ryzen 7 5800X',
-        physicalCores: 8,
-        logicalCores: 16,
-        frequencyMHz: 4200,
+        name: p.cpuName,
+        physicalCores: p.physicalCores,
+        logicalCores: p.logicalCores,
+        frequencyMHz: p.frequencyMHz,
         percent: Number(cpu.toFixed(1)),
-        perCore: Array.from({ length: 16 }, (_, i) => Number(wave(20 + (i % 5) * 8, 15, i * 0.4).toFixed(0))),
+        perCore: Array.from({ length: p.logicalCores }, (_, i) => {
+          if (p.tempMode === 'broken' && i === 3) return null
+          return Number(wave(20 + (i % 5) * 8, 15, i * 0.4).toFixed(0))
+        }),
       },
       gpu: {
-        name: 'NVIDIA GeForce RTX 3070',
-        driverVersion: '566.36',
-        dedicatedMB: 8192,
-        sharedMB: 0,
+        name: p.gpuName,
+        driverVersion: p.isIntegrated ? '31.0.101.5186' : '566.36',
+        dedicatedMB: p.dedicatedMB,
+        sharedMB: p.sharedMB,
+        isIntegrated: p.isIntegrated,
+        vramGB: p.vramGB,
+        fanRPM: brokenFan,
       },
       ram: {
         totalMB: ramTotal,
         usedMB: ramUsed,
         freeMB: ramTotal - ramUsed,
-        type: 'DDR4',
-        speedMHz: 3200,
-        slotsUsed: 2,
-        slotsTotal: 4,
-        isSingleChannel: false,
-        channelStatus: 'Dual Channel',
+        type: p.ramType,
+        speedMHz: p.ramSpeed,
+        slotsUsed: p.slotsUsed,
+        slotsTotal: p.slotsTotal,
+        isSingleChannel: p.isSingleChannel,
+        channelStatus: p.channelStatus,
       },
       power: {
-        hasBattery: true,
+        hasBattery: p.id !== 'C',
         deviceName: 'Primary',
         statusText: 'Зарядка',
         percent: 76,
@@ -131,7 +414,7 @@ function buildMetrics() {
         designCapacitymWh: 60100,
       },
     },
-    lagEvents: [
+    lagEvents: p.id === 'A' || p.id === 'B' ? [
       {
         timestamp: '14:02:11',
         coreID: 3,
@@ -154,21 +437,25 @@ function buildMetrics() {
         explanation: 'lag_core_spike|7|97',
         icon: '',
       },
-    ],
-    stutterEvents: [
+    ] : [],
+    stutterEvents: p.id === 'A' ? [
       { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike · SearchIndexer.exe', culprit: 'SearchIndexer.exe' },
-      { timestamp: '13:55:18', jitterMs: 420, cause: 'GPU queue stall', culprit: '' },
-    ],
+      { timestamp: '13:55:18', jitterMs: 480, cause: 'Low free RAM', culprit: 'chrome.exe' },
+    ] : p.id === 'B' ? [
+      { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike · SearchIndexer.exe', culprit: 'SearchIndexer.exe' },
+    ] : [],
     vampires: [
       { pid: 4120, pids: [4120], count: 1, name: 'MsMpEng.exe', friendlyName: 'Защитник Windows', cpuPercent: 6.4, diskMBps: 1.2, score: 10, ecoMode: false, frozen: false },
-      { pid: 2204, pids: [2204, 2208, 2212], count: 3, name: 'chrome.exe', friendlyName: 'Chrome', cpuPercent: 9.1, diskMBps: 0.4, score: 14, ecoMode: false, frozen: false },
+      { pid: 2204, pids: [2204, 2208, 2212], count: 3, name: 'chrome.exe', friendlyName: 'Chrome', cpuPercent: p.id === 'A' ? 18.4 : 9.1, diskMBps: 0.4, score: 14, ecoMode: false, frozen: false },
       { pid: 1180, pids: [1180], count: 1, name: 'OneDrive.exe', friendlyName: 'OneDrive', cpuPercent: 3.2, diskMBps: 2.8, score: 7, ecoMode: true, frozen: true },
+      ...(p.id === 'A' ? [{ pid: 3300, pids: [3300], count: 1, name: 'SearchIndexer.exe', friendlyName: 'Индексатор Windows', cpuPercent: 11.2, diskMBps: 18.0, score: 22, ecoMode: false, frozen: false }] : []),
     ],
   }
 }
 
 const App = {
   GetMetrics: async () => buildMetrics(),
+  GetSystemPowerProfile: async () => buildSystemPowerProfile(),
   SetLanguage: async (lang) => { state.language = lang || 'ru'; return true },
   SetPowerProfile: async (mode) => { state.powerMode = mode || 'balanced'; return true },
   SetPollInterval: async (ms) => { state.pollIntervalMS = Number(ms) || 1000; return true },
@@ -188,6 +475,7 @@ const App = {
   HideToTray: async () => true,
   FreezeProcess: async () => true,
   ResumeProcess: async () => true,
+  ToggleEcoMode: async () => true,
   EcoModeByProcessName: async () => true,
   CheckDiskHealth: async (drive) => ({
     ok: true,
@@ -195,7 +483,7 @@ const App = {
     serialNumber: 'S5GXNX0MOCK01',
     interfaceType: 'NVMe',
     mediaType: 'SSD',
-    temperatureC: 41,
+    temperatureC: profile().tempMode === 'broken' ? null : 41,
     tbwGB: 12_400,
     powerOnHours: 4820,
     wearRemaining: 94,
@@ -251,40 +539,14 @@ const App = {
     return GAMES.filter((g) => g.name.toLowerCase().includes(s))
   },
   SearchGamesOnline: async (q) => App.SearchGames(q),
-  PredictGameFPS: async (id) => {
-    const g = GAMES.find((x) => x.id === id) || GAMES[0]
-    return {
-      gameName: g.name,
-      genre: g.genre,
-      category: g.category,
-      year: g.year,
-      engine: g.engine,
-      badge: g.genre,
-      posterUrl: g.posterUrl || '',
-      headerUrl: g.headerUrl || '',
-      steamAppId: g.steamAppId || 0,
-      recommend: 'high',
-      verdict: 'fpsVerdictPlayable',
-      verdictLevel: 'ok',
-      warnings: [],
-      isIntegrated: false,
-      dualChannel: true,
-      vramGB: 8,
-      gpuScore: 72,
-      cpuScore: 78,
-      lowAvg: 148,
-      medAvg: 112,
-      highAvg: 86,
-      ultraAvg: 64,
-      lowRange: '140-160',
-      medRange: '100-120',
-      highRange: '78-94',
-      ultraRange: '58-70',
-    }
-  },
+  PredictGameFPS: async (id) => predictFPS(id),
+  /** Demo-only helper — not present on live Wails App. */
+  SetMockProfile: async (id) => setMockProfile(id),
+  GetMockProfile: async () => state.profile,
 }
 
 window.go = { main: { App } }
+window.__PULSECORE_MOCK__ = { setProfile: setMockProfile, getProfile: () => state.profile, profiles: PROFILES }
 
 window.runtime = {
   EventsOnMultiple(eventName, callback) {
@@ -315,14 +577,9 @@ window.runtime = {
   LogFatal() {},
 }
 
-// Live-ish metric stream for sparklines / status strip
 setInterval(() => {
   state.tick += 1
-  if (!state.miniHUD && !state.gameOverlay) {
-    emit('metrics:update', buildMetrics())
-  } else {
-    emit('metrics:update', buildMetrics())
-  }
+  emit('metrics:update', buildMetrics())
 }, 1000)
 
-console.info('[PulseCore mock] Wails bindings ready')
+console.info('[PulseCore mock] Wails bindings ready · profiles A/B/C')

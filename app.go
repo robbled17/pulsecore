@@ -335,6 +335,11 @@ func (a *App) GetMetrics() SystemMetrics {
 	out.LagEvents = append([]LagEvent(nil), a.lagEvents...)
 	out.StutterEvents = append([]StutterEvent(nil), a.stutterEvents...)
 	out.Vampires = append([]VampireProcess(nil), a.vampires...)
+	out.CPUPerCore = append([]float64(nil), a.metrics.CPUPerCore...)
+	out.Disks = append([]DiskMetrics(nil), a.metrics.Disks...)
+	if hw := out.Hardware; hw.CPU.PerCore != nil {
+		out.Hardware.CPU.PerCore = append([]float64(nil), hw.CPU.PerCore...)
+	}
 	out.PowerMode = a.powerMode
 	out.PollIntervalMS = int(a.pollInterval / time.Millisecond)
 	out.MiniHUD = a.miniHUD
@@ -672,6 +677,8 @@ func (a *App) peripheralsWatchdog() {
 	for {
 		select {
 		case <-a.stopWorker:
+			return
+		case <-a.ctx.Done():
 			return
 		case <-ticker.C:
 			items := a.collectConnectedDevices()

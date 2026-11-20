@@ -405,6 +405,13 @@ function safeNum(n, fallback = 0) {
   return Number.isFinite(v) ? v : fallback
 }
 
+/** Reject null/NaN/0/-1 and absurd temps — always Н/Д or —. */
+function fmtTemp(n, digits = 1) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v <= 0 || v > 150) return na()
+  return v.toFixed(digits)
+}
+
 function drawSparkline(canvasId, values, theme) {
   const canvas = $(canvasId)
   if (!canvas) return
@@ -478,13 +485,18 @@ function renderSparklines() {
   drawSparkline('spark-battery', series.battery.current, chartThemes.battery)
 }
 
+function validTemp(n) {
+  const v = Number(n)
+  return Number.isFinite(v) && v > 0 && v <= 150 ? v : NaN
+}
+
 function renderStatusStrip(m) {
   const st = $('st-status')
   const ramEl = $('st-ram')
   const procEl = $('st-procs')
   if (!st || !ramEl || !procEl) return
 
-  const temp = safeNum(m.temperatureC, NaN)
+  const temp = validTemp(m.temperatureC)
   const cpu = safeNum(m.cpuPercent, 0)
   const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
   const vamps = m.vampires || []
@@ -511,6 +523,138 @@ function renderStatusStrip(m) {
     ramEl.textContent = na()
   }
   procEl.textContent = String(bgCount)
+}
+
+function collectInsights(m) {
+  const items = []
+  const temp = validTemp(m.temperatureC)
+  const ramPct = safeNum(m.ramPercent, 0)
+  const disks = m.disks || []
+  const sysDisk = disks.find((d) => /^C/i.test(String(d.mount || ''))) || disks[0]
+  const diskPct = safeNum(sysDisk?.percent, 0)
+  const lags = m.lagEvents || []
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
+  const vamps = (m.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+
+  if (Number.isFinite(temp) && temp >= 85) {
+    items.push({
+      id: 'thermal',
+      level: temp >= 90 ? 'hot' : 'warn',
+      title: t('insightThermalTitle'),
+      body: t('insightThermalBody').replace('{temp}', fmtTemp(temp, 0)),
+      actions: [
+        { id: 'power-silent', label: t('insightActSilent') },
+        { id: 'eco-vampires', label: t('insightActEcoBg') },
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ],
+    })
+  }
+
+  if (ramPct >= 85) {
+    items.push({
+      id: 'ram',
+      level: ramPct >= 90 ? 'hot' : 'warn',
+      title: t('insightRamTitle'),
+      body: t('insightRamBody').replace('{pct}', fmt(ramPct, 0)),
+      actions: [
+        { id: 'tab-weekly', label: t('insightActTopProcs') },
+        { id: 'eco-vampires', label: t('ecoAppetite') },
+      ],
+    })
+  }
+
+  if (sysDisk && diskPct >= 90) {
+    items.push({
+      id: 'disk',
+      level: 'warn',
+      title: t('insightDiskTitle'),
+      body: t('insightDiskBody')
+        .replace('{pct}', fmt(diskPct, 0))
+        .replace('{mount}', sysDisk.mount || 'C:\\'),
+      actions: [
+        { id: 'disk-cleanup', label: t('insightActCleanup') },
+        { id: 'disk-smart', label: t('diskHealthBtn') },
+      ],
+    })
+  }
+
+  if (lags.length) {
+    const e = lags[0]
+    const name = e.culpritFriendly || e.culpritProcess || t('unknownProc')
+    items.push({
+      id: 'lag',
+      level: 'warn',
+      title: t('insightLagTitle'),
+      body: t('insightLagBody').replace('{name}', name).replace('{core}', e.coreID ?? '—'),
+      actions: [
+        ...(e.culpritPID ? [{ id: 'eco-pid', label: t('ecoLower'), pid: e.culpritPID, name: e.culpritProcess }] : []),
+        ...(e.culpritProcess ? [{ id: 'eco-name', label: t('ecoCulprit'), name: e.culpritProcess }] : []),
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ],
+    })
+  } else if (stutters.length) {
+    const e = stutters[0]
+    items.push({
+      id: 'stutter',
+      level: 'warn',
+      title: t('insightStutterTitle'),
+      body: e.cause || t('insightStutterBody'),
+      actions: [
+        ...(e.culprit ? [{ id: 'eco-name', label: t('ecoCulprit'), name: e.culprit }] : []),
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ],
+    })
+  }
+
+  if (vamps.length >= 3 && !items.some((i) => i.id === 'ram' || i.id === 'thermal')) {
+    items.push({
+      id: 'vampires',
+      level: 'warn',
+      title: t('insightVampTitle'),
+      body: t('insightVampBody').replace('{n}', String(vamps.length)),
+      actions: [
+        { id: 'eco-vampires', label: t('insightActEcoBg') },
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ],
+    })
+  }
+
+  return items
+}
+
+function renderInsightHost(hostId, items) {
+  const host = $(hostId)
+  if (!host) return
+  if (!items.length) {
+    host.innerHTML = ''
+    host.classList.add('hidden')
+    return
+  }
+  host.classList.remove('hidden')
+  host.innerHTML = items.map((it) => `
+    <div class="insight-card ${it.level || 'warn'}" data-insight="${it.id}">
+      <div class="insight-text">
+        <div class="insight-title">${it.title}</div>
+        <div class="insight-body">${it.body}</div>
+      </div>
+      <div class="insight-actions">
+        ${(it.actions || []).map((a) => `
+          <button type="button" class="btn compact ${a.id.startsWith('eco') ? 'danger' : ''}"
+            data-insight-act="${a.id}"
+            ${a.pid != null ? `data-pid="${a.pid}"` : ''}
+            ${a.name ? `data-eco-name="${a.name}"` : ''}>${a.label}</button>
+        `).join('')}
+      </div>
+    </div>
+  `).join('')
+}
+
+function renderInsights(m) {
+  const items = collectInsights(m)
+  renderInsightHost('insight-list', items)
+  // Lags tab: emphasize lag/stutter/thermal actions
+  const lagFocus = items.filter((i) => ['lag', 'stutter', 'thermal', 'vampires'].includes(i.id))
+  renderInsightHost('lag-insight-list', lagFocus.length ? lagFocus : items.slice(0, 2))
 }
 
 function batterySeriesValue(m) {
@@ -552,11 +696,12 @@ function renderOverview(m) {
     $('ov-bat-bar').style.width = '100%'
   }
 
-  const temp = fmt(m.temperatureC)
+  const temp = fmtTemp(m.temperatureC)
   $('temp-chip').textContent = temp === na() ? `${na()} °C` : `${temp} °C`
   $('cpu-name').textContent = m.cpuName || 'CPU'
 
   renderStatusStrip(m)
+  renderInsights(m)
 
   latestDisks = m.disks || []
   renderDiskTabs(latestDisks)
@@ -700,11 +845,12 @@ function renderHardware(m) {
   const cores = cpu.perCore || m.cpuPerCore || []
   $('core-grid').innerHTML = cores.length
     ? cores.map((c, i) => {
-      const load = safeNum(c, 0)
+      const load = Number.isFinite(Number(c)) ? safeNum(c, 0) : 0
+      const val = Number.isFinite(Number(c)) ? fmtPct(c, 0) : na()
       return `
       <div class="core-cell">
         <div class="id">C${i}</div>
-        <div class="val">${fmtPct(c, 0)}</div>
+        <div class="val">${val}</div>
         <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
       </div>`
     }).join('')
@@ -982,8 +1128,8 @@ function renderMiniHUD(m) {
   $('mh-gpu').textContent = fmtPct(m.gpuPercent, 0)
   const tempEl = $('mh-temp')
   if (tempEl) {
-    const temp = m.temperatureC
-    tempEl.textContent = Number.isFinite(Number(temp)) ? `${fmt(temp, 0)}°` : na()
+    const temp = fmtTemp(m.temperatureC, 0)
+    tempEl.textContent = temp === na() ? na() : `${temp}°`
   }
   applyMiniHudPrefs()
 }
@@ -994,6 +1140,15 @@ function syncSettings(m) {
   })
   document.querySelectorAll('.btn.poll').forEach((btn) => {
     btn.classList.toggle('active', Number(btn.dataset.poll) === Number(m.pollIntervalMS || 1000))
+  })
+}
+
+function syncMockProfileButtons(profileId) {
+  const bar = $('mock-profile-bar')
+  if (!bar || !window.__PULSECORE_MOCK__) return
+  const cur = profileId || window.__PULSECORE_MOCK__.getProfile()
+  bar.querySelectorAll('.mock-profile-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.profile === cur)
   })
 }
 
@@ -1013,6 +1168,7 @@ function applyMetrics(m) {
   renderHardware(m)
   renderMiniHUD(m)
   syncSettings(m)
+  syncMockProfileButtons(m.mockProfile)
   setHudMode(!!m.miniHUD)
   const sleepPanel = $('sleep-panel')
   if (sleepPanel) {
@@ -1379,7 +1535,7 @@ function renderDiskHealthBody(r) {
     <div class="modal-row"><span class="k">${t('lblModel')}</span><span class="v">${r.model || '-'}</span></div>
     <div class="modal-row"><span class="k">${t('serial')}</span><span class="v">${r.serialNumber || '-'}</span></div>
     <div class="modal-row"><span class="k">${t('iface')}</span><span class="v">${r.interfaceType || r.mediaType || '-'}</span></div>
-    <div class="modal-row"><span class="k">${t('temp')}</span><span class="v">${r.temperatureC ? fmt(r.temperatureC, 0) + ' °C' : t('noControllerTemp')}</span></div>
+    <div class="modal-row"><span class="k">${t('temp')}</span><span class="v">${(() => { const tt = fmtTemp(r.temperatureC, 0); return tt === na() ? t('noControllerTemp') : tt + ' °C' })()}</span></div>
     <div class="modal-row"><span class="k">${t('tbw')}</span><span class="v">${r.tbwGB > 0 ? tbw : t('noData')}</span></div>
     <div class="modal-row"><span class="k">${t('powerOn')}</span><span class="v">${hours}</span></div>
     <div class="modal-row"><span class="k">${t('wearLeft')}</span><span class="v">${r.wearRemaining >= 0 ? fmt(r.wearRemaining, 0) + '%' : '-'}</span></div>
@@ -1520,6 +1676,84 @@ function wireUI() {
     if (ev.target.id === 'about-modal') closeAbout()
   })
   $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+
+  // Demo-only hardware matrix switcher (present only when mock bindings loaded)
+  const mockBar = $('mock-profile-bar')
+  if (mockBar && window.__PULSECORE_MOCK__) {
+    mockBar.classList.remove('hidden')
+    const syncMockBtns = () => {
+      const cur = window.__PULSECORE_MOCK__.getProfile()
+      mockBar.querySelectorAll('.mock-profile-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.profile === cur)
+      })
+    }
+    mockBar.querySelectorAll('.mock-profile-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        window.__PULSECORE_MOCK__.setProfile(btn.dataset.profile)
+        syncMockBtns()
+        if (selectedGameId) {
+          try { await predictSelectedGame() } catch (_) {}
+        }
+      })
+    })
+    syncMockBtns()
+  }
+
+  const onInsightAct = async (ev) => {
+    const btn = ev.target.closest('[data-insight-act]')
+    if (!btn) return
+    const act = btn.dataset.insightAct
+    try {
+      if (act === 'power-silent') {
+        await SetPowerProfile('silent')
+        document.querySelectorAll('.btn.mode').forEach((b) => {
+          b.classList.toggle('active', b.dataset.mode === 'silent')
+        })
+        showToast(t('modeApplied'), true)
+      } else if (act === 'eco-vampires') {
+        const vamps = (lastMetrics?.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+        for (const v of vamps.slice(0, 4)) {
+          try {
+            if (v.name) await EcoModeByProcessName(v.name, true)
+            else if (v.pid) await FreezeProcess(v.pid)
+            if (v.pid) frozen.add(v.pid)
+          } catch (_) {}
+        }
+        showToast(t('insightEcoDone'), true)
+        refresh()
+      } else if (act === 'eco-pid') {
+        const pid = Number(btn.dataset.pid)
+        if (pid) {
+          await FreezeProcess(pid)
+          frozen.add(pid)
+          showToast(t('insightEcoDone'), true)
+          refresh()
+        }
+      } else if (act === 'eco-name') {
+        const name = btn.dataset.ecoName
+        if (name) {
+          await EcoModeByProcessName(name, true)
+          showToast(t('insightEcoDone'), true)
+          refresh()
+        }
+      } else if (act === 'tab-lag') {
+        setActiveTab('lag')
+      } else if (act === 'tab-weekly') {
+        setActiveTab('overview')
+        $('weekly-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else if (act === 'disk-smart') {
+        runDiskHealth(selectedDrive || 'C', false)
+      } else if (act === 'disk-cleanup') {
+        setActiveTab('overview')
+        $('ov-disks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        showToast(t('insightCleanupHint'), true)
+      }
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  }
+  $('insight-list')?.addEventListener('click', onInsightAct)
+  $('lag-insight-list')?.addEventListener('click', onInsightAct)
 
   ;['cpu', 'gpu', 'ram', 'temps'].forEach((key) => {
     $(`mh-opt-${key}`)?.addEventListener('change', (ev) => {

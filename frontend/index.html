@@ -102,6 +102,8 @@
           </div>
         </div>
 
+        <div id="insight-list" class="insight-list" aria-live="polite"></div>
+
         <div class="cards">
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
             <div class="metric-head">
@@ -170,6 +172,7 @@
           <h1 data-i18n="lagTitle">Лаги</h1>
           <p data-i18n="lagSub">Микролаги, сеть и фоновые потребители</p>
         </header>
+        <div id="lag-insight-list" class="insight-list" aria-live="polite"></div>
         <div class="panel">
           <div class="panel-title">
             <span data-i18n="flightTitle">Журнал микролагов</span>
@@ -279,9 +282,17 @@
             <h1 data-i18n="gameLabTitle">GamePulse</h1>
             <p data-i18n="gameLabSub">Прогноз FPS и пресеты качества</p>
           </div>
-          <button type="button" id="btn-toggle-overlay" class="btn-overlay-pill" title="F12">
-            <span data-i18n="overlayPill">Оверлей FPS (F12)</span>
-          </button>
+          <div class="gamepulse-head-actions">
+            <div id="mock-profile-bar" class="mock-profile-bar hidden" aria-label="Demo hardware profiles">
+              <span class="mock-profile-label">HW</span>
+              <button type="button" class="btn compact mock-profile-btn" data-profile="A" title="Weak">A</button>
+              <button type="button" class="btn compact mock-profile-btn" data-profile="B" title="Mid">B</button>
+              <button type="button" class="btn compact mock-profile-btn" data-profile="C" title="Top+">C</button>
+            </div>
+            <button type="button" id="btn-toggle-overlay" class="btn-overlay-pill" title="F12">
+              <span data-i18n="overlayPill">Оверлей FPS (F12)</span>
+            </button>
+          </div>
         </header>
         <div class="panel panel-gamelab">
           <div class="game-toolbar">

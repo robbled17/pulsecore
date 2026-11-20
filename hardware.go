@@ -166,7 +166,11 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 		ramVar, _ := oleutil.GetProperty(item, "AdapterRAM")
 		drvVar, _ := oleutil.GetProperty(item, "DriverVersion")
 		n := strings.TrimSpace(nameVar.ToString())
+		// AdapterRAM is often a signed/unsigned 32-bit WMI value; widen carefully.
 		ram := uint64(uint32(ramVar.Val))
+		if ramVar.Val < 0 {
+			ram = uint64(uint32(int32(ramVar.Val)))
+		}
 		drv := strings.TrimSpace(drvVar.ToString())
 		item.Release()
 		if n == "" {

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -107,6 +108,7 @@ type gameReqSet struct {
 
 var gameCatalog []GameInfo
 var steamCache = map[string]GameInfo{}
+var steamCacheMu sync.RWMutex
 
 // Per-game requirement tables — BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
 var gameRequirements = map[string]gameReqSet{
@@ -332,12 +334,14 @@ func (a *App) SearchGamesOnline(query string) []GameMeta {
 		// Legacy community endpoint as fallback.
 		hits = searchSteamApps(raw)
 	}
+	steamCacheMu.Lock()
 	for _, g := range hits {
 		steamCache[strings.ToLower(g.ID)] = g
 		if g.SteamAppID > 0 {
 			steamCache[fmt.Sprintf("steam:%d", g.SteamAppID)] = g
 		}
 	}
+	steamCacheMu.Unlock()
 	return hits
 }
 
@@ -675,10 +679,15 @@ func synthesizeGame(query string) GameInfo {
 
 func resolveGame(gameID string) GameInfo {
 	id := strings.TrimSpace(gameID)
-	if cached, ok := steamCache[strings.ToLower(id)]; ok {
+	steamCacheMu.RLock()
+	cached, ok := steamCache[strings.ToLower(id)]
+	steamCacheMu.RUnlock()
+	if ok {
 		if cached.FromSteam && cached.SteamAppID > 0 && cached.Year == 0 {
 			enriched := gameFromSteamHit(cached.Name, cached.SteamAppID, true)
+			steamCacheMu.Lock()
 			steamCache[strings.ToLower(enriched.ID)] = enriched
+			steamCacheMu.Unlock()
 			return enriched
 		}
 		return cached
@@ -692,7 +701,9 @@ func resolveGame(gameID string) GameInfo {
 		appStr := strings.TrimPrefix(strings.ToLower(id), "steam:")
 		if appID, err := strconv.Atoi(appStr); err == nil && appID > 0 {
 			g := gameFromSteamHit("Steam App "+appStr, appID, true)
+			steamCacheMu.Lock()
 			steamCache[strings.ToLower(g.ID)] = g
+			steamCacheMu.Unlock()
 			return g
 		}
 	}
