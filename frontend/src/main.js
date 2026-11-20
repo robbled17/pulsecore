@@ -53,10 +53,10 @@ const LERP = 0.08
 const EMA_ALPHA = 0.25
 
 const chartThemes = {
-  cpu: { stroke: '#5b8cff', top: 'rgba(91, 140, 255, 0.28)', bottom: 'rgba(91, 140, 255, 0.02)' },
-  gpu: { stroke: '#2dd4bf', top: 'rgba(45, 212, 191, 0.26)', bottom: 'rgba(45, 212, 191, 0.02)' },
-  ram: { stroke: '#7c6cf0', top: 'rgba(124, 108, 240, 0.24)', bottom: 'rgba(124, 108, 240, 0.02)' },
-  battery: { stroke: '#fbbf24', top: 'rgba(251, 191, 36, 0.22)', bottom: 'rgba(251, 191, 36, 0.02)' },
+  cpu: { stroke: '#8ec0ff', glow: 'rgba(142, 192, 255, 0.95)', top: 'rgba(110, 168, 255, 0.55)', bottom: 'rgba(110, 168, 255, 0.04)' },
+  gpu: { stroke: '#5ff0d4', glow: 'rgba(95, 240, 212, 0.95)', top: 'rgba(61, 231, 200, 0.5)', bottom: 'rgba(61, 231, 200, 0.04)' },
+  ram: { stroke: '#b49bff', glow: 'rgba(180, 155, 255, 0.95)', top: 'rgba(155, 123, 255, 0.5)', bottom: 'rgba(155, 123, 255, 0.04)' },
+  battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -205,8 +205,8 @@ function buildPoints(arr, cssW, cssH, padL = 36, padR = 8, padT = 10, padB = 14)
 }
 
 function batteryTheme(pct) {
-  if (pct < 20) return { stroke: '#d35a66', top: 'rgba(211, 90, 102, 0.28)', bottom: 'rgba(211, 90, 102, 0.02)' }
-  if (pct < 40) return { stroke: '#d4a017', top: 'rgba(212, 160, 23, 0.26)', bottom: 'rgba(212, 160, 23, 0.02)' }
+  if (pct < 20) return { stroke: '#fb7185', glow: 'rgba(251, 113, 133, 0.85)', top: 'rgba(251, 113, 133, 0.34)', bottom: 'rgba(251, 113, 133, 0.02)' }
+  if (pct < 40) return { stroke: '#fbbf24', glow: 'rgba(251, 191, 36, 0.8)', top: 'rgba(251, 191, 36, 0.3)', bottom: 'rgba(251, 191, 36, 0.02)' }
   return chartThemes.battery
 }
 
@@ -267,7 +267,7 @@ function drawTrendFrame() {
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
   const cssW = canvas.clientWidth || 900
-  const cssH = 160
+  const cssH = 190
   if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
@@ -275,10 +275,10 @@ function drawTrendFrame() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cssW, cssH)
 
-  const padL = 36
+  const padL = 40
   const padR = 36
-  const padT = 14
-  const padB = 28
+  const padT = 16
+  const padB = 30
   const plotW = cssW - padL - padR
   const plotH = cssH - padT - padB
   const marks = [
@@ -286,17 +286,17 @@ function drawTrendFrame() {
     { pct: 50, label: '50%' },
     { pct: 0, label: '0%' },
   ]
-  ctx.setLineDash([3, 4])
+  ctx.setLineDash([3, 5])
   ctx.lineWidth = 1
-  ctx.font = '10px ui-monospace, Consolas, monospace'
+  ctx.font = '600 11px Inter, Segoe UI, sans-serif'
   marks.forEach((m) => {
     const y = padT + plotH - (m.pct / 100) * plotH
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
+    ctx.strokeStyle = 'rgba(160, 190, 255, 0.12)'
     ctx.beginPath()
     ctx.moveTo(padL, y)
     ctx.lineTo(cssW - padR, y)
     ctx.stroke()
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+    ctx.fillStyle = 'rgba(200, 210, 230, 0.7)'
     ctx.fillText(m.label, 4, y + 3)
   })
   ctx.setLineDash([])
@@ -307,7 +307,7 @@ function drawTrendFrame() {
     { t: 2 / 3, label: '-10s' },
     { t: 1, label: t('nowLabel') },
   ]
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+  ctx.fillStyle = 'rgba(200, 210, 230, 0.7)'
   timeLabels.forEach((m) => {
     const x = padL + m.t * plotW
     const label = m.label
@@ -330,11 +330,27 @@ function drawTrendFrame() {
   })
 
   fillSmooth(ctx, pts, cssH, theme.top, theme.bottom)
-  ctx.lineWidth = 2.2
+
+  // Neon glow pass
+  ctx.save()
+  ctx.lineWidth = 4.5
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = theme.glow || theme.stroke
+  ctx.shadowColor = theme.glow || theme.stroke
+  ctx.shadowBlur = 18
+  ctx.globalAlpha = 0.55
+  strokeSmooth(ctx, pts)
+  ctx.restore()
+
+  ctx.lineWidth = 2.4
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
   ctx.strokeStyle = theme.stroke
+  ctx.shadowColor = theme.glow || theme.stroke
+  ctx.shadowBlur = 10
   strokeSmooth(ctx, pts)
+  ctx.shadowBlur = 0
 
   const cur = $('chart-current')
   if (cur) cur.textContent = `${t('currentPct')}: ${fmtPct(last, 1)}`
@@ -366,14 +382,14 @@ function safeNum(n, fallback = 0) {
   return Number.isFinite(v) ? v : fallback
 }
 
-function drawSparkline(canvasId, values, stroke) {
+function drawSparkline(canvasId, values, theme) {
   const canvas = $(canvasId)
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const dpr = window.devicePixelRatio || 1
   const cssW = canvas.clientWidth || 160
-  const cssH = 36
+  const cssH = 44
   if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
@@ -382,28 +398,61 @@ function drawSparkline(canvasId, values, stroke) {
   ctx.clearRect(0, 0, cssW, cssH)
   const arr = values || []
   if (arr.length < 2) return
-  const pad = 1
+  const padX = 2
+  const padY = 3
   const n = Math.max(arr.length - 1, 1)
-  ctx.beginPath()
-  arr.forEach((raw, i) => {
+  const pts = arr.map((raw, i) => {
     const v = Math.min(100, Math.max(0, safeNum(raw, 0)))
-    const x = pad + (i / n) * (cssW - pad * 2)
-    const y = pad + (cssH - pad * 2) - (v / 100) * (cssH - pad * 2)
-    if (i === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
+    return {
+      x: padX + (i / n) * (cssW - padX * 2),
+      y: padY + (cssH - padY * 2) - (v / 100) * (cssH - padY * 2),
+    }
   })
-  ctx.strokeStyle = stroke || '#9aa4b2'
-  ctx.lineWidth = 1.25
+  const stroke = theme?.stroke || '#6ea8ff'
+  const glow = theme?.glow || stroke
+  const top = theme?.top || 'rgba(110,168,255,0.35)'
+  const bottom = theme?.bottom || 'rgba(110,168,255,0.02)'
+
+  // Translucent fill
+  ctx.beginPath()
+  pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y) })
+  const last = pts[pts.length - 1]
+  const first = pts[0]
+  ctx.lineTo(last.x, cssH)
+  ctx.lineTo(first.x, cssH)
+  ctx.closePath()
+  const grad = ctx.createLinearGradient(0, 0, 0, cssH)
+  grad.addColorStop(0, top)
+  grad.addColorStop(1, bottom)
+  ctx.fillStyle = grad
+  ctx.fill()
+
+  // Glow stroke
+  ctx.beginPath()
+  pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y) })
+  ctx.strokeStyle = glow
+  ctx.lineWidth = 3.2
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
+  ctx.shadowColor = glow
+  ctx.shadowBlur = 12
+  ctx.globalAlpha = 0.55
   ctx.stroke()
+
+  // Crisp neon stroke
+  ctx.globalAlpha = 1
+  ctx.shadowBlur = 8
+  ctx.strokeStyle = stroke
+  ctx.lineWidth = 1.8
+  ctx.stroke()
+  ctx.shadowBlur = 0
 }
 
 function renderSparklines() {
-  drawSparkline('spark-cpu', series.cpu.current, chartThemes.cpu.stroke)
-  drawSparkline('spark-gpu', series.gpu.current, chartThemes.gpu.stroke)
-  drawSparkline('spark-ram', series.ram.current, chartThemes.ram.stroke)
-  drawSparkline('spark-battery', series.battery.current, chartThemes.battery.stroke)
+  drawSparkline('spark-cpu', series.cpu.current, chartThemes.cpu)
+  drawSparkline('spark-gpu', series.gpu.current, chartThemes.gpu)
+  drawSparkline('spark-ram', series.ram.current, chartThemes.ram)
+  drawSparkline('spark-battery', series.battery.current, chartThemes.battery)
 }
 
 function renderStatusStrip(m) {

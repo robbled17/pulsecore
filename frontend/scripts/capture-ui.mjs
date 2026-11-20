@@ -25,8 +25,8 @@ async function waitReady(page) {
     const el = document.getElementById('ov-cpu')
     return el && el.textContent && !el.textContent.includes('—') && !el.textContent.includes('Н/Д')
   }, { timeout: 15000 }).catch(() => {})
-  // give sparklines a couple of frames
-  await page.waitForTimeout(1200)
+  // let sparklines accumulate samples + fonts settle
+  await page.waitForTimeout(2800)
 }
 
 async function openTab(page, tab) {

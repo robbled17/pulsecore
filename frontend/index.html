@@ -73,16 +73,25 @@
 
         <div class="status-strip" id="status-strip" role="status">
           <div class="status-cell">
-            <span class="status-label" data-i18n="statusLabel">Статус системы</span>
-            <span class="status-value" id="st-status" data-state="ok">Норма</span>
+            <span class="status-ico" aria-hidden="true">◎</span>
+            <div class="status-text">
+              <span class="status-label" data-i18n="statusLabel">Статус системы</span>
+              <span class="status-value" id="st-status" data-state="ok">Норма</span>
+            </div>
           </div>
           <div class="status-cell">
-            <span class="status-label" data-i18n="freeRamLabel">Свободно RAM</span>
-            <span class="status-value metric" id="st-ram">—</span>
+            <span class="status-ico ram" aria-hidden="true">▣</span>
+            <div class="status-text">
+              <span class="status-label" data-i18n="freeRamLabel">Свободно RAM</span>
+              <span class="status-value metric" id="st-ram">—</span>
+            </div>
           </div>
           <div class="status-cell">
-            <span class="status-label" data-i18n="bgProcLabel">Фоновые процессы</span>
-            <span class="status-value metric" id="st-procs">—</span>
+            <span class="status-ico proc" aria-hidden="true">☰</span>
+            <div class="status-text">
+              <span class="status-label" data-i18n="bgProcLabel">Фоновые процессы</span>
+              <span class="status-value metric" id="st-procs">—</span>
+            </div>
           </div>
         </div>
 
