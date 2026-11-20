@@ -10,12 +10,13 @@ const BASE = process.argv[2] || 'http://127.0.0.1:5173/demo.html'
 const MEDIA = '/cursor/stores/bc-01a1f952-18e1-7825-8cd8-3e318e381534/media'
 const ARTIFACTS = '/opt/cursor/artifacts'
 
+const PREFIX = process.env.SHOT_PREFIX || 'ui-sonoma'
 const shots = [
-  { file: 'ui-home-overview.png', label: 'Home / Главная', tab: 'overview' },
-  { file: 'ui-lags.png', label: 'Lags / Лаги', tab: 'lag' },
-  { file: 'ui-games-gamepulse.png', label: 'Games / GamePulse', tab: 'gamelab', extra: 'game' },
-  { file: 'ui-settings.png', label: 'Settings / Настройки', tab: 'settings' },
-  { file: 'ui-mini-hud.png', label: 'Mini-HUD', tab: null, hud: true },
+  { file: `${PREFIX}-home.png`, label: 'Home / Главная', tab: 'overview' },
+  { file: `${PREFIX}-lags.png`, label: 'Lags / Лаги', tab: 'lag' },
+  { file: `${PREFIX}-games.png`, label: 'Games / GamePulse', tab: 'gamelab', extra: 'game' },
+  { file: `${PREFIX}-settings.png`, label: 'Settings / Настройки', tab: 'settings' },
+  { file: `${PREFIX}-mini-hud.png`, label: 'Mini-HUD', tab: null, hud: true },
 ]
 
 async function waitReady(page) {
@@ -76,12 +77,17 @@ async function main() {
     await openTab(page, shot.tab)
 
     if (shot.extra === 'game') {
-      // pick first game card for FPS panel
+      // wait for Steam posters, then pick first game card
+      await page.waitForSelector('#game-grid .game-poster', { timeout: 10000 }).catch(() => {})
+      await page.waitForFunction(() => {
+        const imgs = [...document.querySelectorAll('#game-grid img.game-poster')]
+        return imgs.length > 0 && imgs.some((img) => img.complete && img.naturalWidth > 20)
+      }, { timeout: 12000 }).catch(() => {})
       const card = page.locator('#game-grid .game-card').first()
       if (await card.count()) {
         await card.click()
         await page.waitForSelector('#fps-result .fps-grid', { timeout: 8000 }).catch(() => {})
-        await page.waitForTimeout(500)
+        await page.waitForTimeout(800)
       }
     }
 

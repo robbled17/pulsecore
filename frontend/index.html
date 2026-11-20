@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="./src/style.css" />
   <title>PulseCore</title>
 </head>
@@ -18,21 +20,25 @@
   </div>
 
   <div id="minihud" class="minihud hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
-    <div class="minihud-metrics">
-      <span>CPU <b id="mh-cpu" class="metric">—</b></span>
-      <span>RAM <b id="mh-ram" class="metric">—</b></span>
-      <span>GPU <b id="mh-gpu" class="metric">—</b></span>
+    <div class="minihud-capsule">
+      <div class="minihud-metrics">
+        <span class="mh-item"><span class="mh-ico">CPU</span><b id="mh-cpu" class="metric">—</b></span>
+        <span class="mh-item"><span class="mh-ico gpu">GPU</span><b id="mh-gpu" class="metric">—</b></span>
+        <span class="mh-item"><span class="mh-ico ram">RAM</span><b id="mh-ram" class="metric">—</b></span>
+      </div>
+      <button type="button" id="mh-expand" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Expand">↗</button>
     </div>
-    <button type="button" id="mh-expand" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Expand">↗</button>
   </div>
 
   <div id="gameoverlay" class="gameoverlay hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
-    <div class="gameoverlay-metrics">
-      <span>FPS <b id="go-fps" class="metric">—</b></span>
-      <span>1% <b id="go-low" class="metric">—</b></span>
-      <span>ms <b id="go-ft" class="metric">—</b></span>
+    <div class="gameoverlay-capsule">
+      <div class="gameoverlay-metrics">
+        <span class="mh-item"><span class="mh-ico fps">FPS</span><b id="go-fps" class="metric">—</b></span>
+        <span class="mh-item"><span class="mh-ico">1%</span><b id="go-low" class="metric">—</b></span>
+        <span class="mh-item"><span class="mh-ico">ms</span><b id="go-ft" class="metric">—</b></span>
+      </div>
+      <button type="button" id="go-close" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Close">✕</button>
     </div>
-    <button type="button" id="go-close" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Close">✕</button>
   </div>
 
   <div id="shell" class="shell">

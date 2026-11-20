@@ -53,10 +53,10 @@ const LERP = 0.08
 const EMA_ALPHA = 0.25
 
 const chartThemes = {
-  cpu: { stroke: '#9aa4b2', top: 'rgba(154, 164, 178, 0.22)', bottom: 'rgba(154, 164, 178, 0.02)' },
-  gpu: { stroke: '#7d8796', top: 'rgba(125, 135, 150, 0.22)', bottom: 'rgba(125, 135, 150, 0.02)' },
-  ram: { stroke: '#c5cbd4', top: 'rgba(197, 203, 212, 0.18)', bottom: 'rgba(197, 203, 212, 0.02)' },
-  battery: { stroke: '#d4a017', top: 'rgba(212, 160, 23, 0.18)', bottom: 'rgba(212, 160, 23, 0.02)' },
+  cpu: { stroke: '#5b8cff', top: 'rgba(91, 140, 255, 0.28)', bottom: 'rgba(91, 140, 255, 0.02)' },
+  gpu: { stroke: '#2dd4bf', top: 'rgba(45, 212, 191, 0.26)', bottom: 'rgba(45, 212, 191, 0.02)' },
+  ram: { stroke: '#7c6cf0', top: 'rgba(124, 108, 240, 0.24)', bottom: 'rgba(124, 108, 240, 0.02)' },
+  battery: { stroke: '#fbbf24', top: 'rgba(251, 191, 36, 0.22)', bottom: 'rgba(251, 191, 36, 0.02)' },
 }
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -1085,11 +1085,26 @@ function steamHeaderFromPoster(url) {
     .replace('/library_600x900_2x.jpg', '/header.jpg')
 }
 
+function steamCdnUrls(steamAppId) {
+  const id = Number(steamAppId)
+  if (!Number.isFinite(id) || id <= 0) return { poster: '', header: '' }
+  return {
+    poster: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
+    header: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
+  }
+}
+
+function resolveGameArt(g) {
+  const cdn = steamCdnUrls(g?.steamAppId)
+  const poster = g?.posterUrl || cdn.poster || ''
+  const header = g?.headerUrl || cdn.header || steamHeaderFromPoster(poster) || ''
+  return { poster, header }
+}
+
 function gamePosterHTML(g) {
   const name = String(g.name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const safeName = String(g.name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const primary = g.posterUrl || ''
-  const secondary = g.headerUrl || steamHeaderFromPoster(primary)
+  const { poster: primary, header: secondary } = resolveGameArt(g)
   if (!primary && !secondary) return posterFallbackHTML(g.name, 'game-poster')
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
@@ -1099,8 +1114,7 @@ function gamePosterHTML(g) {
 function compactCoverHTML(p) {
   const name = String(p.gameName || 'Game')
   const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const primary = p.posterUrl || ''
-  const secondary = p.headerUrl || steamHeaderFromPoster(primary)
+  const { poster: primary, header: secondary } = resolveGameArt(p)
   if (!primary && !secondary) return posterFallbackHTML(name, 'game-cover')
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''

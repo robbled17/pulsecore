@@ -29,12 +29,20 @@ let state = {
   tick: 0,
 }
 
+function steamArt(id) {
+  return {
+    posterUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
+    headerUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
+    steamAppId: id,
+  }
+}
+
 const GAMES = [
-  { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', posterUrl: '', headerUrl: '', steamAppId: 730 },
-  { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', posterUrl: '', headerUrl: '', steamAppId: 271590 },
-  { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', posterUrl: '', headerUrl: '', steamAppId: 292030 },
-  { id: 'valorant', name: 'VALORANT', genre: 'FPS', category: 'modern', year: 2020, engine: 'Unreal', posterUrl: '', headerUrl: '', steamAppId: 0 },
-  { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', posterUrl: '', headerUrl: '', steamAppId: 570 },
+  { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', ...steamArt(730) },
+  { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', ...steamArt(271590) },
+  { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', ...steamArt(292030) },
+  { id: 'elden', name: 'ELDEN RING', genre: 'Action RPG', category: 'modern', year: 2022, engine: 'Proprietary', ...steamArt(1245620) },
+  { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', ...steamArt(570) },
 ]
 
 function wave(base, amp, phase = 0) {
@@ -251,8 +259,9 @@ const App = {
       year: g.year,
       engine: g.engine,
       badge: g.genre,
-      posterUrl: '',
-      headerUrl: '',
+      posterUrl: g.posterUrl || '',
+      headerUrl: g.headerUrl || '',
+      steamAppId: g.steamAppId || 0,
       recommend: 'high',
       verdict: 'fpsVerdictPlayable',
       verdictLevel: 'ok',
