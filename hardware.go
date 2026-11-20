@@ -125,9 +125,46 @@ func collectStaticHardware() staticHardware {
 	return out
 }
 
+func gpuDiscreteRank(name string) int {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if n == "" {
+		return 0
+	}
+	if strings.Contains(n, "microsoft basic") || strings.Contains(n, "remote desktop") {
+		return -1
+	}
+	discrete := []string{
+		"geforce", "rtx", "gtx", "quadro", "tesla", "titan",
+		"radeon rx", "rx 5", "rx 6", "rx 7", "rx 4", "rx 3",
+		"arc a", "arc b", "nvidia",
+	}
+	for _, d := range discrete {
+		if strings.Contains(n, d) {
+			return 3
+		}
+	}
+	integrated := []string{
+		"uhd", "iris", "hd graphics", "intel(r) graphics", "intel graphics",
+		"radeon graphics", "radeon(tm) graphics", "vega ", "graphics family",
+	}
+	for _, d := range integrated {
+		if strings.Contains(n, d) {
+			return 1
+		}
+	}
+	return 2 // unknown vendor — prefer over known iGPU when AdapterRAM ties
+}
+
 func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 	ensureOLE()
 	name = "Unknown GPU"
+	defer func() {
+		if r := recover(); r != nil {
+			name = "Unknown GPU"
+			vram = 0
+			driver = ""
+		}
+	}()
 
 	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
@@ -154,6 +191,7 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 	result := resultRaw.ToIDispatch()
 	defer result.Release()
 
+	bestRank := -2
 	countVar, _ := oleutil.GetProperty(result, "Count")
 	count := int(countVar.Val)
 	for i := 0; i < count; i++ {
@@ -162,6 +200,9 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 			continue
 		}
 		item := itemRaw.ToIDispatch()
+		if item == nil {
+			continue
+		}
 		nameVar, _ := oleutil.GetProperty(item, "Name")
 		ramVar, _ := oleutil.GetProperty(item, "AdapterRAM")
 		drvVar, _ := oleutil.GetProperty(item, "DriverVersion")
@@ -176,15 +217,22 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 		if n == "" {
 			continue
 		}
-		lower := strings.ToLower(n)
-		if strings.Contains(lower, "microsoft basic") || strings.Contains(lower, "remote desktop") {
+		rank := gpuDiscreteRank(n)
+		if rank < 0 {
 			continue
 		}
-		if ram >= vram {
+		// Prefer discrete (even when AdapterRAM is 0 on Optimus), then higher VRAM.
+		better := false
+		if rank > bestRank {
+			better = true
+		} else if rank == bestRank && ram > vram {
+			better = true
+		} else if rank == bestRank && ram == vram && name == "Unknown GPU" {
+			better = true
+		}
+		if better {
+			bestRank = rank
 			vram = ram
-			name = n
-			driver = drv
-		} else if name == "Unknown GPU" {
 			name = n
 			driver = drv
 		}
@@ -194,8 +242,9 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 
 func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 	n := strings.ToLower(strings.TrimSpace(name))
+	// Unknown with measurable dedicated VRAM is treated as discrete for GamePulse.
 	if n == "" || strings.Contains(n, "unknown") {
-		return true
+		return dedicatedMB <= 0
 	}
 	// Discrete markers win even if AdapterRAM looks small.
 	discrete := []string{
@@ -221,6 +270,10 @@ func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 	// Very small AdapterRAM usually means iGPU / shared pool.
 	if dedicatedMB > 0 && dedicatedMB < 1536 {
 		return true
+	}
+	// Unknown name with ≥2GB dedicated → discrete.
+	if dedicatedMB >= 2048 {
+		return false
 	}
 	return false
 }
@@ -447,6 +500,9 @@ try {
   $rel = $null
   try { $rel = Get-StorageReliabilityCounter -PhysicalDisk $phys -ErrorAction SilentlyContinue } catch {}
   $bus = [string]$disk.BusType
+  if ($bus -match 'USB|File Backed Virtual|iSCSI|Fibre Channel') {
+    throw "Removable or network disk skipped ($bus)"
+  }
   $media = [string]$phys.MediaType
   $iface = $bus
   if ($media -match 'SSD' -or $media -eq '3' -or $media -eq '4') {

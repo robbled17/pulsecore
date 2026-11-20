@@ -485,7 +485,8 @@ function renderSparklines() {
   drawSparkline('spark-battery', series.battery.current, chartThemes.battery)
 }
 
-function validTemp(n) {
+function validTemp(n, available) {
+  if (available === false) return NaN
   const v = Number(n)
   return Number.isFinite(v) && v > 0 && v <= 150 ? v : NaN
 }
@@ -496,7 +497,7 @@ function renderStatusStrip(m) {
   const procEl = $('st-procs')
   if (!st || !ramEl || !procEl) return
 
-  const temp = validTemp(m.temperatureC)
+  const temp = validTemp(m.temperatureC, m.tempAvailable)
   const cpu = safeNum(m.cpuPercent, 0)
   const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
   const vamps = m.vampires || []
@@ -527,7 +528,7 @@ function renderStatusStrip(m) {
 
 function collectInsights(m) {
   const items = []
-  const temp = validTemp(m.temperatureC)
+  const temp = validTemp(m.temperatureC, m.tempAvailable)
   const ramPct = safeNum(m.ramPercent, 0)
   const disks = m.disks || []
   const sysDisk = disks.find((d) => /^C/i.test(String(d.mount || ''))) || disks[0]
@@ -696,7 +697,7 @@ function renderOverview(m) {
     $('ov-bat-bar').style.width = '100%'
   }
 
-  const temp = fmtTemp(m.temperatureC)
+  const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC)
   $('temp-chip').textContent = temp === na() ? `${na()} °C` : `${temp} °C`
   $('cpu-name').textContent = m.cpuName || 'CPU'
 

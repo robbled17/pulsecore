@@ -105,6 +105,8 @@ type SystemMetrics struct {
 	Battery        BatteryMetrics     `json:"battery"`
 	Hardware       HardwareInfo       `json:"hardware"`
 	TemperatureC   float64            `json:"temperatureC"`
+	TempAvailable  bool               `json:"tempAvailable"`
+	GPUAvailable   bool               `json:"gpuAvailable"`
 	PowerMode      string             `json:"powerMode"`
 	PollIntervalMS int                `json:"pollIntervalMS"`
 	MiniHUD        bool               `json:"miniHUD"`
@@ -123,6 +125,7 @@ type DiskMetrics struct {
 	ReadMBps   float64 `json:"readMBps"`
 	WriteMBps  float64 `json:"writeMBps"`
 	FreeGB     float64 `json:"freeGB"`
+	Removable  bool    `json:"removable,omitempty"`
 }
 
 // BatteryMetrics describes AC/DC power state.
@@ -231,15 +234,26 @@ func (a *App) metricsWorker() {
 }
 
 func (a *App) collectOnce() {
+	defer func() {
+		if r := recover(); r != nil {
+			// Keep UI alive if a Windows sensor path panics.
+			fmt.Printf("collectOnce recovered: %v\n", r)
+		}
+	}()
 	snapshot := a.buildSnapshot()
 	a.LagSpotterCheck(snapshot.CPUPerCore, snapshot.CPUPercent)
 	vampires := a.GetVampireProcesses()
 	realTemp := snapshot.TemperatureC
 	if realTemp <= 0 {
-		snapshot.TemperatureC = estimateTempFromLoad(snapshot.CPUPercent)
+		// Do not invent a fake ACPI reading — UI shows Н/Д when TempAvailable=false.
+		snapshot.TemperatureC = 0
+		snapshot.TempAvailable = false
 	} else {
+		snapshot.TempAvailable = true
 		a.TriggerThermalCheck(realTemp)
 	}
+	gpuName := strings.TrimSpace(snapshot.GPUName)
+	snapshot.GPUAvailable = gpuName != "" && !strings.EqualFold(gpuName, "Unknown GPU")
 
 	a.mu.Lock()
 	a.metrics = snapshot
@@ -832,6 +846,24 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 	return true
 }
 
+func isNonFixedPartition(p disk.PartitionStat) bool {
+	opts := strings.ToLower(strings.Join(p.Opts, ","))
+	ft := strings.ToLower(p.Fstype)
+	mp := strings.ToLower(p.Mountpoint)
+	if strings.Contains(opts, "removable") || strings.Contains(opts, "cdrom") ||
+		strings.Contains(opts, "remote") || strings.Contains(opts, "ram") ||
+		strings.Contains(opts, "network") {
+		return true
+	}
+	if strings.Contains(ft, "cdfs") || strings.Contains(ft, "udf") || strings.Contains(ft, "iso9660") {
+		return true
+	}
+	if strings.HasPrefix(mp, `\\`) || strings.Contains(mp, "\\\\") {
+		return true
+	}
+	return false
+}
+
 func (a *App) collectDisks(now time.Time) []DiskMetrics {
 	partitions, err := disk.Partitions(true)
 	if err != nil {
@@ -849,6 +881,9 @@ func (a *App) collectDisks(now time.Time) []DiskMetrics {
 
 	out := make([]DiskMetrics, 0, len(partitions))
 	for _, p := range partitions {
+		if isNonFixedPartition(p) {
+			continue
+		}
 		usage, err := disk.Usage(p.Mountpoint)
 		if err != nil {
 			continue
@@ -1135,8 +1170,12 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 	_ = runHiddenStart("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
 }
 
+const hiddenCmdTimeout = 5 * time.Second
+
 func runHiddenCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), hiddenCmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
 		CreationFlags: createNoWindow,
@@ -1145,7 +1184,9 @@ func runHiddenCommand(name string, args ...string) error {
 }
 
 func runHiddenOutput(name string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), hiddenCmdTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
 		CreationFlags: createNoWindow,

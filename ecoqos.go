@@ -146,8 +146,19 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 		return fmt.Errorf("invalid pid")
 	}
 	name := processNameByPID(pid)
-	if isEcoProtected(name) || isPPLProtected(name) {
-		return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+	a.mu.RLock()
+	tracked := a.ecoPIDs != nil && a.ecoPIDs[int32(pid)]
+	a.mu.RUnlock()
+	// Allow undo for PIDs we previously eco'd even if name lookup fails transiently.
+	// Never eco-enable critical / unnamed processes.
+	if enable {
+		if name == "" || isEcoProtected(name) || isPPLProtected(name) {
+			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+		}
+	} else if !tracked {
+		if isEcoProtected(name) || isPPLProtected(name) {
+			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
+		}
 	}
 
 	access := uint32(windows.PROCESS_SET_INFORMATION | windows.PROCESS_QUERY_LIMITED_INFORMATION)
