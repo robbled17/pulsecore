@@ -1607,10 +1607,35 @@ function wireTooltips() {
   })
 }
 
+function wireAmbientParallax() {
+  const root = document.documentElement
+  let raf = 0
+  let latestX = 0
+  let latestY = 0
+  const publish = () => {
+    raf = 0
+    root.style.setProperty('--mouse-x', latestX.toFixed(4))
+    root.style.setProperty('--mouse-y', latestY.toFixed(4))
+  }
+  window.addEventListener('pointermove', (ev) => {
+    const w = window.innerWidth || 1
+    const h = window.innerHeight || 1
+    latestX = (ev.clientX / w) * 2 - 1
+    latestY = (ev.clientY / h) * 2 - 1
+    if (!raf) raf = requestAnimationFrame(publish)
+  }, { passive: true })
+  window.addEventListener('pointerleave', () => {
+    latestX = 0
+    latestY = 0
+    if (!raf) raf = requestAnimationFrame(publish)
+  }, { passive: true })
+}
+
 function boot() {
   applyTheme(uiTheme)
   applyI18n()
   wireUI()
+  wireAmbientParallax()
   SetLanguage(lang).catch(() => {})
   refresh()
   refreshWeekly()
