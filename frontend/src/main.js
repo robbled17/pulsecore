@@ -844,18 +844,30 @@ function renderHardware(m) {
   $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
 
   const cores = cpu.perCore || m.cpuPerCore || []
-  $('core-grid').innerHTML = cores.length
-    ? cores.map((c, i) => {
-      const load = Number.isFinite(Number(c)) ? safeNum(c, 0) : 0
-      const val = Number.isFinite(Number(c)) ? fmtPct(c, 0) : na()
-      return `
+  const grid = $('core-grid')
+  if (grid) {
+    const n = cores.length
+    let cols = 0
+    if (n === 16 || n === 32) cols = 8
+    else if (n === 12 || n === 24) cols = 6
+    else if (n === 8 || n === 4) cols = n === 4 ? 4 : 4
+    else if (n === 6) cols = 6
+    if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
+    else grid.style.gridTemplateColumns = ''
+    grid.dataset.cores = String(n || 0)
+    grid.innerHTML = cores.length
+      ? cores.map((c, i) => {
+        const load = Number.isFinite(Number(c)) ? safeNum(c, 0) : 0
+        const val = Number.isFinite(Number(c)) ? fmtPct(c, 0) : na()
+        return `
       <div class="core-cell">
         <div class="id">C${i}</div>
         <div class="val">${val}</div>
         <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
       </div>`
-    }).join('')
-    : `<div class="empty">${na()}</div>`
+      }).join('')
+      : `<div class="empty">${na()}</div>`
+  }
 
   $('hw-gpu-name').textContent = gpu.name || m.gpuName || na()
   $('hw-gpu-driver').textContent = gpu.driverVersion || na()
@@ -883,7 +895,12 @@ function renderHardware(m) {
     : na()
   const channel = $('hw-ram-channel')
   if (channel) {
-    channel.textContent = ram.channelStatus || na()
+    if (ram.isSingleChannel) channel.textContent = t('fpsSingleChannel')
+    else if ((ram.slotsUsed || 0) >= 2 || /dual/i.test(String(ram.channelStatus || ''))) {
+      channel.textContent = t('fpsDualChannel')
+    } else {
+      channel.textContent = ram.channelStatus || na()
+    }
     channel.classList.remove('warn', 'ok')
     if (ram.isSingleChannel) channel.classList.add('warn')
     else if ((ram.slotsUsed || 0) >= 2) channel.classList.add('ok')
@@ -1423,7 +1440,7 @@ async function predictSelectedGame() {
     }
     const vramLabel = p.isIntegrated ? t('fpsSharedVRAM') : `${fmt(p.vramGB, 1)} GB`
     const ramLabel = p.dualChannel ? t('fpsDualChannel') : t('fpsSingleChannel')
-    const scores = `GPU <b>${fmt(p.gpuScore, 0)}</b> · CPU <b>${fmt(p.cpuScore, 0)}</b> · VRAM <b>${vramLabel}</b> · RAM <b>${ramLabel}</b>`
+    const scores = `${t('fpsScoreGPU')} <b>${fmt(p.gpuScore, 0)}</b> · ${t('fpsScoreCPU')} <b>${fmt(p.cpuScore, 0)}</b> · VRAM <b>${vramLabel}</b> · RAM <b>${ramLabel}</b>`
     const badge = p.badge || p.genre || p.category || ''
     const statusBits = [
       `${t('fpsRec')}: <b>${t(recKey)}</b>`,
@@ -1458,6 +1475,24 @@ async function predictSelectedGame() {
   }
 }
 
+function fillAboutSpecs(m = lastMetrics) {
+  const host = $('about-specs')
+  if (!host) return
+  const hw = m?.hardware || {}
+  const cpu = hw.cpu?.name || m?.cpuName || na()
+  const gpu = hw.gpu?.name || m?.gpuName || na()
+  const ramMB = hw.ram?.totalMB || m?.ramTotalMB
+  const ram = ramMB ? `${Math.round(Number(ramMB) / 1024)} GB` : na()
+  const os = m?.osName || m?.os || 'Windows'
+  host.innerHTML = `
+    <div class="about-line"><b>CPU</b>: ${cpu}</div>
+    <div class="about-line"><b>GPU</b>: ${gpu}</div>
+    <div class="about-line"><b>RAM</b>: ${ram}</div>
+    <div class="about-line"><b>OS</b>: ${os}</div>
+    <div class="about-line"><b>PulseCore</b>: ${APP_VERSION}</div>
+  `
+}
+
 function openAbout() {
   const name = $('about-app-name')
   const ver = $('about-app-ver')
@@ -1468,6 +1503,7 @@ function openAbout() {
     link.href = GITHUB_URL
     link.textContent = 'github.com/robbled17/pulsecore'
   }
+  fillAboutSpecs()
   const box = $('license-box')
   if (box) box.textContent = MIT_LICENSE
   $('about-modal')?.classList.remove('hidden')
@@ -1484,13 +1520,28 @@ function buildPCConfigLine(m = lastMetrics) {
   const ramMB = hw.ram?.totalMB || m?.ramTotalMB
   const ram = ramMB ? `${Math.round(Number(ramMB) / 1024)} GB RAM` : na()
   const os = m?.osName || m?.os || 'Windows'
-  return `CPU: ${cpu} | GPU: ${gpu} | RAM: ${ram} | OS: ${os}`
+  return `CPU: ${cpu} | GPU: ${gpu} | RAM: ${ram} | OS: ${os} | PulseCore ${APP_VERSION}`
+}
+
+function flashCopyPCButton() {
+  const btn = $('btn-copy-pc')
+  if (!btn) return
+  const prev = btn.dataset.label || btn.textContent
+  btn.dataset.label = prev
+  btn.textContent = t('aboutCopied')
+  btn.classList.add('copied')
+  clearTimeout(flashCopyPCButton._t)
+  flashCopyPCButton._t = setTimeout(() => {
+    btn.textContent = btn.dataset.label || t('aboutCopyPC')
+    btn.classList.remove('copied')
+  }, 2000)
 }
 
 async function copyPCConfig() {
   const line = buildPCConfigLine()
   try {
     await navigator.clipboard.writeText(line)
+    flashCopyPCButton()
     showToast(t('aboutCopied'), true)
   } catch (_) {
     try {
@@ -1502,6 +1553,7 @@ async function copyPCConfig() {
       ta.select()
       document.execCommand('copy')
       ta.remove()
+      flashCopyPCButton()
       showToast(t('aboutCopied'), true)
     } catch (err) {
       showToast(String(err), false)
