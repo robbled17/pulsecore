@@ -26,11 +26,12 @@
   </div>
 
   <div id="minihud" class="minihud hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
-    <div class="minihud-capsule">
+    <div class="minihud-capsule" style="--wails-draggable: drag;">
       <div class="minihud-metrics">
-        <span class="mh-item"><span class="mh-ico">CPU</span><b id="mh-cpu" class="metric">—</b></span>
-        <span class="mh-item"><span class="mh-ico gpu">GPU</span><b id="mh-gpu" class="metric">—</b></span>
-        <span class="mh-item"><span class="mh-ico ram">RAM</span><b id="mh-ram" class="metric">—</b></span>
+        <span class="mh-item" data-mh="cpu"><span class="mh-ico">CPU</span><b id="mh-cpu" class="metric">—</b></span>
+        <span class="mh-item" data-mh="gpu"><span class="mh-ico gpu">GPU</span><b id="mh-gpu" class="metric">—</b></span>
+        <span class="mh-item" data-mh="ram"><span class="mh-ico ram">RAM</span><b id="mh-ram" class="metric">—</b></span>
+        <span class="mh-item" data-mh="temps"><span class="mh-ico temp">TEMP</span><b id="mh-temp" class="metric">—</b></span>
       </div>
       <button type="button" id="mh-expand" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Expand">↗</button>
     </div>
@@ -214,7 +215,7 @@
           <p data-i18n="hwSub">CPU, GPU, RAM и питание</p>
         </header>
 
-        <details class="panel hw-block expand-panel" open>
+        <details class="panel hw-block expand-panel" data-hw="cpu" open>
           <summary class="panel-title expand-summary" data-i18n="hwCPU">Процессор (CPU)</summary>
           <div class="hw-grid">
             <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">—</div></div>
@@ -225,7 +226,7 @@
           <div id="core-grid" class="core-grid"></div>
         </details>
 
-        <details class="panel hw-block expand-panel" open>
+        <details class="panel hw-block expand-panel" data-hw="gpu" open>
           <summary class="panel-title expand-summary" data-i18n="hwGPU">Видеокарта (GPU)</summary>
           <div class="hw-grid">
             <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-gpu-name">—</div></div>
@@ -241,7 +242,7 @@
           </div>
         </details>
 
-        <details class="panel hw-block expand-panel" open>
+        <details class="panel hw-block expand-panel" data-hw="ram" open>
           <summary class="panel-title expand-summary" data-i18n="hwRAM">Оперативная память (RAM)</summary>
           <div id="hw-ram-channel" class="channel-banner">—</div>
           <div class="hw-grid">
@@ -252,7 +253,7 @@
           </div>
         </details>
 
-        <details class="panel hw-block expand-panel" open>
+        <details class="panel hw-block expand-panel" data-hw="power" open>
           <summary class="panel-title expand-summary" data-i18n="hwPower">Питание</summary>
           <div class="hw-grid">
             <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-pwr-name">—</div></div>
@@ -339,6 +340,22 @@
             <button type="button" class="btn theme-btn" data-theme="light" data-i18n="themeLight">Светлая</button>
           </div>
         </div>
+        <div class="panel" id="minihud-settings">
+          <div class="panel-title" data-i18n="miniHudSettings">Настройка Mini-HUD</div>
+          <div class="hud-opts">
+            <label class="check-row"><input type="checkbox" id="mh-opt-cpu" checked /> <span data-i18n="mhShowCPU">CPU</span></label>
+            <label class="check-row"><input type="checkbox" id="mh-opt-gpu" checked /> <span data-i18n="mhShowGPU">GPU</span></label>
+            <label class="check-row"><input type="checkbox" id="mh-opt-ram" checked /> <span data-i18n="mhShowRAM">RAM</span></label>
+            <label class="check-row"><input type="checkbox" id="mh-opt-temps" checked /> <span data-i18n="mhShowTemps">Temps</span></label>
+          </div>
+          <div class="slider-row">
+            <label for="mh-opacity" class="slider-label">
+              <span data-i18n="mhOpacity">Прозрачность фона</span>
+              <b id="mh-opacity-val" class="metric">78%</b>
+            </label>
+            <input type="range" id="mh-opacity" min="35" max="95" value="78" step="1" />
+          </div>
+        </div>
         <div class="panel">
           <div class="panel-title" data-i18n="langTitle">Язык / Language</div>
           <select id="lang-select-settings" class="lang-select lang-select-block" aria-label="Language">
@@ -370,15 +387,23 @@
   </div>
 
   <div id="about-modal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-card wide">
+    <div class="modal-card about-card">
       <div class="modal-head">
         <h2 data-i18n="aboutTitle">О программе</h2>
         <button type="button" class="win-btn" id="about-close">✕</button>
       </div>
-      <div class="modal-body">
-        <div class="about-line"><b id="about-app-name">PulseCore v1.0</b></div>
+      <div class="modal-body about-body">
+        <div class="about-brand">
+          <div class="about-app" id="about-app-name">PulseCore</div>
+          <div class="about-ver" id="about-app-ver">v1.0</div>
+        </div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: Free &amp; Open Source Software</div>
+        <div class="about-line">
+          <span data-i18n="aboutGitHub">GitHub</span>:
+          <a class="about-link" id="about-github" href="https://github.com/robbled17/pulsecore" target="_blank" rel="noopener noreferrer">github.com/robbled17/pulsecore</a>
+        </div>
+        <button type="button" class="btn" id="btn-copy-pc" data-i18n="aboutCopyPC">Скопировать конфигурацию ПК</button>
         <div class="license-box" id="license-box"></div>
       </div>
     </div>

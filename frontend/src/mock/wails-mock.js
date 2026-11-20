@@ -73,6 +73,7 @@ function buildMetrics() {
     pollIntervalMS: state.pollIntervalMS,
     miniHUD: state.miniHUD,
     language: state.language,
+    osName: 'Windows 11',
     cpuName: 'AMD Ryzen 7 5800X',
     gpuName: 'NVIDIA GeForce RTX 3070',
     cpuPerCore: Array.from({ length: 16 }, (_, i) => Number(wave(20 + (i % 5) * 8, 15, i * 0.4).toFixed(0))),

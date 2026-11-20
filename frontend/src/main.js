@@ -59,6 +59,9 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
+const APP_VERSION = 'v1.0'
+const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
+
 let lang = localStorage.getItem('zp_lang') || 'ru'
 let uiTheme = localStorage.getItem('zp_theme') || 'dark'
 let frozen = new Set()
@@ -75,6 +78,26 @@ const cachedDiskReport = Object.create(null)
 const whitelist = new Set(JSON.parse(localStorage.getItem('zp_whitelist') || '[]'))
 const chartScroll = { pos: 0, target: 0 }
 const frameSamples = []
+
+function loadHudPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('zp_minihud') || '{}')
+    return {
+      cpu: raw.cpu !== false,
+      gpu: raw.gpu !== false,
+      ram: raw.ram !== false,
+      temps: raw.temps !== false,
+      opacity: Number.isFinite(Number(raw.opacity)) ? Math.min(95, Math.max(35, Number(raw.opacity))) : 78,
+    }
+  } catch (_) {
+    return { cpu: true, gpu: true, ram: true, temps: true, opacity: 78 }
+  }
+}
+let hudPrefs = loadHudPrefs()
+
+function saveHudPrefs() {
+  localStorage.setItem('zp_minihud', JSON.stringify(hudPrefs))
+}
 
 const series = {
   cpu: makeSeries(),
@@ -663,11 +686,11 @@ function renderHardware(m) {
   const ram = hw.ram || {}
   const pwr = hw.power || {}
 
-  $('hw-cpu-name').textContent = cpu.name || m.cpuName || dash()
+  $('hw-cpu-name').textContent = cpu.name || m.cpuName || na()
   const phys = cpu.physicalCores
   const logic = cpu.logicalCores
   $('hw-cpu-cores').textContent = (phys || logic)
-    ? `${phys || dash()} / ${logic || dash()}`
+    ? `${phys || na()} / ${logic || na()}`
     : na()
   $('hw-cpu-freq').textContent = cpu.frequencyMHz
     ? `${fmt(cpu.frequencyMHz / 1000, 2)} GHz`
@@ -675,35 +698,45 @@ function renderHardware(m) {
   $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
 
   const cores = cpu.perCore || m.cpuPerCore || []
-  $('core-grid').innerHTML = cores.map((c, i) => {
-    const load = safeNum(c, 0)
-    return `
-    <div class="core-cell">
-      <div class="id">C${i}</div>
-      <div class="val">${fmtPct(c, 0)}</div>
-      <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
-    </div>`
-  }).join('')
+  $('core-grid').innerHTML = cores.length
+    ? cores.map((c, i) => {
+      const load = safeNum(c, 0)
+      return `
+      <div class="core-cell">
+        <div class="id">C${i}</div>
+        <div class="val">${fmtPct(c, 0)}</div>
+        <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
+      </div>`
+    }).join('')
+    : `<div class="empty">${na()}</div>`
 
-  $('hw-gpu-name').textContent = gpu.name || m.gpuName || dash()
-  $('hw-gpu-driver').textContent = gpu.driverVersion || dash()
+  $('hw-gpu-name').textContent = gpu.name || m.gpuName || na()
+  $('hw-gpu-driver').textContent = gpu.driverVersion || na()
   const ded = gpu.dedicatedMB ?? m.vramTotalMB
   const shared = gpu.sharedMB ?? m.vramSharedMB
-  $('hw-gpu-ded').textContent = Number.isFinite(Number(ded)) ? `${fmt(ded, 0)} MB` : na()
+  $('hw-gpu-ded').textContent = Number.isFinite(Number(ded)) && Number(ded) > 0 ? `${fmt(ded, 0)} MB` : na()
   $('hw-gpu-shared').textContent = Number.isFinite(Number(shared)) ? `${fmt(shared, 0)} MB` : na()
 
   const ramTotal = ram.totalMB || m.ramTotalMB
   $('hw-ram-total').textContent = ramTotal ? `${ramTotal} MB` : na()
-  $('hw-ram-type').textContent = `${ram.type || dash()}${ram.speedMHz ? ` · ${ram.speedMHz} MHz` : ''}`
-  $('hw-ram-slots').textContent = `${ram.slotsUsed ?? dash()}/${ram.slotsTotal ?? dash()}`
+  const ramType = ram.type || ''
+  const ramSpeed = ram.speedMHz ? `${ram.speedMHz} MHz` : ''
+  $('hw-ram-type').textContent = (ramType || ramSpeed)
+    ? [ramType || na(), ramSpeed].filter(Boolean).join(' · ')
+    : na()
+  const slotsUsed = ram.slotsUsed
+  const slotsTotal = ram.slotsTotal
+  $('hw-ram-slots').textContent = (slotsUsed != null || slotsTotal != null)
+    ? `${slotsUsed ?? na()}/${slotsTotal ?? na()}`
+    : na()
   const usedMB = ram.usedMB || m.ramUsedMB
   const freeMB = ram.freeMB
   $('hw-ram-use').textContent = (usedMB || freeMB)
-    ? `${usedMB || 0} / ${freeMB ?? dash()} MB`
+    ? `${usedMB || 0} / ${freeMB ?? na()} MB`
     : na()
   const channel = $('hw-ram-channel')
   if (channel) {
-    channel.textContent = ram.channelStatus || dash()
+    channel.textContent = ram.channelStatus || na()
     channel.classList.remove('warn', 'ok')
     if (ram.isSingleChannel) channel.classList.add('warn')
     else if ((ram.slotsUsed || 0) >= 2) channel.classList.add('ok')
@@ -711,7 +744,7 @@ function renderHardware(m) {
 
   if (pwr.hasBattery) {
     $('hw-pwr-name').textContent = pwr.deviceName || t('batteryPack')
-    $('hw-pwr-status').textContent = pwr.statusText || dash()
+    $('hw-pwr-status').textContent = pwr.statusText || na()
     $('hw-pwr-pct').textContent = fmtPct(pwr.percent, 0)
     $('hw-pwr-wear').textContent = pwr.wearLabel || fmtPct(pwr.wearPercent, 0)
     $('hw-pwr-cap').textContent = pwr.capacitymWh
@@ -924,10 +957,35 @@ async function runSleepCheck() {
   }
 }
 
+function applyMiniHudPrefs() {
+  const keys = ['cpu', 'gpu', 'ram', 'temps']
+  keys.forEach((k) => {
+    const el = document.querySelector(`.mh-item[data-mh="${k}"]`)
+    el?.classList.toggle('hidden', !hudPrefs[k])
+    const opt = $(`mh-opt-${k}`)
+    if (opt) opt.checked = !!hudPrefs[k]
+  })
+  const visible = [...document.querySelectorAll('.minihud-metrics .mh-item:not(.hidden)')]
+  visible.forEach((el, i) => el.classList.toggle('is-last', i === visible.length - 1))
+  const opacity = hudPrefs.opacity
+  const capsule = document.querySelector('.minihud-capsule')
+  if (capsule) capsule.style.setProperty('--hud-bg-opacity', (opacity / 100).toFixed(2))
+  const slider = $('mh-opacity')
+  const label = $('mh-opacity-val')
+  if (slider) slider.value = String(opacity)
+  if (label) label.textContent = `${opacity}%`
+}
+
 function renderMiniHUD(m) {
   $('mh-cpu').textContent = fmtPct(m.cpuPercent, 0)
   $('mh-ram').textContent = fmtPct(m.ramPercent, 0)
   $('mh-gpu').textContent = fmtPct(m.gpuPercent, 0)
+  const tempEl = $('mh-temp')
+  if (tempEl) {
+    const temp = m.temperatureC
+    tempEl.textContent = Number.isFinite(Number(temp)) ? `${fmt(temp, 0)}°` : na()
+  }
+  applyMiniHudPrefs()
 }
 
 function syncSettings(m) {
@@ -1244,6 +1302,15 @@ async function predictSelectedGame() {
 }
 
 function openAbout() {
+  const name = $('about-app-name')
+  const ver = $('about-app-ver')
+  if (name) name.textContent = 'PulseCore'
+  if (ver) ver.textContent = APP_VERSION
+  const link = $('about-github')
+  if (link) {
+    link.href = GITHUB_URL
+    link.textContent = 'github.com/robbled17/pulsecore'
+  }
   const box = $('license-box')
   if (box) box.textContent = MIT_LICENSE
   $('about-modal')?.classList.remove('hidden')
@@ -1251,6 +1318,38 @@ function openAbout() {
 
 function closeAbout() {
   $('about-modal')?.classList.add('hidden')
+}
+
+function buildPCConfigLine(m = lastMetrics) {
+  const hw = m?.hardware || {}
+  const cpu = hw.cpu?.name || m?.cpuName || na()
+  const gpu = hw.gpu?.name || m?.gpuName || na()
+  const ramMB = hw.ram?.totalMB || m?.ramTotalMB
+  const ram = ramMB ? `${Math.round(Number(ramMB) / 1024)} GB RAM` : na()
+  const os = m?.osName || m?.os || 'Windows'
+  return `CPU: ${cpu} | GPU: ${gpu} | RAM: ${ram} | OS: ${os}`
+}
+
+async function copyPCConfig() {
+  const line = buildPCConfigLine()
+  try {
+    await navigator.clipboard.writeText(line)
+    showToast(t('aboutCopied'), true)
+  } catch (_) {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = line
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+      showToast(t('aboutCopied'), true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  }
 }
 
 function showToast(text, ok = false) {
@@ -1420,6 +1519,26 @@ function wireUI() {
   $('about-modal')?.addEventListener('click', (ev) => {
     if (ev.target.id === 'about-modal') closeAbout()
   })
+  $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+
+  ;['cpu', 'gpu', 'ram', 'temps'].forEach((key) => {
+    $(`mh-opt-${key}`)?.addEventListener('change', (ev) => {
+      hudPrefs[key] = !!ev.target.checked
+      // keep at least one metric visible
+      if (!hudPrefs.cpu && !hudPrefs.gpu && !hudPrefs.ram && !hudPrefs.temps) {
+        hudPrefs[key] = true
+        ev.target.checked = true
+      }
+      saveHudPrefs()
+      applyMiniHudPrefs()
+    })
+  })
+  $('mh-opacity')?.addEventListener('input', (ev) => {
+    hudPrefs.opacity = Number(ev.target.value) || 78
+    saveHudPrefs()
+    applyMiniHudPrefs()
+  })
+  applyMiniHudPrefs()
 
   $('btn-disk-health').addEventListener('click', () => runDiskHealth(selectedDrive, false))
   $('modal-smart-refresh')?.addEventListener('click', () => runDiskHealth(selectedDrive, true))
