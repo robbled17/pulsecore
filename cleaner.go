@@ -194,7 +194,7 @@ func cleanAllowedRoot(root cleanRoot, dryRun bool) (deleted int, bytes int64, sk
 	if err != nil || !info.IsDir() {
 		return 0, 0, 1, 0
 	}
-	// Never delete the allowlisted folder itself — only contents.
+	// Never delete the allowlisted folder itself - only contents.
 	minAge := tempMinAge
 	if root.kind == cleanKindCache {
 		minAge = cacheMinAge

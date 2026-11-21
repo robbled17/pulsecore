@@ -296,7 +296,7 @@ func (a *App) KillAppProcesses(appID string) map[string]interface{} {
 		return map[string]interface{}{"ok": false, "message": "Приложение не найдено"}
 	}
 	if !isValidInstallLocation(app.InstallLocation) {
-		return map[string]interface{}{"ok": false, "message": "InstallLocation защищён или слишком мелкий — завершение процессов запрещено"}
+		return map[string]interface{}{"ok": false, "message": "InstallLocation защищён или слишком мелкий - завершение процессов запрещено"}
 	}
 	running := findProcessesUnder(app.InstallLocation)
 	killed := 0
@@ -390,7 +390,7 @@ func (a *App) UninstallApp(appID string, killFirst bool) map[string]interface{} 
 		if !isValidInstallLocation(app.InstallLocation) {
 			return map[string]interface{}{
 				"ok":      false,
-				"message": "InstallLocation указывает на системный каталог или слишком мелкий — принудительное завершение запрещено",
+				"message": "InstallLocation указывает на системный каталог или слишком мелкий - принудительное завершение запрещено",
 			}
 		}
 		_ = a.KillAppProcesses(appID)
@@ -682,7 +682,7 @@ func scanRunValues(root registry.Key, path, label string, needles []string) []Re
 		if !nameMatchesAny(blob, needles) {
 			continue
 		}
-		// Run keys live under HK*\\SOFTWARE\\Microsoft\\Windows\\... — never auto-safe.
+		// Run keys live under HK*\\SOFTWARE\\Microsoft\\Windows\\... - never auto-safe.
 		fullPath := label
 		if strings.HasPrefix(label, "HKCU") {
 			fullPath = `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\` + name
@@ -912,7 +912,7 @@ func (a *App) FinishTracedInstall() map[string]interface{} {
 	trace.After = after
 	trace.FinishedAt = time.Now().Format(time.RFC3339)
 	trace.NewKeys = diffStrings(trace.Before.UninstallKeys, after.UninstallKeys)
-	// Run keys live under Microsoft\Windows — never include in auto-diff for cleanup.
+	// Run keys live under Microsoft\Windows - never include in auto-diff for cleanup.
 	trace.NewServices = nil // system service hive; never auto-diff for deletion
 	trace.NewDirs = diffStrings(trace.Before.Dirs, after.Dirs)
 	// Drop forbidden registry-looking entries from the persisted diff.
@@ -986,7 +986,7 @@ const (
 )
 
 // CleanupFromTrace removes new dirs recorded in a trace (whitelist + protect guards).
-// Registry keys from traces are never auto-deleted — they must go through DeleteResiduals
+// Registry keys from traces are never auto-deleted - they must go through DeleteResiduals
 // with explicit user selection and .reg backup.
 // Bounded by timeout, max depth, and max dir count; cancellable via context deadline.
 func (a *App) CleanupFromTrace(appID string) TraceCleanupResult {
@@ -1080,7 +1080,7 @@ func captureTraceSnapshot() TraceSnapshot {
 func filterNonSystemUninstallKeys(keys []string) []string {
 	out := make([]string, 0, len(keys))
 	for _, k := range keys {
-		// Keys are like HKLM\AppName — not full registry paths; skip obvious system names.
+		// Keys are like HKLM\AppName - not full registry paths; skip obvious system names.
 		base := strings.ToLower(k)
 		if strings.Contains(base, "microsoft") || strings.Contains(base, "windows") ||
 			strings.Contains(base, "defender") || strings.Contains(base, "pulsecore") {
