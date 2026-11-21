@@ -44,6 +44,18 @@ jobs:
         shell: bash
         run: npm ci || npm install
 
+      # Embed target for main.go //go:embed; also needed so go test compiles the package.
+      - name: Build frontend assets
+        working-directory: frontend
+        shell: bash
+        run: npm run build
+
+      # Security, hardware-profile, and other unit tests must execute on Windows
+      # before packaging. Prefer real go test over compile-only.
+      - name: Go test (windows)
+        shell: bash
+        run: go test -v ./...
+
       - name: Wails build (windows/amd64)
         shell: bash
         run: |

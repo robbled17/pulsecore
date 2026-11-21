@@ -2459,6 +2459,7 @@
         lang = LANGS.includes(next) ? next : "en";
         try { localStorage.setItem(LANG_STORAGE, lang); } catch (_) {}
         applyI18n();
+        if (typeof renderUpgradeDemo === "function") renderUpgradeDemo();
       }
 
       lang = detectLang();
@@ -3088,7 +3089,8 @@
       }
 
       const upgradeState = { device: "pc", goal: "fps" };
-      const upgradeDemoData = {
+      const upgradeDemoDataByLang = {
+        ru: {
         pc: {
           big: "Ryzen 7 5700X · RTX 3060",
           goals: {
@@ -3303,12 +3305,234 @@
             ]
           }
         }
+      },
+        en: {
+        pc: {
+          big: "Ryzen 7 5700X · RTX 3060",
+          goals: {
+            fps: [
+              {
+                title: "Graphics card",
+                model: "RTX 4070 Super",
+                gain: "+60% FPS",
+                body: "Current GPU is RTX 3060. Moving to 4070 Super is about +60% FPS at 1080p/1440p. Biggest gain for this PC.",
+                pits: [
+                  "Measure case clearance and check PSU wattage and connectors before buying a GPU.",
+                  "Leave headroom on watts and use native 8-pin / 12VHPWR cables.",
+                  "Install a fresh NVIDIA or AMD driver after fitting."
+                ]
+              },
+              {
+                title: "CPU for AM4 socket",
+                model: "Ryzen 7 5700X3D / 5800X3D",
+                gain: "+10-20% 1% lows",
+                body: "AM4 is still alive: an X3D drops in without a new board. Current CPU is Ryzen 7 5700X. Cuts CPU limit in games.",
+                pits: [
+                  "Update BIOS before installing a newer CPU.",
+                  "Check VRM quality on the board.",
+                  "Socket now: AM4. The new CPU must match that socket."
+                ]
+              },
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4 dual-channel",
+                gain: "fewer stutters",
+                body: "2 free slots. Aim for 32 GB DDR4 of the same speed and timings for stable FPS.",
+                pits: [
+                  "Memory type: DDR4. Another generation will not fit.",
+                  "Match module frequency and timings.",
+                  "Enable XMP/EXPO in BIOS."
+                ]
+              }
+            ],
+            quiet: [
+              {
+                title: "Quiet cooling",
+                model: "120/140 mm tower cooler",
+                gain: "5-15°C quieter",
+                body: "A tower cooler, better airflow, and GPU/CPU undervolt often beats swapping parts for noise.",
+                pits: ["Replace thermal paste and check mount pressure.", "Undervolt in small steps.", "Air must exit the case."]
+              },
+              {
+                title: "Quiet graphics card",
+                model: "RTX 4070 Super (3-fan)",
+                gain: "quieter under load",
+                body: "A 3-fan 4070 Super with undervolt is quieter than short blower cards and still adds FPS headroom.",
+                pits: [
+                  "Measure case space and check the PSU first.",
+                  "Use native power connectors.",
+                  "Install a fresh driver after fitting."
+                ]
+              },
+              {
+                title: "Moderate TDP CPU",
+                model: "Keep 5700X + cooler",
+                gain: "lower temps",
+                body: "On AM4 keep the 5700X and fit a good tower cooler instead of a loud stock cooler.",
+                pits: ["Update BIOS if you change the CPU.", "Check VRM.", "Socket AM4."]
+              }
+            ],
+            work: [
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4",
+                gain: "32-64 GB",
+                body: "For work aim for 32 or 64 GB DDR4. Keep every stick on the same speed and timings.",
+                pits: ["Type: DDR4.", "Match frequency and timings.", "Enable XMP/EXPO."]
+              },
+              {
+                title: "More cores on AM4",
+                model: "Ryzen 9 5950X / 5900X",
+                gain: "+multi-core",
+                body: "AM4 socket: Ryzen 9 without a new board. More cores for render, compile, and VMs.",
+                pits: ["Update BIOS before a new CPU.", "Check VRM.", "AM4 only."]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1-2 TB",
+                gain: "faster projects",
+                body: "Put OS and projects on NVMe. Free M.2 slot: quick upgrade without replacing the PC.",
+                pits: ["Need a free M.2.", "Clone the OS if needed.", "SATA SSD is slower than NVMe."]
+              }
+            ],
+            budget: [
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4",
+                gain: "best $/effect",
+                body: "Free slots: dual-channel DDR4 at one speed. Cheap and noticeable.",
+                pits: ["DDR4 only.", "Match frequency and timings.", "Enable XMP."]
+              },
+              {
+                title: "Budget graphics card",
+                model: "RTX 4060 Ti 16GB (used OK)",
+                gain: "+30-45% FPS",
+                body: "Current GPU is RTX 3060. A 4060 Ti (including used) adds FPS without a platform swap.",
+                pits: [
+                  "Measure the case and check the PSU first.",
+                  "Native power connectors.",
+                  "Fresh driver after install."
+                ]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1 TB",
+                gain: "faster boot",
+                body: "A budget NVMe speeds up Windows and games without an expensive GPU swap.",
+                pits: ["Check for a free M.2.", "Clone the system when replacing.", "Pick a drive with a real cache."]
+              }
+            ]
+          }
+        },
+        laptop: {
+          big: "Ryzen 7 6800H · RTX 3060 Laptop",
+          goals: {
+            fps: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "+15-25% FPS (iGPU)",
+                body: "A second stick at the same speed enables dual-channel. Laptop CPU/GPU are usually soldered.",
+                pits: ["Same memory type only.", "Match frequency and timings.", "Check the service manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "faster load",
+                body: "A second M.2 speeds games and projects. Real laptop upgrade without a new board.",
+                pits: ["Confirm the second slot in the manual.", "A heatsink may be required.", "Clone the OS when replacing the boot drive."]
+              },
+              {
+                title: "Cooling and undervolt",
+                model: "Paste + clean + undervolt",
+                gain: "steadier FPS",
+                body: "Cooling keeps clocks longer. On a laptop that often beats trying to overclock everything.",
+                pits: ["Do not block vents.", "Undervolt in small steps.", "Do not buy mobile CPU/GPU as spare parts."]
+              }
+            ],
+            quiet: [
+              {
+                title: "Cooling and undervolt",
+                model: "Paste + clean + undervolt",
+                gain: "noticeably quieter",
+                body: "Main quiet path: clean, paste, undervolt, and a quiet power plan. You cannot drop in a new GPU.",
+                pits: ["Do not block vents.", "Undervolt in small steps.", "CPU/GPU are soldered."]
+              },
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "less iGPU heat",
+                body: "Dual-channel lowers memory pressure and helps hold clocks without extra fan noise.",
+                pits: ["Same memory type.", "Match frequency and timings.", "Read the manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB",
+                gain: "quieter copies",
+                body: "A fast NVMe spins fans less on large copies than a slow disk.",
+                pits: ["Free M.2.", "Heatsink if needed.", "OS clone."]
+              }
+            ],
+            work: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "snappier UI",
+                body: "Second stick for dual-channel. Browsers, IDEs, and tabs love capacity and two channels.",
+                pits: ["Same type.", "Frequency and timings.", "Service manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "faster projects",
+                body: "Work needs a fast NVMe: projects, Docker, IDE.",
+                pits: ["Confirm second slot.", "Heatsink.", "Clone when replacing."]
+              },
+              {
+                title: "Cooling",
+                model: "Paste + clean",
+                gain: "stable clocks",
+                body: "Cleaning and paste hold clocks on long tasks. Soldered CPU cannot be swapped.",
+                pits: ["Keep vents clear.", "Quality paste.", "Do not buy a mobile CPU separately."]
+              }
+            ],
+            budget: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 8-16 GB DDR4 (match)",
+                gain: "best $/effect",
+                body: "Best value on a laptop: a second stick for dual-channel. Cheaper than any board.",
+                pits: ["Same type.", "Frequency and timings.", "Slot guide."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 512 GB-1 TB",
+                gain: "faster boot",
+                body: "Budget NVMe in the second slot. CPU/GPU are soldered; the disk actually changes.",
+                pits: ["Free M.2.", "Clone when replacing.", "USB-only is not a real upgrade."]
+              },
+              {
+                title: "Cooling",
+                model: "Clean + paste",
+                gain: "quieter / steadier",
+                body: "Cooling service costs less than a new machine and restores clocks.",
+                pits: ["Do not block vents.", "Be careful with teardown.", "CPU/GPU are not separate upgrades."]
+              }
+            ]
+          }
+        }
+      }
       };
+      function upgradeDemoData() {
+        const lang = (document.documentElement.lang || localStorage.getItem("pc_lang") || "ru").slice(0, 2);
+        return upgradeDemoDataByLang[lang] || upgradeDemoDataByLang.en;
+      }
 
       function renderUpgradeDemo() {
         const device = upgradeState.device;
         const goal = upgradeState.goal;
-        const pack = upgradeDemoData[device] || upgradeDemoData.pc;
+        const table = upgradeDemoData();
+        const pack = table[device] || table.pc;
         const list = (pack.goals && pack.goals[goal]) || pack.goals.fps;
         const big = el("demo-upgrade-pass-big");
         const sub = el("demo-upgrade-pass-sub");

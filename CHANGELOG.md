@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.5.0
+
+### Fixed
+- Windows CI: `go test -v ./...` runs on `windows-latest` before building `pulsecore.exe` (release + PR workflows)
+- Hardware tab: SSD / disk S.M.A.R.T. accordion with per-drive expand (wear %, temp, TBW, power-on, status)
+- Sensors: Mini-HUD and Hardware temp chips use translated unavailable status when ACPI is missing
+- Desktop battery wear field shows N/A instead of a Russian ATX caption in non-RU UIs
+- App icon: tighter transparent crop so tray/taskbar icon has no empty white-looking margins
+- Cleaner: forbid LOCALAPPDATA\Packages (and WindowsApps / Start Menu package trees) even when LOCALAPPDATA is redirected
+- SMART: never invent 50%/70%/100% wear when the reliability counter is missing
+- Dev Mode badge stays session-only (not restored from localStorage)
+- Landing Upgrade demo recommendations follow language (RU/EN; other langs use EN)
+- i18n: translate insightAct / fpsWarn / mhShowTemps leftovers for kk/tt/de/ja/zh
+
+### Needs hardware
+- Live SMBIOS chassis + batteryPresent on real Windows notebooks
+- Live RAM slot WMI vs Hardware/Upgrade free-slot sync on soldered SO-DIMM mixes
+- Live S.M.A.R.T. PowerShell probes on NVMe / SATA / USB bridges
+- Eco Mode soft-skip against live Defender processes (guards unit-tested)
+
+### Unverified
+- Junction / reparse-point deletes on NTFS (unit-tested with EvalSymlinks on Unix temp dirs)
+- End-to-end TerminateProcess against live third-party apps (guards unit-tested; no live kills in CI)
+
 ## 1.4.1
 
 ### Fixed

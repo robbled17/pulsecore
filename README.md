@@ -15,8 +15,10 @@ PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metr
 - **Overview**: live metrics, sparklines, actionable alerts (thermal / RAM / disk / lag)
 - **Lag Spotter**: per-core spikes, stutter log, network diagnostics, sleep blockers
 - **Eco Mode**: soft-limit hungry background processes (safe denylist; undo supported)
-- **Hardware**: physical CPU cores with SMT thread bars, discrete GPU preference, RAM channels, battery wear
-- **GamePulse**: catalog search + FPS predictor across Low/Med/High/Ultra
+- **Hardware**: physical CPU cores with SMT thread bars, SSD S.M.A.R.T. accordion, discrete GPU preference, RAM channels, battery wear
+- **Upgrade Advisor**: laptop vs desktop hard-split recommendations with free RAM slot sync
+- **Smart Uninstall**: process precheck, residual scan, install tracing, Temp/Cache whitelist clean
+- **GamePulse**: catalog search + FPS predictor across Low/Med/High/Ultra (~30-model HW fallback)
 - **Mini-HUD**: always-on-top capsule with CPU/GPU/RAM/temps toggles
 - **Power profiles**: Silent / Balanced / Turbo via Windows `powercfg`
 
@@ -46,9 +48,9 @@ PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metr
 
 ### From Releases
 
-1. Open [Releases](https://github.com/robbled17/pulsecore/releases)
-2. Download `PulseCore-*-windows-amd64.zip`
-3. Verify SHA256, extract, run `PulseCore.exe`
+1. Download [`pulsecore.exe`](https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe) (or grab the zip from [Releases](https://github.com/robbled17/pulsecore/releases))
+2. Optionally verify SHA256 from the matching `.sha256` asset
+3. Run `pulsecore.exe`
 
 Requires **Windows 10/11** with **WebView2** (preinstalled on modern Windows).
 
@@ -62,7 +64,7 @@ cd frontend && npm install && cd ..
 wails build -clean -platform windows/amd64 -ldflags "-s -w"
 ```
 
-Binary: `build/bin/pulsecore.exe` (release workflow publishes `PulseCore.exe`).
+Binary: `build/bin/pulsecore.exe` (release workflow publishes bare `pulsecore.exe` plus zip).
 
 Dev mode:
 
