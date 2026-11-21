@@ -357,9 +357,15 @@
     }
     .demo-pane {
       display: none;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .demo-pane.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
       animation: demoPaneIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .demo-pane.active { display: block; }
     @keyframes demoPaneIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -1216,14 +1222,14 @@
       <div class="preview-shell reveal" style="--reveal-delay: 100ms">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
           <span class="preview-tab-pill" aria-hidden="true"></span>
-          <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview" data-i18n="tabOverview">Обзор</button>
-          <button type="button" role="tab" aria-selected="false" data-tab="lags" data-i18n="tabLags">Лаги</button>
-          <button type="button" role="tab" aria-selected="false" data-tab="gamepulse">GamePulse</button>
-          <button type="button" role="tab" aria-selected="false" data-tab="hardware" data-i18n="tabHardware">Железо</button>
+          <button type="button" class="active" role="tab" id="tab-overview" aria-selected="true" data-tab="overview" aria-controls="panel-overview" data-i18n="tabOverview">Обзор</button>
+          <button type="button" role="tab" id="tab-lags" aria-selected="false" data-tab="lags" aria-controls="panel-lags" data-i18n="tabLags">Лаги</button>
+          <button type="button" role="tab" id="tab-gamepulse" aria-selected="false" data-tab="gamepulse" aria-controls="panel-gamepulse">GamePulse</button>
+          <button type="button" role="tab" id="tab-hardware" aria-selected="false" data-tab="hardware" aria-controls="panel-hardware" data-i18n="tabHardware">Железо</button>
         </div>
         <div class="preview-frame" id="demo-preview">
           <div class="demo-work" id="demo-work">
-            <div class="demo-pane active" data-pane="overview">
+            <div class="demo-pane active" id="panel-overview" data-panel="overview" role="tabpanel" aria-labelledby="tab-overview">
               <div class="demo-head">
                 <div>
                   <h3 data-i18n="demoOverviewTitle">Обзор системы</h3>
@@ -1233,7 +1239,6 @@
               <div class="demo-alert" id="demo-alert">
                 <div class="txt" data-i18n="demoAlertPeak">Пик ядра: Браузер нагружает систему</div>
                 <button type="button" class="btn-eco" id="demo-eco-alert">Eco Mode</button>
-              </div>
               </div>
               <div class="demo-metrics" id="demo-metrics">
                 <div class="demo-metric" data-k="cpu">
@@ -1267,7 +1272,7 @@
               </div>
             </div>
 
-            <div class="demo-pane" data-pane="lags">
+            <div class="demo-pane" id="panel-lags" data-panel="lags" role="tabpanel">
               <div class="demo-head">
                 <div>
                   <h3 data-i18n="demoLagsTitle">Лаги</h3>
@@ -1277,7 +1282,7 @@
               <div class="demo-procs" id="demo-procs"></div>
             </div>
 
-            <div class="demo-pane" data-pane="gamepulse">
+            <div class="demo-pane" id="panel-gamepulse" data-panel="gamepulse" role="tabpanel">
               <div class="demo-head">
                 <div>
                   <h3>GamePulse</h3>
@@ -1289,7 +1294,7 @@
               <div class="demo-tip" id="demo-tip" data-i18n="demoGameTip">Нажмите на игру, чтобы увидеть пресеты</div>
             </div>
 
-            <div class="demo-pane" data-pane="hardware">
+            <div class="demo-pane" id="panel-hardware" data-panel="hardware" role="tabpanel">
               <div class="demo-head">
                 <div>
                   <h3 data-i18n="demoHwTitle">Железо</h3>
@@ -2035,6 +2040,7 @@
       };
       window.__pcMovePill = movePill;
 
+      const panelIdOf = (p) => p.dataset.panel || p.dataset.pane || (p.id || "").replace(/^panel-/, "");
       const activate = (id) => {
         let activeBtn = null;
         tabs.forEach((b) => {
@@ -2046,7 +2052,12 @@
             b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
           }
         });
-        panes.forEach((p) => p.classList.toggle("active", p.dataset.pane === id));
+        panes.forEach((p) => {
+          const on = panelIdOf(p) === id || p.id === "panel-" + id;
+          p.classList.toggle("active", on);
+          p.hidden = !on;
+          p.setAttribute("aria-hidden", on ? "false" : "true");
+        });
         if (activeBtn) {
           requestAnimationFrame(() => movePill(activeBtn, reduceMotion.matches));
         }
@@ -2054,6 +2065,8 @@
       tabs.forEach((btn) => {
         btn.addEventListener("click", () => activate(btn.dataset.tab));
       });
+      // Ensure initial inactive panels are display:none + hidden
+      activate(tabs.find((b) => b.classList.contains("active"))?.dataset.tab || "overview");
       const syncPill = () => {
         const active = tabs.find((b) => b.classList.contains("active")) || tabs[0];
         movePill(active, true);
@@ -2082,7 +2095,7 @@
           if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
           const ids = tabs.map((t) => t.dataset.tab);
           const cur = panes.find((p) => p.classList.contains("active"));
-          const i = ids.indexOf(cur && cur.dataset.pane);
+          const i = ids.indexOf(cur && panelIdOf(cur));
           if (i < 0) return;
           const next = dx < 0 ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
           if (next !== i) activate(ids[next]);
