@@ -787,17 +787,23 @@
     }
     .demo-upgrade-rec .model { font-size: 15px; font-weight: 750; margin-bottom: 6px; letter-spacing: -0.02em; }
     .demo-upgrade-rec .body { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 8px; }
-    .demo-upgrade-rec .pit {
+    .demo-upgrade-rec .pit,
+    .demo-upgrade-rec .pit ul,
+    .demo-upgrade-rec .pit li {
       font-family: inherit;
       font-size: 13px;
       line-height: 1.45;
       color: var(--muted);
+      letter-spacing: inherit;
     }
     .demo-upgrade-rec .pit .pit-label {
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      font-family: inherit;
+      font-size: 13px;
       font-weight: 700;
+      line-height: 1.45;
       color: var(--text);
       margin-bottom: 2px;
     }
@@ -814,15 +820,12 @@
       margin: 6px 0 0;
       padding-left: 0;
       list-style: none;
-      color: inherit;
-      font-family: inherit;
-      font-size: inherit;
-      line-height: inherit;
     }
     .demo-upgrade-rec .pit li {
       position: relative;
       padding-left: 16px;
       margin-top: 4px;
+      color: var(--muted);
     }
     .demo-upgrade-rec .pit li::before {
       content: "";
@@ -832,7 +835,8 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: rgba(160, 190, 255, 0.55);
+      background: var(--accent);
+      opacity: 0.7;
     }
     .demo-uninstall-app {
       border: 1px solid var(--line);
