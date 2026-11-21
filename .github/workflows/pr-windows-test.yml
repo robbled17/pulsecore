@@ -40,6 +40,12 @@ jobs:
         shell: bash
         run: npm run build
 
+      - name: Build embedded sensor helper
+        shell: bash
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" \
+            -o third_party/sensor-helper/pulsecore-sensor-helper.exe ./cmd/sensor-helper
+
       - name: Install Playwright Chromium
         working-directory: frontend
         shell: bash

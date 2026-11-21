@@ -508,9 +508,8 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
   min-height: 36px;
   border-radius: 10px;
   border: 1px solid rgba(251, 191, 36, 0.28);
-  background: linear-gradient(135deg, rgba(60, 42, 18, 0.55), rgba(28, 22, 14, 0.5));
+  background: linear-gradient(135deg, rgba(60, 42, 18, 0.82), rgba(28, 22, 14, 0.9));
   box-shadow: 0 0 12px rgba(251, 191, 36, 0.05);
-  backdrop-filter: var(--blur);
 }
 .insight-card.hot {
   border-color: rgba(251, 113, 133, 0.4);
@@ -621,12 +620,11 @@ html[data-theme="light"] .insight-body { color: #92400e; }
   .metric-card { min-height: 148px; }
 }
 .metric-card, .panel {
-  background: linear-gradient(165deg, rgba(32, 42, 72, 0.55), rgba(16, 22, 38, 0.52));
+  background: linear-gradient(165deg, rgba(32, 42, 72, 0.88), rgba(16, 22, 38, 0.92));
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
+  /* No backdrop-filter on large cards/lists: WebView2 blur is costly on weak laptops. */
 }
 html[data-theme="light"] .metric-card,
 html[data-theme="light"] .panel {
@@ -1208,8 +1206,6 @@ html[data-theme="light"] .channel-banner.ok { color: #047857; }
   box-shadow:
     0 0 20px rgba(110, 168, 255, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
   min-width: 0;
 }
 html[data-theme="light"] .core-phys {
@@ -2319,3 +2315,26 @@ html[data-theme="light"] body.game-overlay-active {
   .minihud-capsule, .gameoverlay-capsule { min-width: min(240px, 100%); }
   .hud-opts { grid-template-columns: 1fr; }
 }
+
+.sensor-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 360px;
+}
+.sensor-tip.hidden { display: none !important; }
+.sensor-tip .linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sensor-tip .linkish:hover { color: var(--text); }

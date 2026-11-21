@@ -21,7 +21,7 @@ func startSystray(app *App) {
 		go systray.Run(func() {
 			systray.SetIcon(trayIcon)
 			systray.SetTitle("PulseCore")
-			systray.SetTooltip("PulseCore v1.6.1")
+			systray.SetTooltip("PulseCore v1.6.2")
 
 			systray.SetOnClick(func(menu systray.IMenu) {
 				app.toggleWindowVisibility()

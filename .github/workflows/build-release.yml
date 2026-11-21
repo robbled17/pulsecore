@@ -50,11 +50,21 @@ jobs:
         shell: bash
         run: npm run build
 
+      - name: Build embedded sensor helper
+        shell: bash
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" \
+            -o third_party/sensor-helper/pulsecore-sensor-helper.exe ./cmd/sensor-helper
+
       # Security, hardware-profile, and other unit tests must execute on Windows
       # before packaging. Prefer real go test over compile-only.
       - name: Go test (windows)
         shell: bash
         run: go test -v ./...
+
+      - name: Go vet (windows)
+        shell: bash
+        run: go vet ./...
 
       - name: Wails build (windows/amd64)
         shell: bash

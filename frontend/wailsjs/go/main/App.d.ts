@@ -105,3 +105,7 @@ export function RunSelfDiagnostics():Promise<Record<string, any>>;
 export function SetMiniHUDHotkey(arg1:string):Promise<Record<string, any>>;
 
 export function GetMiniHUDHotkey():Promise<Record<string, any>>;
+
+export function IsElevated():Promise<boolean>;
+
+export function RestartAsAdministrator():Promise<void>;
