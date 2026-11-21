@@ -80,23 +80,23 @@ func TestBuildSelfDiagnosticsReport_WindowsFixtures(t *testing.T) {
 		byID[it.ID] = it
 	}
 
-	if byID["cpu"].Status != DiagStatusAdmin {
-		t.Fatalf("cpu status=%s want admin", byID["cpu"].Status)
+	if byID["cpu"].Status != DiagStatusAdmin || byID["cpu"].Detail != "admin_temp" {
+		t.Fatalf("cpu status=%s detail=%s", byID["cpu"].Status, byID["cpu"].Detail)
 	}
-	if byID["gpu"].Status != DiagStatusFallback {
-		t.Fatalf("gpu status=%s want fallback", byID["gpu"].Status)
+	if byID["gpu"].Status != DiagStatusFallback || byID["gpu"].Detail != "fallback_gpu" {
+		t.Fatalf("gpu status=%s detail=%s", byID["gpu"].Status, byID["gpu"].Detail)
 	}
-	if byID["ram"].Status != DiagStatusOK {
-		t.Fatalf("ram status=%s want ok", byID["ram"].Status)
+	if byID["ram"].Status != DiagStatusOK || byID["ram"].Detail != "ok" {
+		t.Fatalf("ram status=%s detail=%s", byID["ram"].Status, byID["ram"].Detail)
 	}
-	if byID["drives"].Status != DiagStatusAdmin {
-		t.Fatalf("drives status=%s want admin", byID["drives"].Status)
+	if byID["drives"].Status != DiagStatusAdmin || byID["drives"].Detail != "admin_smart" {
+		t.Fatalf("drives status=%s detail=%s", byID["drives"].Status, byID["drives"].Detail)
 	}
-	if byID["registry"].Status != DiagStatusFallback {
-		t.Fatalf("registry status=%s want fallback (partial roots)", byID["registry"].Status)
+	if byID["registry"].Status != DiagStatusFallback || byID["registry"].Detail != "fallback_paths" {
+		t.Fatalf("registry status=%s detail=%s", byID["registry"].Status, byID["registry"].Detail)
 	}
-	if byID["runmode"].Status != DiagStatusOK || rep.RunMode != "user" {
-		t.Fatalf("runmode=%s status=%s", rep.RunMode, byID["runmode"].Status)
+	if byID["runmode"].Status != DiagStatusOK || byID["runmode"].Detail != "user" || rep.RunMode != "user" {
+		t.Fatalf("runmode=%s status=%s detail=%s", rep.RunMode, byID["runmode"].Status, byID["runmode"].Detail)
 	}
 	if !strings.Contains(byID["cpu"].Facts[0], "AMD Ryzen") {
 		t.Fatalf("cpu facts missing model: %v", byID["cpu"].Facts)

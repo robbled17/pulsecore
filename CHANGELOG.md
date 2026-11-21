@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1
+
+### Fixed
+- Self-diagnostics modal: no duplicate Working line under badges; facts use translated labels; MB shown as GB where useful; check time as local datetime
+
 ## 1.6.0
 
 ### Added
