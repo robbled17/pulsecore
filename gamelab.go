@@ -66,6 +66,9 @@ type FPSPrediction struct {
 	Category     string   `json:"category"`
 	Verdict      string   `json:"verdict"`
 	VerdictLevel string   `json:"verdictLevel"`
+	Approximate  bool     `json:"approximate"`
+	GPUClass     string   `json:"gpuClass,omitempty"`
+	CPUClass     string   `json:"cpuClass,omitempty"`
 }
 
 // SystemPowerProfile is the live hardware scorecard used by GamePulse.
@@ -81,6 +84,9 @@ type SystemPowerProfile struct {
 	CPUPowerScore  float64 `json:"cpuPowerScore"`
 	RAMGB          float64 `json:"ramGB"`
 	IsDualChannel  bool    `json:"isDualChannel"`
+	Approximate    bool    `json:"approximate"`
+	GPUClass       string  `json:"gpuClass,omitempty"`
+	CPUClass       string  `json:"cpuClass,omitempty"`
 }
 
 type qualityPreset string
@@ -799,21 +805,24 @@ func (a *App) buildSystemPowerProfile() SystemPowerProfile {
 		vramGB = hw.GPU.DedicatedMB / 1024.0
 	}
 
-	gpuScore := calcGPUPowerScore(gpuName, integrated, vramGB)
-	cpuScore := calcCPUPowerScore(cpuName, cores, threads, freq)
+	gpu := scoreGPU(gpuName, integrated, vramGB)
+	cpu := scoreCPU(cpuName, cores, threads, freq)
 
 	return SystemPowerProfile{
 		GPUName:       gpuName,
 		IsIntegrated:  integrated,
 		VRAMGB:        vramGB,
-		GPUPowerScore: gpuScore,
+		GPUPowerScore: gpu.Score,
 		CPUName:       cpuName,
 		CPUCores:      cores,
 		CPUThreads:    threads,
 		CPUFreqMHz:    freq,
-		CPUPowerScore: cpuScore,
+		CPUPowerScore: cpu.Score,
 		RAMGB:         ramGB,
 		IsDualChannel: dual,
+		Approximate:   gpu.Approximate || cpu.Approximate,
+		GPUClass:      gpu.Class,
+		CPUClass:      cpu.Class,
 	}
 }
 
@@ -853,12 +862,20 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 	}
 
 	classic := strings.EqualFold(game.Category, "classic") || (!reqSet.Heavy && reqSet.Low.ReqGPUScore <= 8)
+	if sys.Approximate {
+		note = "approximate"
+		warnings = appendUnique(warnings, "fpsWarnApprox")
+	}
 	if !classic {
 		if sys.IsIntegrated && !sys.IsDualChannel {
-			note = "integrated_single_channel"
+			if note == "" {
+				note = "integrated_single_channel"
+			}
 			warnings = appendUnique(warnings, "fpsWarnIntegratedSingle")
 		} else if !sys.IsDualChannel {
-			note = "single_channel"
+			if note == "" {
+				note = "single_channel"
+			}
 			warnings = appendUnique(warnings, "fpsWarnSingleChannel")
 		}
 		if sys.CPUCores > 0 && sys.CPUCores < 4 {
@@ -932,6 +949,9 @@ func (a *App) PredictGameFPS(gameID string) FPSPrediction {
 		Category:     game.Category,
 		Verdict:      verdict,
 		VerdictLevel: level,
+		Approximate:  sys.Approximate,
+		GPUClass:     sys.GPUClass,
+		CPUClass:     sys.CPUClass,
 	}
 }
 
@@ -1087,216 +1107,4 @@ func clampScore(v float64) float64 {
 		return 100
 	}
 	return math.Round(v*10) / 10
-}
-
-func calcGPUPowerScore(name string, integrated bool, vramGB float64) float64 {
-	n := strings.ToLower(name)
-	score := 40.0
-
-	switch {
-	case strings.Contains(n, "5090"):
-		score = 100
-	case strings.Contains(n, "5080"):
-		score = 96
-	case strings.Contains(n, "5070"):
-		score = 88
-	case strings.Contains(n, "4090"):
-		score = 100
-	case strings.Contains(n, "4080"):
-		score = 94
-	case strings.Contains(n, "4070 ti"):
-		score = 88
-	case strings.Contains(n, "4070"):
-		score = 85
-	case strings.Contains(n, "4060 ti"):
-		score = 72
-	case strings.Contains(n, "4060"):
-		score = 65
-	case strings.Contains(n, "3090"):
-		score = 90
-	case strings.Contains(n, "3080"):
-		score = 84
-	case strings.Contains(n, "3070"):
-		score = 76
-	case strings.Contains(n, "3060 ti"):
-		score = 68
-	case strings.Contains(n, "3060"):
-		score = 60
-	case strings.Contains(n, "2060 super"):
-		score = 55
-	case strings.Contains(n, "2070 super"):
-		score = 62
-	case strings.Contains(n, "2080"):
-		score = 68
-	case strings.Contains(n, "2060"):
-		score = 50
-	case strings.Contains(n, "1660"):
-		score = 42
-	case strings.Contains(n, "1650"):
-		score = 34
-	case strings.Contains(n, "1050"):
-		score = 26
-	case strings.Contains(n, "rx 7900"):
-		score = 95
-	case strings.Contains(n, "rx 7800"):
-		score = 88
-	case strings.Contains(n, "rx 7700"):
-		score = 80
-	case strings.Contains(n, "rx 7600"):
-		score = 70
-	case strings.Contains(n, "rx 6800"):
-		score = 82
-	case strings.Contains(n, "rx 6700"):
-		score = 72
-	case strings.Contains(n, "rx 6600"):
-		score = 62
-	case strings.Contains(n, "rx 580"):
-		score = 38
-	case strings.Contains(n, "arc a770"):
-		score = 64
-	case strings.Contains(n, "arc a750"):
-		score = 58
-	case strings.Contains(n, "arc a580"):
-		score = 48
-	case strings.Contains(n, "vega 11") || strings.Contains(n, "vega11"):
-		score = 26
-	case strings.Contains(n, "vega 8") || strings.Contains(n, "vega8"):
-		score = 22
-	case strings.Contains(n, "vega 7") || strings.Contains(n, "vega7"):
-		score = 20
-	case strings.Contains(n, "vega 6") || strings.Contains(n, "vega6"):
-		score = 19
-	case strings.Contains(n, "vega 5") || strings.Contains(n, "vega5"):
-		score = 18
-	case strings.Contains(n, "vega 3") || strings.Contains(n, "vega3"):
-		score = 12
-	case strings.Contains(n, "iris xe"):
-		score = 22
-	case strings.Contains(n, "iris"):
-		score = 18
-	case strings.Contains(n, "uhd"):
-		score = 12
-	case strings.Contains(n, "radeon graphics") || strings.Contains(n, "radeon(tm) graphics"):
-		score = 20
-	case n == "" || strings.Contains(n, "unknown"):
-		score = 18
-	default:
-		// Heuristic from chip number for unknown discrete cards.
-		if m := regexp.MustCompile(`(?:rtx|gtx|rx)\s*([0-9]{3,4})`).FindStringSubmatch(n); len(m) == 2 {
-			if num, err := strconv.Atoi(m[1]); err == nil {
-				switch {
-				case num >= 4000:
-					score = 80
-				case num >= 3000:
-					score = 70
-				case num >= 2000:
-					score = 55
-				case num >= 1600:
-					score = 40
-				case num >= 1000:
-					score = 30
-				case num >= 600:
-					score = 65
-				case num >= 500:
-					score = 50
-				default:
-					score = 35
-				}
-			}
-		}
-	}
-
-	if integrated {
-		if score > 35 {
-			score = 28
-		}
-		score *= 0.95
-	} else {
-		// Dedicated VRAM soft boost / penalty.
-		switch {
-		case vramGB >= 12:
-			score *= 1.04
-		case vramGB >= 8:
-			score *= 1.02
-		case vramGB > 0 && vramGB < 4:
-			score *= 0.92
-		case vramGB > 0 && vramGB < 2:
-			score *= 0.85
-		}
-	}
-
-	if strings.Contains(n, "laptop") || strings.Contains(n, "mobile") || strings.Contains(n, "max-q") || strings.Contains(n, "max-p") {
-		score *= 0.90
-	}
-
-	return clampScore(score)
-}
-
-func calcCPUPowerScore(name string, cores, threads int, freqMHz float64) float64 {
-	n := strings.ToLower(name)
-	base := 55.0
-
-	switch {
-	case strings.Contains(n, "ryzen ai 9") || strings.Contains(n, "ultra 9"):
-		base = 92
-	case strings.Contains(n, "ultra 7") || strings.Contains(n, "ryzen ai 7"):
-		base = 84
-	case strings.Contains(n, "ultra 5") || strings.Contains(n, "ryzen ai 5"):
-		base = 74
-	case strings.Contains(n, "i9-14") || strings.Contains(n, "i9-13") || strings.Contains(n, "ryzen 9 7") || strings.Contains(n, "ryzen 9 9"):
-		base = 90
-	case strings.Contains(n, "i7-14") || strings.Contains(n, "i7-13") || strings.Contains(n, "ryzen 7 7") || strings.Contains(n, "ryzen 7 9"):
-		base = 82
-	case strings.Contains(n, "i5-14") || strings.Contains(n, "i5-13") || strings.Contains(n, "ryzen 5 7") || strings.Contains(n, "ryzen 5 9"):
-		base = 72
-	case strings.Contains(n, "i9") || strings.Contains(n, "ryzen 9"):
-		base = 85
-	case strings.Contains(n, "i7") || strings.Contains(n, "ryzen 7"):
-		base = 75
-	case strings.Contains(n, "i5") || strings.Contains(n, "ryzen 5"):
-		base = 65
-	case strings.Contains(n, "4300u") || strings.Contains(n, "4500u") || strings.Contains(n, "5500u"):
-		base = 42
-	case strings.Contains(n, "i3") || strings.Contains(n, "ryzen 3"):
-		base = 45
-	case strings.Contains(n, "celeron") || strings.Contains(n, "pentium") || strings.Contains(n, "athlon"):
-		base = 28
-	}
-
-	if cores <= 0 {
-		cores = 4
-	}
-	if threads <= 0 {
-		threads = cores
-	}
-
-	coreFactor := float64(cores) / 6.0
-	if coreFactor > 1.35 {
-		coreFactor = 1.35
-	}
-	if coreFactor < 0.45 {
-		coreFactor = 0.45
-	}
-
-	threadBonus := 1.0 + math.Min(0.12, float64(threads-cores)*0.02)
-
-	freqFactor := 1.0
-	if freqMHz > 0 {
-		freqFactor = freqMHz / 3200.0
-		if freqFactor > 1.25 {
-			freqFactor = 1.25
-		}
-		if freqFactor < 0.7 {
-			freqFactor = 0.7
-		}
-	}
-
-	// Low-power U-series / thin-laptop penalty.
-	if regexp.MustCompile(`(?i)(\d{4}u\b|ryzen\s+[3579]\s+\d{4}u)`).MatchString(n) ||
-		(strings.Contains(n, "u") && (strings.Contains(n, "ryzen") || strings.Contains(n, "core"))) {
-		base *= 0.88
-	}
-
-	score := base * (0.55 + 0.45*coreFactor) * threadBonus * freqFactor
-	return clampScore(score)
 }

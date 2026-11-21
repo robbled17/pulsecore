@@ -42,6 +42,9 @@ type PCPassport struct {
 	Storage         []StorageDrive  `json:"storage"`
 	HasFreeM2       bool            `json:"hasFreeM2"`
 	Notes           []string        `json:"notes"`
+	Approximate     bool            `json:"approximate"`
+	GPUClass        string          `json:"gpuClass,omitempty"`
+	CPUClass        string          `json:"cpuClass,omitempty"`
 }
 
 // StorageDrive is one physical disk for the passport.
@@ -134,6 +137,13 @@ func (a *App) GetPCPassport() PCPassport {
 	vramGB := float64(gpuVRAM) / (1024 * 1024 * 1024)
 	dedicatedMB := float64(gpuVRAM) / (1024 * 1024)
 	integrated := detectIntegratedGPU(gpuName, dedicatedMB)
+	if integrated {
+		vramGB = 0
+	}
+
+	gpuScore := scoreGPU(gpuName, integrated, vramGB)
+	cpuScore := scoreCPU(static.cpuName, static.physicalCores, static.logicalCores, static.frequencyMHz)
+	approximate := gpuScore.Approximate || cpuScore.Approximate
 
 	notes := make([]string, 0, 4)
 	if isLaptop {
@@ -182,6 +192,9 @@ func (a *App) GetPCPassport() PCPassport {
 		Storage:         storage,
 		HasFreeM2:       hasFreeM2,
 		Notes:           notes,
+		Approximate:     approximate,
+		GPUClass:        gpuScore.Class,
+		CPUClass:        cpuScore.Class,
 	}
 }
 
@@ -203,6 +216,19 @@ func (a *App) GetUpgradeAdvice(goal string) UpgradeAdvice {
 
 	pass := a.GetPCPassport()
 	lang := a.GetLanguage()
+	if pass.Approximate {
+		note := trUpgrade(lang, "noteApprox")
+		dup := false
+		for _, n := range pass.Notes {
+			if n == note {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			pass.Notes = append(pass.Notes, note)
+		}
+	}
 	recs := buildUpgradeRecommendations(pass, goal, lang)
 	summary := upgradeSummary(pass, goal, lang)
 	return UpgradeAdvice{
