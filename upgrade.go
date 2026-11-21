@@ -101,12 +101,29 @@ func (a *App) GetPCPassport() PCPassport {
 	slotsUsed := static.ramSlotsUsed
 	slotsTotal := static.ramSlotsTotal
 	ramSpeed := static.ramSpeedMHz
+	// Single source of truth with Hardware tab: prefer cached static slots.
+	// Re-read only when static inventory is empty.
 	if ramType == "" || slotsTotal == 0 {
-		ramType, slotsUsed, slotsTotal, ramSpeed = readRAMSlots()
+		rt, used, total, speed := readRAMSlots()
+		if ramType == "" {
+			ramType = rt
+		}
+		if slotsTotal == 0 {
+			slotsUsed, slotsTotal = used, total
+		}
+		if ramSpeed == 0 {
+			ramSpeed = speed
+		}
 	}
-	slotsFree := slotsTotal - slotsUsed
-	if slotsFree < 0 {
-		slotsFree = 0
+	slotsUsed, slotsTotal, slotsFree := normalizeRAMSlots(slotsUsed, slotsTotal)
+
+	hasBattery := batteryPresent()
+	if refine := refineLaptopDetection(isLaptop, chassis, static.cpuName, gpuName, hasBattery); refine.isLaptop {
+		isLaptop = true
+		chassis = refine.chassis
+		if chassisRaw == "" {
+			chassisRaw = refine.raw
+		}
 	}
 
 	var ramGB float64
@@ -343,6 +360,122 @@ func classifyChassis(codes []int) (string, bool) {
 		}
 	}
 	return "unknown", false
+}
+
+// normalizeRAMSlots clamps used/total and returns free = max(0, total-used).
+// Shared by Hardware and Upgrade so both UIs agree on free slot count.
+func normalizeRAMSlots(used, total int) (usedOut, totalOut, free int) {
+	if used < 0 {
+		used = 0
+	}
+	if total < 0 {
+		total = 0
+	}
+	if total > 0 && used > total {
+		used = total
+	}
+	free = total - used
+	if free < 0 {
+		free = 0
+	}
+	return used, total, free
+}
+
+type laptopRefine struct {
+	isLaptop bool
+	chassis  string
+	raw      string
+}
+
+// refineLaptopDetection upgrades a false-negative desktop/unknown chassis when
+// battery, mobile CPU suffixes (H/HX/U/HS), or "Laptop" GPU markers are present.
+func refineLaptopDetection(already bool, chassis, cpuName, gpuName string, hasBattery bool) laptopRefine {
+	if already || chassis == "laptop" {
+		return laptopRefine{isLaptop: true, chassis: "laptop"}
+	}
+	if looksLikeLaptopHardware(cpuName, gpuName, hasBattery) {
+		reason := "heuristic"
+		if hasBattery {
+			reason = "battery"
+		} else if mobileCPUName(cpuName) {
+			reason = "cpu-mobile"
+		} else if mobileGPUName(gpuName) {
+			reason = "gpu-laptop"
+		}
+		return laptopRefine{isLaptop: true, chassis: "laptop", raw: reason}
+	}
+	return laptopRefine{isLaptop: false, chassis: chassis}
+}
+
+func looksLikeLaptopHardware(cpuName, gpuName string, hasBattery bool) bool {
+	if hasBattery {
+		return true
+	}
+	return mobileCPUName(cpuName) || mobileGPUName(gpuName)
+}
+
+func mobileGPUName(name string) bool {
+	n := strings.ToLower(name)
+	return strings.Contains(n, "laptop") ||
+		strings.Contains(n, "mobile") ||
+		strings.Contains(n, "max-q") ||
+		strings.Contains(n, "max-p") ||
+		strings.Contains(n, "maxq")
+}
+
+// mobileCPUName detects common notebook CPU product markers (H/HX/U/HS and "Laptop").
+func mobileCPUName(name string) bool {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if n == "" {
+		return false
+	}
+	if strings.Contains(n, "laptop") || strings.Contains(n, "mobile") {
+		return true
+	}
+	// Strip trademark noise, keep alnum tokens.
+	compact := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return ' '
+	}, n)
+	for _, tok := range strings.Fields(compact) {
+		// Intel/AMD mobile SKUs: 5800h, 12700hx, 1135g7, 7840hs, 5600u …
+		if len(tok) < 4 {
+			continue
+		}
+		hasDigit := false
+		for _, r := range tok {
+			if r >= '0' && r <= '9' {
+				hasDigit = true
+				break
+			}
+		}
+		if !hasDigit {
+			continue
+		}
+		if strings.HasSuffix(tok, "hx") || strings.HasSuffix(tok, "hs") ||
+			strings.HasSuffix(tok, "h") || strings.HasSuffix(tok, "u") {
+			return true
+		}
+		// Intel G-series mobile (e.g. 1135g7): digit+g+digit
+		if strings.Contains(tok, "g") {
+			i := strings.IndexByte(tok, 'g')
+			if i > 0 && i+1 < len(tok) && tok[i-1] >= '0' && tok[i-1] <= '9' && tok[i+1] >= '0' && tok[i+1] <= '9' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func batteryPresent() bool {
+	st, ok := readSystemPowerStatus()
+	if !ok {
+		return false
+	}
+	// 255 = unknown / no battery on most Windows builds.
+	return st.BatteryLifePercent != 255
 }
 
 func joinInts(xs []int) string {

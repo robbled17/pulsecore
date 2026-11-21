@@ -542,11 +542,12 @@ func buildHardwareInfo(static staticHardware, cpuPct float64, perCore []float64,
 }
 
 func buildRAMDeepInfo(static staticHardware, totalMB, usedMB, freeMB uint64, pct float64) RAMDeepInfo {
-	single := static.ramSlotsUsed == 1
+	slotsUsed, slotsTotal, _ := normalizeRAMSlots(static.ramSlotsUsed, static.ramSlotsTotal)
+	single := slotsUsed == 1
 	status := "✓ Двухканальный режим активен (максимальная скорость графики)."
 	if single {
 		status = "⚠ Память в одноканале. Встроенная графика Radeon теряет до 30-40% мощности."
-	} else if static.ramSlotsUsed >= 2 {
+	} else if slotsUsed >= 2 {
 		status = "✓ Двухканальный режим активен (максимальная скорость графики)."
 	} else {
 		status = "Режим каналов памяти не определён."
@@ -558,8 +559,8 @@ func buildRAMDeepInfo(static staticHardware, totalMB, usedMB, freeMB uint64, pct
 		FreeMB:          freeMB,
 		Percent:         pct,
 		Type:            static.ramType,
-		SlotsUsed:       static.ramSlotsUsed,
-		SlotsTotal:      static.ramSlotsTotal,
+		SlotsUsed:       slotsUsed,
+		SlotsTotal:      slotsTotal,
 		SpeedMHz:        static.ramSpeedMHz,
 		IsSingleChannel: single,
 		ChannelStatus:   status,
