@@ -52,6 +52,7 @@ const TABS = [
     file: 'live-demo-tab-uninstall-1440x900.png',
     expectVisible: ['#demo-residual', '#demo-kill-remove'],
     expectHidden: ['#demo-metrics', '#demo-procs', '#demo-games', '#demo-hw-ssd'],
+    uninstallSequence: true,
   },
 ]
 
@@ -176,6 +177,57 @@ async function main() {
       if (!ssdOpen) throw new Error('hardware: SSD accordion not open')
     }
 
+    if (tab.uninstallSequence) {
+      await page.click('#demo-kill-remove')
+      await page.waitForTimeout(200)
+      const step1 = await page.evaluate(() => {
+        const status = document.getElementById('demo-uninstall-status')
+        const msg = document.getElementById('demo-uninstall-status-msg')
+        return {
+          on: status?.classList.contains('is-on'),
+          text: (msg?.textContent || '').trim(),
+        }
+      })
+      if (!step1.on) throw new Error('uninstall: status not shown after click')
+      if (!/процесс|process|Hintergrund|終了|后台|аяқтау|туктату/i.test(step1.text)) {
+        throw new Error(`uninstall: unexpected kill step text: ${step1.text}`)
+      }
+      await page.waitForTimeout(900)
+      const step2 = await page.evaluate(() => {
+        const msg = document.getElementById('demo-uninstall-status-msg')
+        const cleared = [...document.querySelectorAll('#demo-residual .demo-check.is-cleared')].length
+        return { text: (msg?.textContent || '').trim(), cleared }
+      })
+      if (!/реестр|registry|Registry|レジストリ|注册表|реестр|калдык/i.test(step2.text) && step2.cleared < 1) {
+        throw new Error(`uninstall: clean step not progressing: ${JSON.stringify(step2)}`)
+      }
+      await page.waitForTimeout(1400)
+      const done = await page.evaluate(() => {
+        const doneEl = document.getElementById('demo-uninstall-done')
+        const card = document.getElementById('demo-uninstall-card')
+        const residual = document.getElementById('demo-residual')
+        return {
+          doneOn: doneEl?.classList.contains('is-on'),
+          doneText: (doneEl?.innerText || '').replace(/\s+/g, ' ').trim(),
+          cardCollapsed: card?.classList.contains('is-collapsing'),
+          residualGone: residual?.classList.contains('is-gone'),
+          hasReplay: !!document.getElementById('demo-uninstall-replay'),
+        }
+      })
+      if (!done.doneOn) throw new Error(`uninstall: done state missing ${JSON.stringify(done)}`)
+      if (!done.hasReplay) throw new Error('uninstall: replay button missing')
+      if (!done.cardCollapsed) throw new Error('uninstall: card did not collapse')
+      // reset for screenshot of idle panel next time / keep done state for shot
+      await page.click('#demo-uninstall-replay')
+      await page.waitForTimeout(250)
+      const resetOk = await page.evaluate(() => {
+        const btn = document.getElementById('demo-kill-remove')
+        const doneEl = document.getElementById('demo-uninstall-done')
+        return !!(btn && !btn.hidden && !btn.disabled && doneEl && !doneEl.classList.contains('is-on'))
+      })
+      if (!resetOk) throw new Error('uninstall: replay did not reset demo')
+    }
+
     const shotPath = path.join(LOCAL, tab.file)
     await page.screenshot({ path: shotPath, fullPage: false })
     await copyFile(shotPath, path.join(MEDIA, tab.file))
@@ -201,6 +253,51 @@ async function main() {
       throw new Error(`inactive panel ${p.panel} display=${p.display}`)
     }
   }
+
+  // Mobile: all 6 tabs fully visible (no clipped Удаление), preferably wrapped at 390
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  await mobile.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 })
+  await mobile.waitForSelector('.preview-tabs button[data-tab="uninstall"]', { timeout: 10000 })
+  await mobile.evaluate(() => {
+    document.getElementById('preview')?.scrollIntoView({ block: 'start' })
+  })
+  await mobile.waitForTimeout(400)
+  const tabGeom = await mobile.evaluate(() => {
+    const list = document.querySelector('.preview-tabs')
+    const btns = [...document.querySelectorAll('.preview-tabs button')]
+    const listRect = list.getBoundingClientRect()
+    return btns.map((b) => {
+      const r = b.getBoundingClientRect()
+      return {
+        tab: b.dataset.tab,
+        text: b.textContent.trim(),
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        clippedRight: r.right > listRect.right + 1,
+        clippedLeft: r.left < listRect.left - 1,
+        fullyInList: r.left >= listRect.left - 1 && r.right <= listRect.right + 1,
+      }
+    })
+  })
+  if (tabGeom.length !== 6) throw new Error(`mobile: expected 6 tabs, got ${tabGeom.length}`)
+  const clipped = tabGeom.filter((t) => !t.fullyInList || t.clippedRight)
+  if (clipped.length) {
+    throw new Error(`mobile: tabs clipped: ${JSON.stringify(clipped)}`)
+  }
+  const uninstallTab = tabGeom.find((t) => t.tab === 'uninstall')
+  if (!uninstallTab || /…|\.\.\./.test(uninstallTab.text)) {
+    throw new Error(`mobile: uninstall label clipped: ${JSON.stringify(uninstallTab)}`)
+  }
+  const mobileShot = 'live-demo-tabs-mobile-390x844.png'
+  const mobilePath = path.join(LOCAL, mobileShot)
+  await mobile.screenshot({ path: mobilePath, fullPage: false })
+  await copyFile(mobilePath, path.join(MEDIA, mobileShot))
+  await copyFile(mobilePath, path.join(ARTIFACTS, mobileShot))
+  results.push({ tab: 'mobile-tabs', ok: true, tabGeom, file: mobileShot })
+  console.log('OK mobile-tabs', tabGeom.map((t) => t.tab).join(','))
+  await mobile.close()
 
   await writeFile(path.join(ARTIFACTS, 'live-demo-tabs-verify.json'), JSON.stringify({ results, inactive }, null, 2))
   await browser.close()
