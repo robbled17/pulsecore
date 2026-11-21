@@ -276,13 +276,40 @@ func isSymlinkPath(path string, d fs.DirEntry) bool {
 	return fi.Mode()&os.ModeSymlink != 0
 }
 
+// isUnderLocalPackages forbids UWP/Store package trees under LOCALAPPDATA\Packages
+// (and classic AppData\Local\Packages / WindowsApps paths), including test harnesses
+// that redirect LOCALAPPDATA into a temp folder.
+func isUnderLocalPackages(norm string) bool {
+	if norm == "" {
+		return false
+	}
+	local := normalizeProtectPath(os.Getenv("LOCALAPPDATA"))
+	if local != "" {
+		root := local + `\packages`
+		if norm == root || strings.HasPrefix(norm, root+`\`) {
+			return true
+		}
+	}
+	if strings.Contains(norm, `\appdata\local\packages`) {
+		return true
+	}
+	// Store install roots / Start Menu package hosts.
+	if strings.Contains(norm, `\windowsapps\`) || strings.HasSuffix(norm, `\windowsapps`) {
+		return true
+	}
+	if strings.Contains(norm, `\microsoft\windows\start menu`) {
+		return true
+	}
+	return false
+}
+
 // isForbiddenCleanRoot blocks cleaning entire AppData / ProgramData / Windows / PF trees.
 func isForbiddenCleanRoot(path string) bool {
 	norm := normalizeProtectPath(path)
 	if norm == "" || IsProtectedSystemTarget(path) {
 		return true
 	}
-	if strings.Contains(norm, `\appdata\local\packages`) {
+	if isUnderLocalPackages(norm) {
 		return true
 	}
 	// Bare profile AppData roots (not a specific allowlisted leaf)
@@ -306,7 +333,7 @@ func isForbiddenCleanRoot(path string) bool {
 // isForbiddenCleanPath rejects any file under Packages or outside allowlisted trees mid-walk.
 func isForbiddenCleanPath(path string) bool {
 	norm := normalizeProtectPath(path)
-	if strings.Contains(norm, `\appdata\local\packages`) {
+	if isUnderLocalPackages(norm) {
 		return true
 	}
 	if IsProtectedSystemTarget(path) {
@@ -355,7 +382,7 @@ func isAllowedBrowserCacheDir(path string) bool {
 	if local == "" || !strings.HasPrefix(norm, local+`\`) {
 		return false
 	}
-	if strings.Contains(norm, `\appdata\local\packages`) {
+	if isUnderLocalPackages(norm) {
 		return false
 	}
 	// Must live under a known browser User Data (or Opera Stable) tree.

@@ -47,7 +47,8 @@ export function isDevModeActive() {
 export function loadDevState() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    state = { ...DEFAULTS, ...raw, active: !!raw.active }
+    // Never restore Dev Mode badge/nav across sessions - requires About 7-click again.
+    state = { ...DEFAULTS, ...raw, active: false }
   } catch (_) {
     state = { ...DEFAULTS }
   }
@@ -55,7 +56,9 @@ export function loadDevState() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  // Persist thresholds/prefs, but keep `active` session-only so production stays clean.
+  const { active, ...rest } = state
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...rest, active: false }))
   hooks.onChange(getDevState())
 }
 

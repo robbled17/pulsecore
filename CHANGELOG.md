@@ -8,6 +8,11 @@
 - Sensors: Mini-HUD and Hardware temp chips use translated unavailable status when ACPI is missing
 - Desktop battery wear field shows N/A instead of a Russian ATX caption in non-RU UIs
 - App icon: tighter transparent crop so tray/taskbar icon has no empty white-looking margins
+- Cleaner: forbid LOCALAPPDATA\Packages (and WindowsApps / Start Menu package trees) even when LOCALAPPDATA is redirected
+- SMART: never invent 50%/70%/100% wear when the reliability counter is missing
+- Dev Mode badge stays session-only (not restored from localStorage)
+- Landing Upgrade demo recommendations follow language (RU/EN; other langs use EN)
+- i18n: translate insightAct / fpsWarn / mhShowTemps leftovers for kk/tt/de/ja/zh
 
 ### Needs hardware
 - Live SMBIOS chassis + batteryPresent on real Windows notebooks

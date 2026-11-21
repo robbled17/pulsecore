@@ -651,6 +651,13 @@ try {
 	wear := asFloat(parsed["Wear"])
 	report.ReadErrors = asInt64(parsed["ReadErrors"])
 	report.WriteErrors = asInt64(parsed["WriteErrors"])
+	sizeBytes := asFloat(parsed["SizeBytes"])
+	return finalizeDiskHealthReport(report, wear, sizeBytes)
+}
+
+// finalizeDiskHealthReport applies wear/health scoring without inventing percentages
+// when the Storage Reliability wear counter is missing (wear < 0).
+func finalizeDiskHealthReport(report DiskHealthReport, wear, sizeBytes float64) DiskHealthReport {
 	report.HasCriticalErrors = report.ReadErrors > 0 || report.WriteErrors > 0 ||
 		strings.EqualFold(report.HealthStatus, "Warning") ||
 		strings.EqualFold(report.HealthStatus, "Unhealthy")
@@ -662,18 +669,13 @@ try {
 		}
 		report.HealthPercent = report.WearRemaining
 		// Approximate TBW from capacity * wear fraction when size known.
-		sizeBytes := asFloat(parsed["SizeBytes"])
 		if sizeBytes > 0 && wear > 0 {
 			report.TBWGB = (sizeBytes * (wear / 100.0)) / (1024 * 1024 * 1024)
 		}
-	} else if strings.EqualFold(report.HealthStatus, "Healthy") {
-		report.HealthPercent = 100
-		report.WearRemaining = 100
-	} else if strings.EqualFold(report.HealthStatus, "Warning") {
-		report.HealthPercent = 70
-		report.WearRemaining = 70
 	} else {
-		report.HealthPercent = 50
+		// Wear counter missing: never invent 50%/70%/100% health.
+		report.WearRemaining = -1
+		report.HealthPercent = -1
 	}
 
 	switch {
@@ -683,9 +685,16 @@ try {
 	case strings.EqualFold(report.HealthStatus, "Warning"):
 		report.Verdict = "Внимание"
 		report.VerdictBadge = "⚠ Внимание"
-	default:
+	case report.WearRemaining >= 0:
 		report.Verdict = fmt.Sprintf("Отличное (%.0f%%)", report.HealthPercent)
 		report.VerdictBadge = fmt.Sprintf("✓ Состояние: Отличное (%.0f%%)", report.HealthPercent)
+	case strings.EqualFold(report.HealthStatus, "Healthy"):
+		// Disk reports healthy, but wear % is unavailable.
+		report.Verdict = "OK"
+		report.VerdictBadge = "OK"
+	default:
+		report.Verdict = "Недоступно"
+		report.VerdictBadge = "N/A"
 	}
 	report.OK = true
 	return report
