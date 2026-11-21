@@ -53,7 +53,9 @@ html[data-theme="light"] {
 html, body {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
   background: linear-gradient(180deg, #080d18 0%, #05070f 52%, #04060c 100%);
   color: var(--text);
   font-family: var(--font);
@@ -233,8 +235,12 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 /* ── Shell / Sidebar ──────────────────────────────────── */
 .shell {
   display: grid;
-  grid-template-columns: 204px 1fr;
+  grid-template-columns: 204px minmax(0, 1fr);
   height: calc(100% - 36px);
+  max-width: 100%;
+  overflow-x: hidden;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .sidebar {
   border-right: 1px solid var(--line);
@@ -334,10 +340,112 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 .btn-about:hover { color: var(--text); border-color: var(--line-soft); }
 
 .content {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 24px 28px 36px;
   scrollbar-width: thin;
   scrollbar-color: rgba(160, 190, 255, 0.35) transparent;
+}
+
+/* Prevent flex/grid children from forcing horizontal page scroll */
+#tab-overview *,
+#tab-lag *,
+#tab-hardware *,
+#tab-upgrade *,
+#tab-uninstall *,
+#tab-gamelab *,
+#tab-settings * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#tab-overview,
+#tab-lag,
+#tab-hardware,
+#tab-upgrade,
+#tab-uninstall,
+#tab-gamelab,
+#tab-settings {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.update-banner {
+  position: fixed;
+  top: 36px;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 10px 18px;
+  border-bottom: 1px solid rgba(110, 168, 255, 0.35);
+  background: linear-gradient(90deg, rgba(30, 40, 70, 0.96), rgba(40, 32, 70, 0.94));
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.update-banner.hidden { display: none !important; }
+.update-banner-text {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.update-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.update-panel .update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.update-current {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.update-result {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  min-height: 1.2em;
+}
+.update-result .update-spin {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid rgba(160, 190, 255, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: updateSpin 0.7s linear infinite;
+}
+@keyframes updateSpin {
+  to { transform: rotate(360deg); }
+}
+.update-result a,
+.update-result .update-dl {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .content::-webkit-scrollbar { width: 10px; }
 .content::-webkit-scrollbar-track {

@@ -109,3 +109,5 @@ export function GetMiniHUDHotkey():Promise<Record<string, any>>;
 export function IsElevated():Promise<boolean>;
 
 export function RestartAsAdministrator():Promise<void>;
+
+export function CheckForUpdates():Promise<Record<string, any>>;

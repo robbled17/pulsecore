@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.4
+
+### Added
+- Update checker: GitHub Releases latest with About/Settings check and launch banner when newer
+- Version and updates block at the bottom of Settings
+
+### Fixed
+- Horizontal overflow on Overview, Lags, Hardware, Upgrade, Uninstall, GamePulse, and Settings at common laptop widths
+
+
 ## 1.6.3
 
 ### Fixed

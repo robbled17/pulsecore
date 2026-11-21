@@ -964,6 +964,34 @@ const App = {
   RestartAsAdministrator: async () => {
     console.info('[PulseCore mock] RestartAsAdministrator (no-op)')
   },
+  CheckForUpdates: async () => {
+    const force = typeof window !== 'undefined' && window.__PULSECORE_FORCE_UPDATE__
+    if (force === 'offline') {
+      return {
+        status: 'offline',
+        currentVersion: '1.6.4',
+        latestVersion: '',
+        notes: '',
+        downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
+      }
+    }
+    if (force === 'available' || force === true) {
+      return {
+        status: 'update_available',
+        currentVersion: '1.6.4',
+        latestVersion: '1.9.9',
+        notes: 'Mock release notes for UI capture',
+        downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
+      }
+    }
+    return {
+      status: 'up_to_date',
+      currentVersion: '1.6.4',
+      latestVersion: '1.6.4',
+      notes: '',
+      downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
+    }
+  },
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,

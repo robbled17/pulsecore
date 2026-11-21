@@ -217,3 +217,7 @@ export function IsElevated() {
 export function RestartAsAdministrator() {
   return window['go']['main']['App']['RestartAsAdministrator']();
 }
+
+export function CheckForUpdates() {
+  return window['go']['main']['App']['CheckForUpdates']();
+}

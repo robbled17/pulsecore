@@ -36,6 +36,7 @@ import {
   GetMiniHUDHotkey,
   IsElevated,
   RestartAsAdministrator,
+  CheckForUpdates,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -47,7 +48,7 @@ import {
 /** Dev Mode UI is compile-time gated: Vite production (wails build) never ships it. */
 const DEV_MODE_ENABLED = import.meta.env.DEV === true
 
-const MIT_LICENSE = `PulseCore v1.6.3
+const MIT_LICENSE = `PulseCore v1.6.4
 
 MIT License
 
@@ -83,8 +84,9 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.6.3'
+const APP_VERSION = 'v1.6.4'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
+const DEFAULT_EXE_URL = 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
 let uiTheme = localStorage.getItem('zp_theme') || 'dark'
@@ -1957,6 +1959,86 @@ async function copyPCConfig() {
   }
 }
 
+let lastUpdateResult = null
+let updateBannerDismissed = false
+
+function openDownloadURL(url) {
+  const target = (url && String(url).trim()) || DEFAULT_EXE_URL
+  try {
+    BrowserOpenURL(target)
+  } catch (_) {
+    window.open(target, '_blank', 'noopener,noreferrer')
+  }
+}
+
+function setUpdateResultHost(host, html) {
+  if (!host) return
+  host.innerHTML = html
+}
+
+function renderUpdateStatus(host, res) {
+  if (!host) return
+  if (!res || res.status === 'offline') {
+    setUpdateResultHost(host, t('updateOffline'))
+    return
+  }
+  if (res.status === 'up_to_date') {
+    const latest = res.latestVersion ? ` v${String(res.latestVersion).replace(/^v/i, '')}` : ''
+    setUpdateResultHost(host, `${t('updateUpToDate')}${latest}`)
+    return
+  }
+  if (res.status === 'update_available') {
+    const ver = `v${String(res.latestVersion || '').replace(/^v/i, '')}`
+    const label = t('updateAvailable').replace('{version}', ver)
+    const notes = res.notes ? `<div class="muted" style="margin-top:4px">${escapeHtml(res.notes)}</div>` : ''
+    setUpdateResultHost(
+      host,
+      `${escapeHtml(label)} <button type="button" class="btn compact update-dl-btn" data-update-dl="1">${escapeHtml(t('updateDownload'))}</button>${notes}`,
+    )
+    host.querySelector('[data-update-dl]')?.addEventListener('click', () => openDownloadURL(res.downloadURL))
+    return
+  }
+  setUpdateResultHost(host, t('updateOffline'))
+}
+
+function showUpdateBanner(res) {
+  const banner = $('update-banner')
+  const text = $('update-banner-text')
+  if (!banner || !text || !res || res.status !== 'update_available') return
+  if (updateBannerDismissed) return
+  const ver = `v${String(res.latestVersion || '').replace(/^v/i, '')}`
+  text.textContent = t('updateBannerText').replace('{version}', ver)
+  banner.dataset.downloadUrl = res.downloadURL || DEFAULT_EXE_URL
+  banner.classList.remove('hidden')
+}
+
+function hideUpdateBanner() {
+  updateBannerDismissed = true
+  $('update-banner')?.classList.add('hidden')
+}
+
+async function runUpdateCheck({ showBanner = false, hosts = [] } = {}) {
+  const targets = (hosts || []).filter(Boolean)
+  for (const host of targets) {
+    setUpdateResultHost(host, `<span class="update-spin" aria-hidden="true"></span>${escapeHtml(t('updateChecking'))}`)
+  }
+  let res
+  try {
+    res = await CheckForUpdates()
+  } catch (_) {
+    res = { status: 'offline', currentVersion: APP_VERSION.replace(/^v/i, ''), latestVersion: '', notes: '', downloadURL: DEFAULT_EXE_URL }
+  }
+  lastUpdateResult = res
+  for (const host of targets) renderUpdateStatus(host, res)
+  if (showBanner && res?.status === 'update_available') showUpdateBanner(res)
+  return res
+}
+
+function syncSettingsVersionLabel() {
+  const el = $('settings-app-ver')
+  if (el) el.textContent = APP_VERSION
+}
+
 function diagStatusLabel(status) {
   switch (String(status || '')) {
     case 'ok': return t('diagStatusOk')
@@ -2795,6 +2877,17 @@ function wireUI() {
     if (ev.target.id === 'about-modal') closeAbout()
   })
   $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+  $('btn-check-updates')?.addEventListener('click', () => {
+    runUpdateCheck({ hosts: [$('about-update-result')] })
+  })
+  $('btn-check-updates-settings')?.addEventListener('click', () => {
+    runUpdateCheck({ hosts: [$('settings-update-result')] })
+  })
+  $('update-banner-download')?.addEventListener('click', () => {
+    openDownloadURL($('update-banner')?.dataset?.downloadUrl || lastUpdateResult?.downloadURL)
+  })
+  $('update-banner-close')?.addEventListener('click', hideUpdateBanner)
+  $('update-banner-x')?.addEventListener('click', hideUpdateBanner)
   $('btn-check-sensors')?.addEventListener('click', openSelfDiagnostics)
   $('diag-close')?.addEventListener('click', closeDiagModal)
   $('diag-modal')?.addEventListener('click', (ev) => {
@@ -3185,12 +3278,17 @@ function boot() {
     setChartActive(!document.hidden)
   })
   SetLanguage(lang).catch(() => {})
+  syncSettingsVersionLabel()
   refresh()
   refreshWeekly()
   refreshPeripherals()
   loadGames()
   setInterval(refresh, 1000)
   setChartActive(true)
+  // Background update check shortly after launch
+  setTimeout(() => {
+    runUpdateCheck({ showBanner: true }).catch(() => {})
+  }, 3000)
 
   try {
     EventsOn('metrics:update', (m) => {
