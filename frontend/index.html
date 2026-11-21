@@ -62,6 +62,8 @@
         <button type="button" class="nav-item active" data-tab="overview" data-i18n="tabOverview">Обзор</button>
         <button type="button" class="nav-item" data-tab="lag" data-i18n="tabLag">Лаги</button>
         <button type="button" class="nav-item" data-tab="hardware" data-i18n="tabHardware">Железо</button>
+        <button type="button" class="nav-item" data-tab="upgrade" data-i18n="tabUpgrade">Апгрейд</button>
+        <button type="button" class="nav-item" data-tab="uninstall" data-i18n="tabUninstall">Удаление</button>
         <button type="button" class="nav-item" data-tab="gamelab" data-i18n="tabGameLab">GamePulse</button>
         <button type="button" class="nav-item" data-tab="settings" data-i18n="tabSettings">Настройки</button>
         <button type="button" class="nav-item dev-mode-nav hidden" data-tab="dev" data-i18n="tabDevMode">Dev Mode</button>
@@ -286,6 +288,82 @@
           </summary>
           <div id="periph-list" class="periph-list"><div class="empty" data-i18n="periphEmpty">Сканирование…</div></div>
         </details>
+      </section>
+
+      <section id="tab-upgrade" class="tab">
+        <header class="section-head">
+          <h1 data-i18n="upgradeTitle">Советник апгрейда</h1>
+          <p data-i18n="upgradeSub">Паспорт ПК и локальные рекомендации под вашу цель</p>
+        </header>
+        <div class="panel">
+          <div class="panel-title row-between">
+            <span data-i18n="passportTitle">Текущий ПК</span>
+            <button type="button" class="btn compact" id="btn-upgrade-refresh" data-i18n="upgradeRefresh">Обновить паспорт</button>
+          </div>
+          <div id="upgrade-passport" class="upgrade-passport">
+            <div class="empty" data-i18n="upgradeLoading">Собираю паспорт ПК…</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" data-i18n="recTitle">Рекомендации</div>
+          <div class="btn-row upgrade-goals" id="upgrade-goals">
+            <button type="button" class="btn goal active" data-goal="max_fps" data-i18n="goalMaxFps">Максимум FPS</button>
+            <button type="button" class="btn goal" data-goal="quiet_cool" data-i18n="goalQuiet">Тише и холоднее</button>
+            <button type="button" class="btn goal" data-goal="work" data-i18n="goalWork">Работа</button>
+            <button type="button" class="btn goal" data-goal="budget" data-i18n="goalBudget">Бюджет</button>
+          </div>
+          <p id="upgrade-summary" class="upgrade-summary muted"></p>
+          <div id="upgrade-recs" class="upgrade-recs">
+            <div class="empty" data-i18n="upgradeEmpty">Выберите цель апгрейда</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-uninstall" class="tab">
+        <header class="section-head">
+          <h1 data-i18n="uninstallTitle">Умное удаление</h1>
+          <p data-i18n="uninstallSub">Процессы, остатки и трассировка установки</p>
+        </header>
+        <div class="panel">
+          <div class="panel-title row-between">
+            <span data-i18n="uninstallListTitle">Установленные программы</span>
+            <button type="button" class="btn compact" id="btn-uninstall-refresh" data-i18n="uninstallRefresh">Обновить список</button>
+          </div>
+          <input id="uninstall-search" class="game-search" type="search" data-i18n-placeholder="uninstallSearchPh" placeholder="Поиск программ…" autocomplete="off" />
+          <div id="uninstall-list" class="list dense-table uninstall-list">
+            <div class="empty" data-i18n="checking">…</div>
+          </div>
+        </div>
+        <div class="panel" id="uninstall-detail" hidden>
+          <div class="panel-title" id="uninstall-detail-title">-</div>
+          <div id="uninstall-running" class="list dense-table"></div>
+          <div class="btn-row">
+            <button type="button" class="btn compact" id="btn-uninstall-precheck" data-i18n="uninstallPrecheck">Проверить процессы</button>
+            <button type="button" class="btn compact danger" id="btn-uninstall-kill" data-i18n="uninstallKillRemove">Завершить и удалить</button>
+            <button type="button" class="btn compact" id="btn-uninstall-only" data-i18n="uninstallOnly">Удалить</button>
+            <button type="button" class="btn compact" id="btn-residual-scan" data-i18n="residualScan">Сканировать остатки</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title row-between">
+            <span data-i18n="residualTitle">Остатки после удаления</span>
+            <button type="button" class="btn compact danger" id="btn-residual-delete" data-i18n="residualDelete">Удалить выбранное</button>
+          </div>
+          <div id="residual-list" class="list dense-table">
+            <div class="empty" data-i18n="residualEmpty">Остатков не найдено</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" data-i18n="traceTitle">Установка с трассировкой</div>
+          <div class="btn-row">
+            <button type="button" class="btn compact" id="btn-trace-start" data-i18n="traceStart">Выбрать .exe / .msi</button>
+            <button type="button" class="btn compact" id="btn-trace-finish" data-i18n="traceFinish">Завершить трассировку</button>
+          </div>
+          <div class="panel-title" style="margin-top:12px" data-i18n="traceList">Сохранённые трассы</div>
+          <div id="trace-list" class="list dense-table">
+            <div class="empty" data-i18n="traceEmpty">Трасс пока нет</div>
+          </div>
+        </div>
       </section>
 
       <section id="tab-gamelab" class="tab tab-gamelab">

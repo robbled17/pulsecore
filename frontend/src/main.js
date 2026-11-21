@@ -19,6 +19,16 @@ import {
   SearchGames,
   SearchGamesOnline,
   PredictGameFPS,
+  GetUpgradeAdvice,
+  ListInstalledApps,
+  PrecheckUninstall,
+  UninstallApp,
+  ScanResiduals,
+  DeleteResiduals,
+  StartTracedInstall,
+  FinishTracedInstall,
+  ListInstallTraces,
+  CleanupFromTrace,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -181,6 +191,11 @@ function setActiveTab(name) {
     tab.classList.toggle('active', tab.id === `tab-${name}`)
   })
   if (name === 'hardware') refreshPeripherals()
+  if (name === 'upgrade') refreshUpgradeAdvisor()
+  if (name === 'uninstall') {
+    refreshInstalledApps()
+    refreshTraceList()
+  }
 }
 
 function updateChartTitle() {
@@ -1717,9 +1732,290 @@ async function refresh() {
   }
 }
 
+let upgradeGoal = localStorage.getItem('zp_upgrade_goal') || 'max_fps'
+let installedAppsCache = []
+let selectedUninstallApp = null
+let residualItemsCache = []
+
+function chassisLabel(pass) {
+  if (pass?.isLaptop || pass?.chassis === 'laptop') return t('chassisLaptop')
+  if (pass?.chassis === 'desktop') return t('chassisDesktop')
+  return t('chassisUnknown')
+}
+
+function renderPassport(pass) {
+  const host = $('upgrade-passport')
+  if (!host || !pass) return
+  const storage = (pass.storage || []).map((d) => {
+    const size = d.sizeGB ? `${Math.round(d.sizeGB)} GB` : ''
+    return `${d.model || '-'} (${d.interfaceType || '?'} ${d.mediaType || ''} ${size})`.trim()
+  }).join('<br>') || '-'
+  const notes = (pass.notes || []).map((n) => `<li>${escapeHtml(n)}</li>`).join('')
+  host.innerHTML = `
+    <div class="upgrade-chip">${escapeHtml(chassisLabel(pass))}</div>
+    <div class="hw-grid upgrade-grid">
+      <div><span class="muted" data-i18n="lblModel">CPU</span><div class="hw-val">${escapeHtml(pass.cpuName || '-')}</div></div>
+      <div><span class="muted" data-i18n="lblCores">Cores</span><div class="hw-val metric">${pass.physicalCores || '-'} / ${pass.logicalCores || '-'}</div></div>
+      <div><span class="muted" data-i18n="lblSocket">Socket</span><div class="hw-val">${escapeHtml(pass.socket || '-')}</div></div>
+      <div><span class="muted" data-i18n="lblChipset">Chipset</span><div class="hw-val">${escapeHtml(pass.chipset || '-')}</div></div>
+      <div><span class="muted" data-i18n="lblMobo">Board</span><div class="hw-val">${escapeHtml([pass.manufacturer, pass.motherboard].filter(Boolean).join(' ') || '-')}</div></div>
+      <div><span class="muted">GPU</span><div class="hw-val">${escapeHtml(pass.gpuName || '-')} · ${pass.vramGB ? pass.vramGB.toFixed(1) + ' GB' : '-'}</div></div>
+      <div><span class="muted">RAM</span><div class="hw-val metric">${pass.ramTotalGB ? pass.ramTotalGB.toFixed(0) + ' GB' : '-'} ${escapeHtml(pass.ramType || '')} · ${pass.ramSlotsUsed || 0}/${pass.ramSlotsTotal || 0}</div></div>
+      <div><span class="muted" data-i18n="lblSlotsFree">Free slots</span><div class="hw-val metric">${pass.ramSlotsFree ?? '-'}</div></div>
+      <div class="wide"><span class="muted" data-i18n="lblStorage">Storage</span><div class="hw-val">${storage}</div></div>
+    </div>
+    ${notes ? `<ul class="upgrade-notes">${notes}</ul>` : ''}
+  `
+  applyI18n()
+}
+
+function renderUpgradeRecs(advice) {
+  const host = $('upgrade-recs')
+  const summary = $('upgrade-summary')
+  if (summary) summary.textContent = advice?.summary || ''
+  if (!host) return
+  const recs = advice?.recommendations || []
+  if (!recs.length) {
+    host.innerHTML = `<div class="empty">${t('upgradeEmpty')}</div>`
+    return
+  }
+  host.innerHTML = recs.map((r) => {
+    const pitfalls = (r.pitfalls || []).map((p) => `<li>${escapeHtml(p)}</li>`).join('')
+    return `
+      <article class="upgrade-rec">
+        <div class="upgrade-rec-head">
+          <h3>${escapeHtml(r.title || '')}</h3>
+          <span class="upgrade-part">${escapeHtml(r.part || '')}</span>
+        </div>
+        <p>${escapeHtml(r.body || '')}</p>
+        <div class="pitfalls">
+          <div class="pitfalls-title">${t('pitfallsTitle')}</div>
+          <ul>${pitfalls}</ul>
+        </div>
+      </article>`
+  }).join('')
+}
+
+async function refreshUpgradeAdvisor() {
+  document.querySelectorAll('.btn.goal').forEach((b) => {
+    b.classList.toggle('active', b.dataset.goal === upgradeGoal)
+  })
+  try {
+    const advice = await GetUpgradeAdvice(upgradeGoal)
+    renderPassport(advice?.passport)
+    renderUpgradeRecs(advice)
+  } catch (err) {
+    const host = $('upgrade-passport')
+    if (host) host.innerHTML = `<div class="empty">${escapeHtml(String(err))}</div>`
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function renderInstalledApps(filter = '') {
+  const host = $('uninstall-list')
+  if (!host) return
+  const q = String(filter || '').toLowerCase().trim()
+  const list = installedAppsCache.filter((a) => {
+    if (!q) return true
+    return `${a.displayName || ''} ${a.publisher || ''}`.toLowerCase().includes(q)
+  }).slice(0, 200)
+  if (!list.length) {
+    host.innerHTML = `<div class="empty">${t('weeklyEmpty')}</div>`
+    return
+  }
+  host.innerHTML = list.map((a) => `
+    <button type="button" class="row uninstall-row ${selectedUninstallApp?.id === a.id ? 'active' : ''}" data-app-id="${escapeHtml(a.id)}">
+      <div class="row-main">
+        <b>${escapeHtml(a.displayName || '-')}</b>
+        <span class="muted">${escapeHtml(a.publisher || '')} · ${escapeHtml(a.displayVersion || '')}</span>
+      </div>
+      <span class="metric">${a.estimatedMB ? a.estimatedMB + ' MB' : ''}</span>
+    </button>`).join('')
+  host.querySelectorAll('[data-app-id]').forEach((btn) => {
+    btn.addEventListener('click', () => selectUninstallApp(btn.dataset.appId))
+  })
+}
+
+async function refreshInstalledApps() {
+  try {
+    installedAppsCache = await ListInstalledApps() || []
+    installedAppsCache.sort((a, b) => String(a.displayName || '').localeCompare(String(b.displayName || ''), undefined, { sensitivity: 'base' }))
+    renderInstalledApps($('uninstall-search')?.value || '')
+  } catch (err) {
+    const host = $('uninstall-list')
+    if (host) host.innerHTML = `<div class="empty">${escapeHtml(String(err))}</div>`
+  }
+}
+
+function selectUninstallApp(id) {
+  selectedUninstallApp = installedAppsCache.find((a) => a.id === id) || null
+  const detail = $('uninstall-detail')
+  if (!detail) return
+  if (!selectedUninstallApp) {
+    detail.hidden = true
+    return
+  }
+  detail.hidden = false
+  const title = $('uninstall-detail-title')
+  if (title) title.textContent = selectedUninstallApp.displayName || '-'
+  renderInstalledApps($('uninstall-search')?.value || '')
+  const run = $('uninstall-running')
+  if (run) run.innerHTML = `<div class="empty">${t('uninstallNoRunning')}</div>`
+}
+
+async function runUninstallPrecheck() {
+  if (!selectedUninstallApp) return
+  try {
+    const r = await PrecheckUninstall(selectedUninstallApp.id)
+    const host = $('uninstall-running')
+    if (!host) return
+    const running = r?.running || []
+    if (!running.length) {
+      host.innerHTML = `<div class="empty">${t('uninstallNoRunning')}</div>`
+      if (r?.warning) showToast(r.warning, true)
+      return
+    }
+    host.innerHTML = `<div class="panel-title">${t('uninstallRunning')}</div>` + running.map((p) => `
+      <div class="row"><div class="row-main"><b>${escapeHtml(p.name)}</b><span class="muted">PID ${p.pid}</span></div></div>`).join('')
+    if (r?.warning) showToast(r.warning, false)
+  } catch (err) {
+    showToast(String(err), false)
+  }
+}
+
+async function runUninstall(killFirst) {
+  if (!selectedUninstallApp) return
+  try {
+    const r = await UninstallApp(selectedUninstallApp.id, !!killFirst)
+    showToast(r?.message || t('uninstallOnly'), !!r?.ok)
+  } catch (err) {
+    showToast(String(err), false)
+  }
+}
+
+async function runResidualScan() {
+  if (!selectedUninstallApp) return
+  try {
+    const r = await ScanResiduals(selectedUninstallApp.displayName || '', selectedUninstallApp.publisher || '')
+    residualItemsCache = r?.items || []
+    renderResiduals()
+    showToast(r?.message || '', !!r?.ok)
+  } catch (err) {
+    showToast(String(err), false)
+  }
+}
+
+function renderResiduals() {
+  const host = $('residual-list')
+  if (!host) return
+  if (!residualItemsCache.length) {
+    host.innerHTML = `<div class="empty">${t('residualEmpty')}</div>`
+    return
+  }
+  host.innerHTML = residualItemsCache.map((it, idx) => `
+    <label class="row residual-row ${it.safe ? '' : 'blocked'}">
+      <input type="checkbox" data-res-idx="${idx}" ${it.selected && it.safe ? 'checked' : ''} ${it.safe ? '' : 'disabled'} />
+      <div class="row-main">
+        <b>${escapeHtml(it.label || it.path)}</b>
+        <span class="muted">${escapeHtml(it.kind)} ${it.safe ? '' : '· ' + t('residualBlocked')}</span>
+      </div>
+    </label>`).join('')
+  host.querySelectorAll('[data-res-idx]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const i = Number(cb.dataset.resIdx)
+      if (residualItemsCache[i]) residualItemsCache[i].selected = cb.checked
+    })
+  })
+}
+
+async function runResidualDelete() {
+  if (!residualItemsCache.length) return
+  try {
+    const r = await DeleteResiduals(residualItemsCache)
+    showToast(r?.message || '', !!r?.ok)
+    await runResidualScan()
+  } catch (err) {
+    showToast(String(err), false)
+  }
+}
+
+async function refreshTraceList() {
+  const host = $('trace-list')
+  if (!host) return
+  try {
+    const list = await ListInstallTraces() || []
+    if (!list.length) {
+      host.innerHTML = `<div class="empty">${t('traceEmpty')}</div>`
+      return
+    }
+    host.innerHTML = list.map((tr) => `
+      <div class="row">
+        <div class="row-main">
+          <b>${escapeHtml(tr.appName || tr.appId)}</b>
+          <span class="muted">${escapeHtml(tr.finishedAt || tr.createdAt || '')} · keys ${tr.newKeys || 0} · dirs ${tr.newDirs || 0}</span>
+        </div>
+        <button type="button" class="btn compact danger" data-trace-id="${escapeHtml(tr.appId)}">${t('traceCleanup')}</button>
+      </div>`).join('')
+    host.querySelectorAll('[data-trace-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          const r = await CleanupFromTrace(btn.dataset.traceId)
+          showToast(r?.message || '', !!r?.ok)
+          refreshTraceList()
+        } catch (err) {
+          showToast(String(err), false)
+        }
+      })
+    })
+  } catch (err) {
+    host.innerHTML = `<div class="empty">${escapeHtml(String(err))}</div>`
+  }
+}
+
 function wireUI() {
   document.querySelectorAll('.nav-item').forEach((btn) => {
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab))
+  })
+
+  document.querySelectorAll('.btn.goal').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      upgradeGoal = btn.dataset.goal || 'max_fps'
+      localStorage.setItem('zp_upgrade_goal', upgradeGoal)
+      refreshUpgradeAdvisor()
+    })
+  })
+  $('btn-upgrade-refresh')?.addEventListener('click', () => refreshUpgradeAdvisor())
+
+  $('btn-uninstall-refresh')?.addEventListener('click', () => refreshInstalledApps())
+  $('uninstall-search')?.addEventListener('input', (ev) => renderInstalledApps(ev.target.value))
+  $('btn-uninstall-precheck')?.addEventListener('click', () => runUninstallPrecheck())
+  $('btn-uninstall-kill')?.addEventListener('click', () => runUninstall(true))
+  $('btn-uninstall-only')?.addEventListener('click', () => runUninstall(false))
+  $('btn-residual-scan')?.addEventListener('click', () => runResidualScan())
+  $('btn-residual-delete')?.addEventListener('click', () => runResidualDelete())
+  $('btn-trace-start')?.addEventListener('click', async () => {
+    try {
+      const r = await StartTracedInstall()
+      showToast(r?.message || '', !!r?.ok)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+  $('btn-trace-finish')?.addEventListener('click', async () => {
+    try {
+      const r = await FinishTracedInstall()
+      showToast(r?.message || '', !!r?.ok)
+      refreshTraceList()
+    } catch (err) {
+      showToast(String(err), false)
+    }
   })
 
   wireTooltips()

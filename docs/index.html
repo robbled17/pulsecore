@@ -625,6 +625,52 @@
       white-space: nowrap;
     }
     .demo-hw-card .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .demo-upgrade-goals {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+    }
+    .demo-goal {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .demo-goal.active {
+      color: var(--text);
+      border-color: rgba(110,168,255,0.45);
+      background: rgba(110,168,255,0.16);
+    }
+    .demo-upgrade-passport { margin-bottom: 12px; }
+    .demo-upgrade-rec {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,0.03);
+    }
+    .demo-upgrade-rec .title { font-weight: 700; margin-bottom: 6px; }
+    .demo-upgrade-rec .body { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 8px; }
+    .demo-upgrade-rec .pit { color: #fbbf24; font-size: 12.5px; line-height: 1.4; }
+    .demo-uninstall-app {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .demo-uninstall-app .name { font-weight: 700; margin-bottom: 4px; }
+    .demo-uninstall-app .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+    .demo-residual { display: flex; flex-direction: column; gap: 8px; }
+    .demo-check {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.03);
+    }
     .demo-core-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1226,6 +1272,8 @@
           <button type="button" role="tab" id="tab-lags" aria-selected="false" data-tab="lags" aria-controls="panel-lags" data-i18n="tabLags">Лаги</button>
           <button type="button" role="tab" id="tab-gamepulse" aria-selected="false" data-tab="gamepulse" aria-controls="panel-gamepulse">GamePulse</button>
           <button type="button" role="tab" id="tab-hardware" aria-selected="false" data-tab="hardware" aria-controls="panel-hardware" data-i18n="tabHardware">Железо</button>
+          <button type="button" role="tab" id="tab-upgrade" aria-selected="false" data-tab="upgrade" aria-controls="panel-upgrade" data-i18n="tabUpgrade">Апгрейд</button>
+          <button type="button" role="tab" id="tab-uninstall" aria-selected="false" data-tab="uninstall" aria-controls="panel-uninstall" data-i18n="tabUninstall">Удаление</button>
         </div>
         <div class="preview-frame" id="demo-preview">
           <div class="demo-work" id="demo-work">
@@ -1337,6 +1385,52 @@
               </div>
               <div class="demo-core-grid" id="demo-core-grid"></div>
             </div>
+
+            <div class="demo-pane" id="panel-upgrade" data-panel="upgrade" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoUpgradeTitle">Советник апгрейда</h3>
+                  <p data-i18n="demoUpgradeSub">Паспорт ПК и рекомендации под цель</p>
+                </div>
+              </div>
+              <div class="demo-upgrade-goals" id="demo-upgrade-goals">
+                <button type="button" class="demo-goal active" data-goal="fps" data-i18n="goalMaxFps">Максимум FPS</button>
+                <button type="button" class="demo-goal" data-goal="quiet" data-i18n="goalQuiet">Тише и холоднее</button>
+                <button type="button" class="demo-goal" data-goal="work" data-i18n="goalWork">Работа</button>
+                <button type="button" class="demo-goal" data-goal="budget" data-i18n="goalBudget">Бюджет</button>
+              </div>
+              <div class="demo-upgrade-passport">
+                <div class="demo-hw-card">
+                  <div class="lab" data-i18n="passportTitle">Текущий ПК</div>
+                  <div class="big">Ryzen 7 5700X · RTX 3060</div>
+                  <div class="sub">AM4 · B550 · 16 GB DDR4 · 2/4 слота</div>
+                </div>
+              </div>
+              <div class="demo-upgrade-rec" id="demo-upgrade-rec">
+                <div class="title" data-i18n="demoUpgradeRecTitle">Сбалансированная видеокарта</div>
+                <div class="body" data-i18n="demoUpgradeRecBody">Главный прирост FPS даёт видеокарта под ваше разрешение.</div>
+                <div class="pit" data-i18n="demoUpgradePit">Подводные камни: длина корпуса, разъёмы БП, обновление BIOS.</div>
+              </div>
+            </div>
+
+            <div class="demo-pane" id="panel-uninstall" data-panel="uninstall" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoUninstallTitle">Умное удаление</h3>
+                  <p data-i18n="demoUninstallSub">Процессы, остатки и трассировка</p>
+                </div>
+              </div>
+              <div class="demo-uninstall-app">
+                <div class="name">Chatty 1.8.0</div>
+                <div class="sub" data-i18n="demoUninstallWarn">Найден процесс Chatty.exe. Можно завершить и удалить.</div>
+                <button type="button" class="btn-eco" id="demo-kill-remove" data-i18n="uninstallKillRemove">Завершить и удалить</button>
+              </div>
+              <div class="demo-residual" id="demo-residual">
+                <label class="demo-check"><input type="checkbox" checked disabled /> Local · Chatty</label>
+                <label class="demo-check"><input type="checkbox" checked disabled /> Roaming · Chatty</label>
+                <label class="demo-check"><input type="checkbox" checked disabled /> HKCU\Software\Chatty</label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1382,6 +1476,16 @@
           <div class="card-icon">💨</div>
           <h3 data-i18n="featResTitle">Ресурсы</h3>
           <p data-i18n="featResBody">Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
+        </article>
+        <article class="card teal span-2 reveal" style="--reveal-delay: 700ms">
+          <div class="card-icon">🔧</div>
+          <h3 data-i18n="featUpgradeTitle">Советник апгрейда</h3>
+          <p data-i18n="featUpgradeBody">Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 800ms">
+          <div class="card-icon">🧹</div>
+          <h3 data-i18n="featUninstallTitle">Умное удаление</h3>
+          <p data-i18n="featUninstallBody">Перед удалением гасит процессы программы, после ищет остатки в AppData и реестре, умеет ставить с трассировкой для точной очистки</p>
         </article>
       </div>
     </section>
@@ -1487,6 +1591,26 @@
           featPrivBody: "Программа работает локально на вашем компьютере и никуда не отправляет личные данные",
           featResTitle: "Ресурсы",
           featResBody: "Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Удаление",
+          demoUpgradeTitle: "Советник апгрейда",
+          demoUpgradeSub: "Паспорт ПК и рекомендации под цель",
+          demoUpgradeRecTitle: "Сбалансированная видеокарта",
+          demoUpgradeRecBody: "Главный прирост FPS даёт видеокарта под ваше разрешение.",
+          demoUpgradePit: "Подводные камни: длина корпуса, разъёмы БП, обновление BIOS.",
+          demoUninstallTitle: "Умное удаление",
+          demoUninstallSub: "Процессы, остатки и трассировка",
+          demoUninstallWarn: "Найден процесс Chatty.exe. Можно завершить и удалить.",
+          goalMaxFps: "Максимум FPS",
+          goalQuiet: "Тише и холоднее",
+          goalWork: "Работа",
+          goalBudget: "Бюджет",
+          passportTitle: "Текущий ПК",
+          uninstallKillRemove: "Завершить и удалить",
+          featUpgradeTitle: "Советник апгрейда",
+          featUpgradeBody: "Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями",
+          featUninstallTitle: "Умное удаление",
+          featUninstallBody: "Перед удалением гасит процессы программы, после ищет остатки в AppData и реестре, умеет ставить с трассировкой для точной очистки",
           startTitle: "Быстрый старт",
           startSub: "Три простых шага на Windows 10 или 11",
           step1Title: "Скачайте программу",
@@ -1560,6 +1684,26 @@
           featPrivBody: "Runs locally on your PC and never sends personal data away",
           featResTitle: "Resources",
           featResBody: "Uses little memory and stays out of games, unlike heavy monitoring suites",
+          tabUpgrade: "Upgrade",
+          tabUninstall: "Uninstall",
+          demoUpgradeTitle: "Upgrade Advisor",
+          demoUpgradeSub: "PC passport and goal-based tips",
+          demoUpgradeRecTitle: "Balanced graphics card",
+          demoUpgradeRecBody: "The biggest FPS jump comes from a GPU matched to your resolution.",
+          demoUpgradePit: "Pitfalls: case length, PSU connectors, BIOS update.",
+          demoUninstallTitle: "Smart Uninstaller",
+          demoUninstallSub: "Processes, leftovers and tracing",
+          demoUninstallWarn: "Chatty.exe is running. You can kill it and uninstall.",
+          goalMaxFps: "Max FPS",
+          goalQuiet: "Quiet and cool",
+          goalWork: "Work",
+          goalBudget: "Budget",
+          passportTitle: "Current PC",
+          uninstallKillRemove: "Kill and uninstall",
+          featUpgradeTitle: "Upgrade Advisor",
+          featUpgradeBody: "PC passport: socket, RAM slots, NVMe. Local tips for FPS, quiet, work or budget, with plain pitfalls",
+          featUninstallTitle: "Smart Uninstaller",
+          featUninstallBody: "Stops app processes before uninstall, then finds leftovers in AppData and the registry, with install tracing for precise cleanup",
           startTitle: "Quick start",
           startSub: "Three simple steps on Windows 10 or 11",
           step1Title: "Download the app",
@@ -1633,6 +1777,26 @@
           featPrivBody: "Компьютеріңізде жергілікті жұмыс істейді және жеке деректерді жібермейді",
           featResTitle: "Ресурстар",
           featResBody: "Аз жады алады және ойындарға кедергі жасамайды",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Жою",
+          demoUpgradeTitle: "Апгрейд кеңесшісі",
+          demoUpgradeSub: "ПК паспорты және мақсатқа сай кеңестер",
+          demoUpgradeRecTitle: "Теңгерімді видеокарта",
+          demoUpgradeRecBody: "FPS өсімінің басты бөлігі рұқсатыңызға сай GPU-дан келеді.",
+          demoUpgradePit: "Тұзақтар: корпус ұзындығы, БП қосқыштары, BIOS жаңарту.",
+          demoUninstallTitle: "Ақылды жою",
+          demoUninstallSub: "Процестер, қалдықтар және із",
+          demoUninstallWarn: "Chatty.exe іске қосулы. Тоқтатып жоюға болады.",
+          goalMaxFps: "Макс FPS",
+          goalQuiet: "Тыныш әрі салқын",
+          goalWork: "Жұмыс",
+          goalBudget: "Бюджет",
+          passportTitle: "Қазіргі ПК",
+          uninstallKillRemove: "Тоқтатып жою",
+          featUpgradeTitle: "Апгрейд кеңесшісі",
+          featUpgradeBody: "ПК паспорты: сокет, RAM слоттары, NVMe. FPS, тыныштық, жұмыс не бюджетке сай жергілікті кеңестер",
+          featUninstallTitle: "Ақылды жою",
+          featUninstallBody: "Жоймас бұрын процестерді тоқтатады, сосын AppData мен тізілімде қалдық іздейді, ізбен орнату арқылы нақты тазалайды",
           startTitle: "Жылдам бастау",
           startSub: "Windows 10 немесе 11-те үш қарапайым қадам",
           step1Title: "Бағдарламаны жүктеңіз",
@@ -1706,6 +1870,26 @@
           featPrivBody: "Компьютерыгызда җирле эшли һәм шәхси мәгълүматны җибәрми",
           featResTitle: "Ресурслар",
           featResBody: "Аз хәтер ала һәм уеннарга комачауламый",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Бетерү",
+          demoUpgradeTitle: "Апгрейд киңәшчесе",
+          demoUpgradeSub: "ПК паспорты һәм максат буенча киңәшләр",
+          demoUpgradeRecTitle: "Тигез видеокарта",
+          demoUpgradeRecBody: "FPS үсешенең төп өлеше резолюциягә туры килгән GPU-дан килә.",
+          demoUpgradePit: "Куркынычлар: корпус озынлыгы, БП тоташтыргычлары, BIOS яңарту.",
+          demoUninstallTitle: "Акыллы бетерү",
+          demoUninstallSub: "Процесслар, калдыклар һәм эз",
+          demoUninstallWarn: "Chatty.exe эшли. Туктатып бетерергә була.",
+          goalMaxFps: "Макс FPS",
+          goalQuiet: "Тынрак һәм салкынрак",
+          goalWork: "Эш",
+          goalBudget: "Бюджет",
+          passportTitle: "Хәзерге ПК",
+          uninstallKillRemove: "Туктатып бетерү",
+          featUpgradeTitle: "Апгрейд киңәшчесе",
+          featUpgradeBody: "ПК паспорты: сокет, RAM слотлары, NVMe. FPS, тынлык, эш яки бюджет өчен җирле киңәшләр",
+          featUninstallTitle: "Акыллы бетерү",
+          featUninstallBody: "Бетергәнче процессларны туктата, аннары AppData һәм реестрда калдык эзли, эз белән урнаштыру аша төгәл чистарта",
           startTitle: "Тиз старт",
           startSub: "Windows 10 яки 11тә өч гади адым",
           step1Title: "Программаны йөкләгез",
@@ -1779,6 +1963,26 @@
           featPrivBody: "Läuft lokal auf Ihrem PC und sendet keine persönlichen Daten",
           featResTitle: "Ressourcen",
           featResBody: "Braucht wenig Speicher und stört Spiele nicht, anders als schwere Monitore",
+          tabUpgrade: "Upgrade",
+          tabUninstall: "Deinstallieren",
+          demoUpgradeTitle: "Upgrade-Berater",
+          demoUpgradeSub: "PC-Pass und Tipps nach Ziel",
+          demoUpgradeRecTitle: "Ausgewogene Grafikkarte",
+          demoUpgradeRecBody: "Den größten FPS-Sprung bringt eine GPU passend zur Auflösung.",
+          demoUpgradePit: "Fallstricke: Gehäuselänge, Netzteilstecker, BIOS-Update.",
+          demoUninstallTitle: "Intelligente Deinstallation",
+          demoUninstallSub: "Prozesse, Reste und Tracing",
+          demoUninstallWarn: "Chatty.exe läuft. Sie können beenden und entfernen.",
+          goalMaxFps: "Max FPS",
+          goalQuiet: "Leise und kühl",
+          goalWork: "Arbeit",
+          goalBudget: "Budget",
+          passportTitle: "Aktueller PC",
+          uninstallKillRemove: "Beenden und entfernen",
+          featUpgradeTitle: "Upgrade-Berater",
+          featUpgradeBody: "PC-Pass: Sockel, RAM-Slots, NVMe. Lokale Tipps für FPS, Ruhe, Arbeit oder Budget mit klaren Fallstricken",
+          featUninstallTitle: "Intelligente Deinstallation",
+          featUninstallBody: "Stoppt Prozesse vor der Deinstallation, findet Reste in AppData und Registry, mit Tracing für präzise Reinigung",
           startTitle: "Schnellstart",
           startSub: "Drei einfache Schritte unter Windows 10 oder 11",
           step1Title: "App laden",
@@ -1852,6 +2056,26 @@
           featPrivBody: "PC上でローカル動作し、個人データを送信しません",
           featResTitle: "リソース",
           featResBody: "メモリ使用が少なく、重い監視ソフトと違いゲームを妨げません",
+          tabUpgrade: "アップグレード",
+          tabUninstall: "削除",
+          demoUpgradeTitle: "アップグレード助言",
+          demoUpgradeSub: "PCパスポートと目的別の提案",
+          demoUpgradeRecTitle: "バランスの良いGPU",
+          demoUpgradeRecBody: "解像度に合ったGPUがFPS向上の主役です。",
+          demoUpgradePit: "注意点: ケース長、電源コネクタ、BIOS更新。",
+          demoUninstallTitle: "スマートアンインストール",
+          demoUninstallSub: "プロセス、残留、追跡",
+          demoUninstallWarn: "Chatty.exe が実行中。終了して削除できます。",
+          goalMaxFps: "最大FPS",
+          goalQuiet: "静かで涼しい",
+          goalWork: "作業",
+          goalBudget: "予算",
+          passportTitle: "現在のPC",
+          uninstallKillRemove: "終了して削除",
+          featUpgradeTitle: "アップグレード助言",
+          featUpgradeBody: "PCパスポート: ソケット、RAMスロット、NVMe。FPS・静音・作業・予算向けのローカル提案と注意点",
+          featUninstallTitle: "スマートアンインストール",
+          featUninstallBody: "削除前にプロセスを止め、AppDataとレジストリの残留を探し、トレース付きインストールで精密に掃除",
           startTitle: "クイックスタート",
           startSub: "Windows 10 / 11 での3ステップ",
           step1Title: "アプリをダウンロード",
@@ -1925,6 +2149,26 @@
           featPrivBody: "在本地运行，不会发送个人数据",
           featResTitle: "资源",
           featResBody: "占用内存很少，不像沉重的监控套件那样干扰游戏",
+          tabUpgrade: "升级",
+          tabUninstall: "卸载",
+          demoUpgradeTitle: "升级顾问",
+          demoUpgradeSub: "电脑护照与按目标的建议",
+          demoUpgradeRecTitle: "均衡显卡",
+          demoUpgradeRecBody: "按分辨率搭配显卡，帧率提升最大。",
+          demoUpgradePit: "坑点: 机箱长度、电源接口、更新 BIOS。",
+          demoUninstallTitle: "智能卸载",
+          demoUninstallSub: "进程、残留与追踪",
+          demoUninstallWarn: "Chatty.exe 正在运行。可以结束并卸载。",
+          goalMaxFps: "最高帧率",
+          goalQuiet: "更安静更凉",
+          goalWork: "办公",
+          goalBudget: "省钱",
+          passportTitle: "当前电脑",
+          uninstallKillRemove: "结束并卸载",
+          featUpgradeTitle: "升级顾问",
+          featUpgradeBody: "电脑护照: 插槽、内存槽、NVMe。按帧率、安静、办公或省钱给出本地建议与坑点",
+          featUninstallTitle: "智能卸载",
+          featUninstallBody: "卸载前结束进程，随后扫描 AppData 与注册表残留，并支持带追踪的安装以便精确清理",
           startTitle: "快速开始",
           startSub: "在 Windows 10 或 11 上三步搞定",
           step1Title: "下载应用",
@@ -2547,6 +2791,35 @@
             browser.load = clamp(browser.load * 0.3, 3, 10);
             renderProcs();
           }
+        });
+      }
+
+      const upgradeCopy = {
+        fps: { titleKey: "demoUpgradeRecTitle", bodyKey: "demoUpgradeRecBody", pitKey: "demoUpgradePit" },
+        quiet: { titleKey: "featUpgradeTitle", bodyKey: "goalQuiet", pitKey: "demoUpgradePit" },
+        work: { titleKey: "goalWork", bodyKey: "featUpgradeBody", pitKey: "demoUpgradePit" },
+        budget: { titleKey: "goalBudget", bodyKey: "featUpgradeBody", pitKey: "demoUpgradePit" }
+      };
+      document.querySelectorAll(".demo-goal").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".demo-goal").forEach((b) => b.classList.toggle("active", b === btn));
+          const pack = upgradeCopy[btn.dataset.goal] || upgradeCopy.fps;
+          const rec = el("demo-upgrade-rec");
+          if (!rec) return;
+          const title = rec.querySelector(".title");
+          const body = rec.querySelector(".body");
+          const pit = rec.querySelector(".pit");
+          if (title) title.textContent = t(pack.titleKey);
+          if (body) body.textContent = t(pack.bodyKey);
+          if (pit) pit.textContent = t(pack.pitKey);
+        });
+      });
+      const killBtn = el("demo-kill-remove");
+      if (killBtn) {
+        killBtn.addEventListener("click", () => {
+          const warn = document.querySelector(".demo-uninstall-app .sub");
+          if (warn) warn.textContent = t("featUninstallTitle") + ": OK";
+          killBtn.disabled = true;
         });
       }
 
