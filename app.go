@@ -196,9 +196,13 @@ func (a *App) startup(ctx context.Context) {
 		a.startFlightRecorder()
 	})
 	go a.peripheralsWatchdog()
+	a.startActivateListener()
+	// Global Mini-HUD hotkey (fail soft if already taken by another app).
+	_ = a.SetMiniHUDHotkey(defaultMiniHUDHotkey)
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	stopMiniHUDHotkey()
 	select {
 	case <-a.stopWorker:
 	default:

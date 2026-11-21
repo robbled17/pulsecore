@@ -13,6 +13,13 @@ import (
 var assets embed.FS
 
 func main() {
+	si := ensureSingleInstance()
+	if !si.IsPrimary {
+		// Second launch: existing window was activated via mutex/IPC. Do not start a duplicate.
+		return
+	}
+	defer releaseSingleInstance()
+
 	app := NewApp()
 	startSystray(app)
 
