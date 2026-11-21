@@ -209,3 +209,11 @@ export function SetMiniHUDHotkey(arg1) {
 export function GetMiniHUDHotkey() {
   return window['go']['main']['App']['GetMiniHUDHotkey']();
 }
+
+export function IsElevated() {
+  return window['go']['main']['App']['IsElevated']();
+}
+
+export function RestartAsAdministrator() {
+  return window['go']['main']['App']['RestartAsAdministrator']();
+}

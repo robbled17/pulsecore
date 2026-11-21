@@ -1,6 +1,8 @@
 # Build artifacts
 build/bin/
 *.exe
+# Embedded sidecar shipped inside pulsecore.exe (extracted to LocalAppData).
+!third_party/sensor-helper/pulsecore-sensor-helper.exe
 
 # Frontend deps & build output
 frontend/node_modules/

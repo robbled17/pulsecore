@@ -103,11 +103,13 @@ type SystemMetrics struct {
 	Hardware       HardwareInfo       `json:"hardware"`
 	TemperatureC   float64            `json:"temperatureC"`
 	TempAvailable  bool               `json:"tempAvailable"`
+	TempNeedsAdmin bool               `json:"tempNeedsAdmin"`
 	GPUAvailable   bool               `json:"gpuAvailable"`
 	PowerMode      string             `json:"powerMode"`
 	PollIntervalMS int                `json:"pollIntervalMS"`
 	MiniHUD        bool               `json:"miniHUD"`
 	Language       string             `json:"language"`
+	WindowVisible  bool               `json:"windowVisible"`
 	LagEvents      []LagEvent         `json:"lagEvents"`
 	StutterEvents  []StutterEvent     `json:"stutterEvents"`
 	Vampires       []VampireProcess   `json:"vampires"`
@@ -185,6 +187,8 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Extract embedded sensor helper once (no-op when version already matches).
+	_, _ = ensureSensorHelper()
 	a.staticHW = collectStaticHardware()
 	a.cpuName = a.staticHW.cpuName
 	a.gpuName = a.staticHW.gpuName
@@ -246,17 +250,19 @@ func (a *App) collectOnce() {
 	vampires := a.GetVampireProcesses()
 	realTemp := snapshot.TemperatureC
 	if realTemp <= 0 {
-		// Do not invent a fake ACPI reading: UI shows Н/Д when TempAvailable=false.
+		// Do not invent a fake ACPI reading: UI shows Недоступно when TempAvailable=false.
 		snapshot.TemperatureC = 0
 		snapshot.TempAvailable = false
 	} else {
 		snapshot.TempAvailable = true
+		snapshot.TempNeedsAdmin = false
 		a.TriggerThermalCheck(realTemp)
 	}
 	gpuName := strings.TrimSpace(snapshot.GPUName)
 	snapshot.GPUAvailable = gpuName != "" && !strings.EqualFold(gpuName, "Unknown GPU")
 
 	a.mu.Lock()
+	snapshot.WindowVisible = !a.hidden
 	a.metrics = snapshot
 	a.vampires = vampires
 	a.metrics.LagEvents = append([]LagEvent(nil), a.lagEvents...)
@@ -290,7 +296,7 @@ func (a *App) buildSnapshot() SystemMetrics {
 	bat := collectBattery()
 	gpuPct, vramUsed, vramShared, vramDedicated := a.collectGPUUsage()
 
-	temp := readCPUTemperature()
+	temp, tempNeedsAdmin := readCPUTemperatureCached()
 
 	a.mu.RLock()
 	cpuName := a.cpuName
@@ -304,6 +310,7 @@ func (a *App) buildSnapshot() SystemMetrics {
 	pollMS := int(a.pollInterval / time.Millisecond)
 	mini := a.miniHUD
 	lang := a.language
+	hidden := a.hidden
 	lags := append([]LagEvent(nil), a.lagEvents...)
 	stutters := append([]StutterEvent(nil), a.stutterEvents...)
 	vamps := append([]VampireProcess(nil), a.vampires...)
@@ -332,10 +339,12 @@ func (a *App) buildSnapshot() SystemMetrics {
 		Battery:         bat,
 		Hardware:        hw,
 		TemperatureC:    temp,
+		TempNeedsAdmin:  tempNeedsAdmin && temp <= 0,
 		PowerMode:       powerMode,
 		PollIntervalMS:  pollMS,
 		MiniHUD:         mini,
 		Language:        lang,
+		WindowVisible:   !hidden,
 		LagEvents:       lags,
 		StutterEvents:   stutters,
 		Vampires:        vamps,
@@ -826,6 +835,7 @@ func (a *App) ShowWindow() {
 	a.mu.Unlock()
 	runtime.WindowUnminimise(a.ctx)
 	runtime.WindowShow(a.ctx)
+	a.emitVisibility(true)
 }
 
 // HideToTray hides the window while keeping the process alive in the tray.
@@ -837,6 +847,16 @@ func (a *App) HideToTray() {
 	a.hidden = true
 	a.mu.Unlock()
 	runtime.WindowHide(a.ctx)
+	a.emitVisibility(false)
+}
+
+func (a *App) emitVisibility(visible bool) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, "ui:visibility", map[string]interface{}{
+		"visible": visible,
+	})
 }
 
 // QuitApp exits the application and tears down the tray icon.
@@ -853,6 +873,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 	a.hidden = true
 	a.mu.Unlock()
 	runtime.WindowHide(ctx)
+	runtime.EventsEmit(ctx, "ui:visibility", map[string]interface{}{
+		"visible": false,
+	})
 	return true
 }
 
@@ -941,28 +964,32 @@ func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
 	total := float64(a.gpuTotalVRAM) / (1024 * 1024)
 	a.mu.RUnlock()
 
-	// Best-effort via absolute nvidia-smi path (no PATH lookup / hijack).
-	if smi := nvidiaSMIPath(); smi != "" {
-		if out, err := runHiddenOutput(smi,
-			"--query-gpu=utilization.gpu,memory.used,memory.total",
-			"--format=csv,noheader,nounits"); err == nil {
-			parts := strings.Split(strings.TrimSpace(string(out)), ",")
-			if len(parts) >= 3 {
-				fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
-				fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)
-				fmt.Sscanf(strings.TrimSpace(parts[2]), "%f", &total)
-				dedicatedMB = usedMB
-				if total > usedMB {
-					sharedMB = 0
-				}
-				a.mu.Lock()
-				if total > 0 {
-					a.gpuTotalVRAM = uint64(total * 1024 * 1024)
-				}
-				a.mu.Unlock()
-				return pct, usedMB, sharedMB, dedicatedMB
-			}
+	// Prefer cached helper / nvidia-smi result (TTL) over spawning every poll tick.
+	if hp, hu, ht, _, ok := readGPUFromHelperCached(); ok {
+		pct = hp
+		usedMB = hu
+		if ht > 0 {
+			total = ht
 		}
+		dedicatedMB = usedMB
+		a.mu.Lock()
+		if total > 0 {
+			a.gpuTotalVRAM = uint64(total * 1024 * 1024)
+		}
+		a.mu.Unlock()
+		return pct, usedMB, sharedMB, dedicatedMB
+	}
+
+	// Best-effort nvidia-smi with TTL cache (no PATH lookup / hijack).
+	if np, nu, nt, ok := readNVIDIASMICached(); ok {
+		pct, usedMB, total = np, nu, nt
+		dedicatedMB = usedMB
+		a.mu.Lock()
+		if total > 0 {
+			a.gpuTotalVRAM = uint64(total * 1024 * 1024)
+		}
+		a.mu.Unlock()
+		return pct, usedMB, sharedMB, dedicatedMB
 	}
 
 	// Fallback: derive light GPU pressure proxy from top 3D-ish processes.
@@ -1023,7 +1050,9 @@ func readGPUInfo() (string, uint64) {
 	return name, vram
 }
 
-func readCPUTemperature() float64 {
+// readCPUTemperatureACPI is the direct WMI path. Prefer readCPUTemperatureCached
+// from the metrics poller so heavy OLE work is not stacked every tick.
+func readCPUTemperatureACPI() float64 {
 	var maxC float64
 	ok := withSensorGate(defaultSensorTimeout, func() {
 		ensureOLE()
@@ -1075,6 +1104,12 @@ func readCPUTemperature() float64 {
 		return 0
 	}
 	return maxC
+}
+
+// readCPUTemperature keeps the historical name for diagnostics callers.
+func readCPUTemperature() float64 {
+	temp, _ := readCPUTemperatureCached()
+	return temp
 }
 
 func isSelfOrWebView(name string) bool {

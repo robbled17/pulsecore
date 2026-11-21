@@ -451,6 +451,8 @@ function buildMetrics() {
     vramSharedMB: p.sharedMB,
     temperatureC: temp,
     tempAvailable: p.tempMode !== 'broken',
+    tempNeedsAdmin: p.tempMode === 'broken',
+    windowVisible: true,
     fanRPM: brokenFan,
     powerMode: state.powerMode,
     pollIntervalMS: state.pollIntervalMS,
@@ -958,6 +960,10 @@ const App = {
     chord: state.miniHUDHotkey || 'Ctrl+Shift+M',
     active: true,
   }),
+  IsElevated: async () => false,
+  RestartAsAdministrator: async () => {
+    console.info('[PulseCore mock] RestartAsAdministrator (no-op)')
+  },
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,

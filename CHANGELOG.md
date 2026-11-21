@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.2
+
+### Added
+- Embedded sensor helper extracted to `%LOCALAPPDATA%\PulseCore\bin` when missing or version-changed (single-file `pulsecore.exe`)
+- Unavailable sensor tip with restart-as-administrator action (7 langs)
+- Hardware/docs cores labeled 1..N (never Core 0)
+
+### Fixed
+- Poll path caches helper/nvidia-smi so heavy WMI/PowerShell is not run every tick
+- Large cards/lists no longer use heavy `backdrop-filter` blur on weak WebView2 laptops
+- Charts throttled to ~24 FPS and fully paused when tray-minimized or inactive
+- Landing `#features` dense even grid (3/2/1) with equal row heights and no span holes
+- Dev Mode hidden in production `wails build` (kept for `wails dev` / Vite DEV only)
+
+### Needs hardware
+- Live admin elevation for ACPI/SMART on real Windows notebooks
+- Dual-GPU laptop temp preference (discrete vs iGPU) on Optimus/AMD switchable graphics
+- Tray minimize chart pause on a real laptop session
+
+
 ## 1.6.1
 
 ### Fixed

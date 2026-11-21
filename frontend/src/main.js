@@ -34,6 +34,8 @@ import {
   RunSelfDiagnostics,
   SetMiniHUDHotkey,
   GetMiniHUDHotkey,
+  IsElevated,
+  RestartAsAdministrator,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -42,7 +44,10 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.6.1
+/** Dev Mode UI is compile-time gated: Vite production (wails build) never ships it. */
+const DEV_MODE_ENABLED = import.meta.env.DEV === true
+
+const MIT_LICENSE = `PulseCore v1.6.2
 
 MIT License
 
@@ -78,7 +83,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.6.1'
+const APP_VERSION = 'v1.6.2'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -415,13 +420,36 @@ function drawTrendFrame() {
   if (cur) cur.textContent = `${t('currentPct')}: ${fmtPct(last, 1)}`
 }
 
+const CHART_FPS = 24
+const CHART_FRAME_MS = 1000 / CHART_FPS
+let chartActive = true
+let lastChartDraw = 0
+let chartRaf = 0
+
+function setChartActive(on) {
+  chartActive = !!on
+  if (chartActive && !chartRaf) {
+    chartRaf = requestAnimationFrame(animateChart)
+  }
+}
+
 function animateChart(now) {
-  drainQueues(now)
-  lerpSeries()
-  drawTrendFrame()
-  renderSparklines()
-  sampleFrametime(now)
-  requestAnimationFrame(animateChart)
+  chartRaf = 0
+  if (!chartActive) return
+  // Fully pause when tab/window is hidden (tray minimize or inactive).
+  if (typeof document !== 'undefined' && document.hidden) {
+    chartRaf = requestAnimationFrame(animateChart)
+    return
+  }
+  if (!lastChartDraw || (now - lastChartDraw) >= CHART_FRAME_MS) {
+    lastChartDraw = now
+    drainQueues(now)
+    lerpSeries()
+    drawTrendFrame()
+    renderSparklines()
+    sampleFrametime(now)
+  }
+  chartRaf = requestAnimationFrame(animateChart)
 }
 
 function fmt(n, digits = 1) {
@@ -803,14 +831,40 @@ function renderDiskTabs(disks, targetId = 'disk-tabs') {
 }
 
 function lagExplanation(e) {
+  const toCoreLabel = (raw) => {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n + 1 : raw
+  }
   const raw = String(e.explanation || '')
   if (raw.startsWith('lag_core_spike|')) {
     const parts = raw.split('|')
-    const core = parts[1] ?? e.coreID
+    const core = toCoreLabel(parts[1] ?? e.coreID)
     const load = parts[2] ?? fmt(e.coreLoad, 0)
     return t('lagExplain').replace('{core}', core).replace('{load}', load)
   }
-  return t('lagExplain').replace('{core}', e.coreID).replace('{load}', fmt(e.coreLoad, 0))
+  return t('lagExplain').replace('{core}', toCoreLabel(e.coreID)).replace('{load}', fmt(e.coreLoad, 0))
+}
+
+function updateSensorTip(show) {
+  const tip = $('hw-temp-tip')
+  if (!tip) return
+  tip.classList.toggle('hidden', !show)
+  const adminBtn = $('btn-restart-admin')
+  if (adminBtn && show) {
+    IsElevated().then((elevated) => {
+      adminBtn.classList.toggle('hidden', !!elevated)
+    }).catch(() => {
+      adminBtn.classList.remove('hidden')
+    })
+  }
+}
+
+async function restartAsAdmin() {
+  try {
+    await RestartAsAdministrator()
+  } catch (_) {
+    showToast(t('sensorUnavailableTip'), false)
+  }
 }
 
 function renderLag(m) {
@@ -937,9 +991,9 @@ function renderHardware(m) {
   $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
   if ($('hw-cpu-temp')) {
     const temp = m.tempAvailable === false ? sensorUnavailableLabel() : fmtTemp(m.temperatureC, 0)
-    $('hw-cpu-temp').textContent = (temp === na() || temp === sensorUnavailableLabel())
-      ? sensorUnavailableLabel()
-      : `${temp} °C`
+    const unavailable = (temp === na() || temp === sensorUnavailableLabel())
+    $('hw-cpu-temp').textContent = unavailable ? sensorUnavailableLabel() : `${temp} °C`
+    updateSensorTip(unavailable || m.tempNeedsAdmin === true)
   }
   if ($('hw-cpu-cache')) {
     const kb = Number(cpu.cacheKB) || 0
@@ -969,20 +1023,21 @@ function renderHardware(m) {
       ? groups.map((g) => {
         const load = Number.isFinite(g.load) ? Math.min(100, Math.max(0, g.load)) : 0
         const val = Number.isFinite(g.load) ? fmtPct(g.load, 0) : na()
+        const coreLabel = g.id + 1 // physical cores are 1..N in the UI
         const threadRows = g.threads.map((th) => {
           const tLoad = Number.isFinite(Number(th.load)) ? Math.min(100, Math.max(0, Number(th.load))) : 0
           const tVal = Number.isFinite(Number(th.load)) ? fmtPct(th.load, 0) : na()
           return `
-          <div class="core-thread" title="T${th.id}">
-            <span class="tid">${t('lblThread')}${th.id}</span>
+          <div class="core-thread" title="T${th.id + 1}">
+            <span class="tid">${t('lblThread')}${th.id + 1}</span>
             <div class="mini-bar"><i style="width:${tLoad}%"></i></div>
             <span class="tval">${tVal}</span>
           </div>`
         }).join('')
         return `
-      <div class="core-phys" data-core="${g.id}">
+      <div class="core-phys" data-core="${coreLabel}">
         <div class="core-phys-head">
-          <span class="id">${coreWord} ${g.id}</span>
+          <span class="id">${coreWord} ${coreLabel}</span>
           <span class="val">${val}</span>
         </div>
         <div class="core-phys-bar"><i style="width:${load}%"></i></div>
@@ -3098,22 +3153,36 @@ function boot() {
   applyI18n()
   wireUI()
   wireAmbientParallax()
-  initDevMode({
-    showToast,
-    setActiveTab,
-    t,
-    applyPoll: async (ms) => {
-      await SetPollInterval(Number(ms) || 1000)
-      document.querySelectorAll('.btn.poll').forEach((b) => {
-        b.classList.toggle('active', Number(b.dataset.poll) === Number(ms))
-      })
-    },
-    onChange: () => {
-      if (lastMetrics) {
-        renderHardware(lastMetrics)
-        renderInsights(lastMetrics)
-      }
-    },
+  // Production wails build: Dev Mode nav/badge never appear (compile-time flag).
+  if (DEV_MODE_ENABLED) {
+    initDevMode({
+      showToast,
+      setActiveTab,
+      t,
+      applyPoll: async (ms) => {
+        await SetPollInterval(Number(ms) || 1000)
+        document.querySelectorAll('.btn.poll').forEach((b) => {
+          b.classList.toggle('active', Number(b.dataset.poll) === Number(ms))
+        })
+      },
+      onChange: () => {
+        if (lastMetrics) {
+          renderHardware(lastMetrics)
+          renderInsights(lastMetrics)
+        }
+      },
+    })
+  } else {
+    $('dev-mode-badge')?.classList.add('hidden')
+    document.querySelectorAll('.dev-mode-nav').forEach((n) => n.classList.add('hidden'))
+    $('tab-dev')?.classList.add('hidden')
+  }
+  $('btn-restart-admin')?.addEventListener('click', () => { restartAsAdmin() })
+  $('hw-temp-tip-btn')?.addEventListener('click', () => {
+    showToast(t('sensorUnavailableTip'), false)
+  })
+  document.addEventListener('visibilitychange', () => {
+    setChartActive(!document.hidden)
   })
   SetLanguage(lang).catch(() => {})
   refresh()
@@ -3121,13 +3190,22 @@ function boot() {
   refreshPeripherals()
   loadGames()
   setInterval(refresh, 1000)
-  requestAnimationFrame(animateChart)
+  setChartActive(true)
 
   try {
-    EventsOn('metrics:update', (m) => applyMetrics(m))
+    EventsOn('metrics:update', (m) => {
+      applyMetrics(m)
+      if (m && typeof m.windowVisible === 'boolean') {
+        setChartActive(!!m.windowVisible && !document.hidden)
+      }
+    })
     EventsOn('thermal:alarm', () => showToast(t('thermal')))
     EventsOn('ui:minihud', (enabled) => setHudMode(!!enabled))
     EventsOn('ui:gameoverlay', (enabled) => setGameOverlayMode(!!enabled, true))
+    EventsOn('ui:visibility', (payload) => {
+      const visible = payload && typeof payload === 'object' ? !!payload.visible : !!payload
+      setChartActive(visible && !document.hidden)
+    })
     EventsOn('peripherals:update', (items) => renderPeripherals(items || []))
   } catch (_) {}
 }
