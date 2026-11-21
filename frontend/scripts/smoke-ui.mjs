@@ -71,6 +71,27 @@ function overflowSuspects(page) {
   })
 }
 
+async function assertNoHorizontalPageScroll(page, label) {
+  const ok = await page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+  )
+  if (!ok) {
+    const dims = await page.evaluate(() => ({
+      sw: document.documentElement.scrollWidth,
+      cw: document.documentElement.clientWidth,
+    }))
+    throw new Error(`horizontal overflow at ${label}: ${JSON.stringify(dims)}`)
+  }
+}
+
+async function checkTabsNoHScroll(page, viewportLabel) {
+  for (const tab of TABS) {
+    await openTab(page, tab)
+    await page.waitForTimeout(60)
+    await assertNoHorizontalPageScroll(page, `${viewportLabel}/${tab}`)
+  }
+}
+
 async function openTab(page, tab) {
   await page.locator(`.nav-item[data-tab="${tab}"]`).click()
   await page.waitForSelector(`#tab-${tab}.tab.active`, { timeout: 8000 })
@@ -98,6 +119,17 @@ async function main() {
       await openTab(page, tab)
       await page.waitForTimeout(80)
     }
+
+    // Horizontal overflow guards at common laptop widths (every main tab).
+    for (const vp of [
+      { width: 1366, height: 768, label: '1366x768' },
+      { width: 1280, height: 720, label: '1280x720' },
+    ]) {
+      await page.setViewportSize({ width: vp.width, height: vp.height })
+      await page.waitForTimeout(80)
+      await checkTabsNoHScroll(page, vp.label)
+    }
+    await page.setViewportSize({ width: 1180, height: 760 })
 
     await openTab(page, 'gamelab')
     const search = page.locator('#game-search')

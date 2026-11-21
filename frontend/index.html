@@ -49,13 +49,22 @@
     </div>
   </div>
 
+  <div id="update-banner" class="update-banner hidden" role="status" aria-live="polite">
+    <div class="update-banner-text" id="update-banner-text"></div>
+    <div class="update-banner-actions">
+      <button type="button" class="btn compact" id="update-banner-download" data-i18n="updateDownload">Скачать</button>
+      <button type="button" class="btn compact ghost" id="update-banner-close" data-i18n="updateBannerClose">Закрыть</button>
+      <button type="button" class="win-btn" id="update-banner-x" aria-label="Close">✕</button>
+    </div>
+  </div>
+
   <div id="shell" class="shell">
     <aside class="sidebar">
       <div class="brand-block">
         <img class="brand-logo" src="./src/assets/logo.svg" alt="PulseCore" />
         <div class="brand-text">
           <div class="brand-name">PulseCore</div>
-          <div class="brand-ver">v1.6.3</div>
+          <div class="brand-ver">v1.6.4</div>
         </div>
       </div>
       <nav class="nav">
@@ -508,6 +517,17 @@
             <option value="zh">简体中文</option>
           </select>
         </div>
+        <div class="panel update-panel" id="settings-update-panel">
+          <div class="panel-title" data-i18n="updateVersionsTitle">Версия и обновления</div>
+          <div class="update-row">
+            <div class="update-current">
+              <span class="muted" data-i18n="currentVersion">Текущая версия</span>
+              <b id="settings-app-ver" class="metric">v1.6.4</b>
+            </div>
+            <button type="button" class="btn" id="btn-check-updates-settings" data-i18n="checkUpdates">Проверить обновления</button>
+          </div>
+          <div id="settings-update-result" class="update-result muted" aria-live="polite"></div>
+        </div>
       </section>
 
       <section id="tab-dev" class="tab">
@@ -625,7 +645,7 @@
       <div class="modal-body about-body">
         <div class="about-brand">
           <div class="about-app" id="about-app-name">PulseCore</div>
-          <div class="about-ver" id="about-app-ver">v1.6.3</div>
+          <div class="about-ver" id="about-app-ver">v1.6.4</div>
         </div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: <span data-i18n="aboutFOSS">Свободное ПО с открытым исходным кодом</span></div>
@@ -635,9 +655,11 @@
           <a class="about-link" id="about-github" href="https://github.com/robbled17/pulsecore" rel="noopener noreferrer">github.com/robbled17/pulsecore</a>
         </div>
         <div class="about-actions">
+          <button type="button" class="btn" id="btn-check-updates" data-i18n="checkUpdates">Проверить обновления</button>
           <button type="button" class="btn" id="btn-check-sensors" data-i18n="checkSensors">Проверить датчики</button>
           <button type="button" class="btn" id="btn-copy-pc" data-i18n="aboutCopyPC">Скопировать конфигурацию ПК</button>
         </div>
+        <div id="about-update-result" class="update-result muted" aria-live="polite"></div>
         <details class="about-license">
           <summary><span data-i18n="aboutLicense">Лицензия MIT</span></summary>
           <pre class="license-box" id="license-box"></pre>
