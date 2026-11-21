@@ -39,7 +39,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.4.1
+const MIT_LICENSE = `PulseCore v1.5.0
 
 MIT License
 
@@ -75,7 +75,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.4.1'
+const APP_VERSION = 'v1.5.0'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -192,6 +192,7 @@ async function changeLanguage(next) {
   localStorage.setItem('zp_lang', lang)
   try { await SetLanguage(lang) } catch (_) {}
   applyI18n()
+  hwSSDSignature = '' // force SSD accordion labels to rebuild for new lang
   refresh()
   refreshWeekly()
   refreshPeripherals()
@@ -743,8 +744,10 @@ function renderOverview(m) {
     $('ov-bat-bar').style.width = '100%'
   }
 
-  const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC)
-  $('temp-chip').textContent = temp === na() ? `${na()} °C` : `${temp} °C`
+  const temp = m.tempAvailable === false ? sensorUnavailableLabel() : fmtTemp(m.temperatureC)
+  $('temp-chip').textContent = (temp === na() || temp === sensorUnavailableLabel())
+    ? sensorUnavailableLabel()
+    : `${temp} °C`
   $('cpu-name').textContent = m.cpuName || 'CPU'
 
   renderStatusStrip(m)
@@ -752,6 +755,7 @@ function renderOverview(m) {
 
   latestDisks = m.disks || []
   renderDiskTabs(latestDisks)
+  renderHwSSDShell(latestDisks)
   const box = $('ov-disks')
   const disks = latestDisks
   if (!disks.length) {
@@ -926,8 +930,10 @@ function renderHardware(m) {
   $('hw-cpu-freq').textContent = curMHz ? `${fmt(curMHz / 1000, 2)} GHz` : na()
   $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
   if ($('hw-cpu-temp')) {
-    const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC, 0)
-    $('hw-cpu-temp').textContent = temp === na() ? na() : `${temp} °C`
+    const temp = m.tempAvailable === false ? sensorUnavailableLabel() : fmtTemp(m.temperatureC, 0)
+    $('hw-cpu-temp').textContent = (temp === na() || temp === sensorUnavailableLabel())
+      ? sensorUnavailableLabel()
+      : `${temp} °C`
   }
   if ($('hw-cpu-cache')) {
     const kb = Number(cpu.cacheKB) || 0
@@ -1041,9 +1047,116 @@ function renderHardware(m) {
     $('hw-pwr-name').textContent = t('desktopPC')
     $('hw-pwr-status').textContent = 'AC'
     $('hw-pwr-pct').textContent = 'AC'
-    $('hw-pwr-wear').textContent = pwr.wearLabel || t('desktopPC')
+    $('hw-pwr-wear').textContent = na()
     $('hw-pwr-cap').textContent = na()
   }
+}
+
+function ssdWearLabel(r) {
+  if (!r || r.ok === false) return t('ssdUnavailable')
+  if (Number(r.wearRemaining) >= 0) return `${fmt(r.wearRemaining, 0)}%`
+  return t('ssdUnavailable')
+}
+
+let hwSSDSignature = ''
+
+function renderHwSSDShell(disks) {
+  const host = $('hw-ssd-list')
+  if (!host) return
+  const list = Array.isArray(disks) ? disks : []
+  const sig = list.map((d) => driveLetter(d.mount)).join('|')
+  if (!list.length) {
+    hwSSDSignature = ''
+    host.innerHTML = `<div class="empty">${t('ssdUnavailable')}</div>`
+    return
+  }
+  // Avoid wiping open accordions on every 1s metrics tick.
+  if (sig === hwSSDSignature && host.querySelector('.hw-ssd-acc')) {
+    host.querySelectorAll('.hw-ssd-acc').forEach((acc) => {
+      const letter = acc.dataset.drive
+      const cached = cachedDiskReport[letter]
+      const compact = acc.querySelector('[data-ssd-compact]')
+      if (compact && cached) {
+        compact.textContent = `${cached.model || t('diskPrefix')} · ${ssdWearLabel(cached)}`
+      }
+    })
+    return
+  }
+  hwSSDSignature = sig
+  const openMap = {}
+  host.querySelectorAll('.hw-ssd-acc').forEach((acc) => {
+    openMap[acc.dataset.drive] = !!acc.open
+  })
+  host.innerHTML = list.map((d, idx) => {
+    const letter = driveLetter(d.mount)
+    const cached = cachedDiskReport[letter]
+    const model = cached?.model || `${t('diskPrefix')} ${letter}:`
+    const wear = cached ? ssdWearLabel(cached) : '…'
+    const isOpen = openMap[letter] != null ? openMap[letter] : idx === 0
+    return `
+      <details class="hw-ssd-acc" data-drive="${letter}" ${isOpen ? 'open' : ''}>
+        <summary>
+          <span class="ssd-sum-left">
+            <span class="ssd-drive">${t('diskPrefix')} ${letter}:</span>
+            <span class="ssd-compact" data-ssd-compact>${model} · ${wear}</span>
+          </span>
+          <span class="ssd-chevron" aria-hidden="true" title="${t('ssdExpandHint')}"></span>
+        </summary>
+        <div class="hw-ssd-details" data-ssd-body>
+          <div class="empty">${t('ssdLoading')}</div>
+        </div>
+      </details>`
+  }).join('')
+  // Prefill open ones from cache or fetch once.
+  host.querySelectorAll('.hw-ssd-acc[open]').forEach((acc) => {
+    fillHwSSDDetails(acc, false)
+  })
+}
+
+async function fillHwSSDDetails(acc, force = false) {
+  if (!acc) return
+  const letter = String(acc.dataset.drive || 'C').toUpperCase()
+  const body = acc.querySelector('[data-ssd-body]')
+  const compact = acc.querySelector('[data-ssd-compact]')
+  if (!body) return
+  if (getDevState().smartEnabled === false) {
+    body.innerHTML = `<div class="empty">${t('devSmartOff')}</div>`
+    if (compact) compact.textContent = t('ssdUnavailable')
+    return
+  }
+  let r = !force ? cachedDiskReport[letter] : null
+  if (!r) {
+    body.innerHTML = `<div class="empty">${t('ssdLoading')}</div>`
+    try {
+      r = await CheckDiskHealth(letter)
+      if (r && r.ok !== false) cachedDiskReport[letter] = r
+    } catch (err) {
+      body.innerHTML = `<div class="empty">${t('ssdUnavailable')}</div>`
+      if (compact) compact.textContent = t('ssdUnavailable')
+      return
+    }
+  }
+  if (!r || r.ok === false) {
+    body.innerHTML = `<div class="empty">${r?.errorMessage || t('ssdUnavailable')}</div>`
+    if (compact) compact.textContent = t('ssdUnavailable')
+    return
+  }
+  const wear = ssdWearLabel(r)
+  const temp = (() => {
+    const tt = fmtTemp(r.temperatureC, 0)
+    return tt === na() ? t('noControllerTemp') : `${tt} °C`
+  })()
+  const tbw = r.tbwGB > 1024 ? `${fmt(r.tbwGB / 1024, 2)} TB` : (r.tbwGB > 0 ? `${fmt(r.tbwGB, 1)} GB` : t('noData'))
+  const hours = r.powerOnHours > 0 ? `${fmt(r.powerOnHours, 0)} h` : t('noData')
+  if (compact) compact.textContent = `${r.model || t('diskPrefix')} · ${wear}`
+  body.innerHTML = `
+    <div class="row"><span>${t('wearLeft')}</span><strong>${wear}</strong></div>
+    <div class="row"><span>${t('temp')}</span><strong>${temp}</strong></div>
+    <div class="row"><span>${t('critErr')}</span><strong>${r.hasCriticalErrors ? t('yes') : t('no')}</strong></div>
+    <div class="row"><span>${t('tbw')}</span><strong>${tbw}</strong></div>
+    <div class="row"><span>${t('powerOn')}</span><strong>${hours}</strong></div>
+    <div class="row"><span>${t('lblStatus')}</span><strong>${r.verdictBadge || r.verdict || na()}</strong></div>
+  `
 }
 
 function isDefenderName(name) {
@@ -1296,8 +1409,12 @@ function renderMiniHUD(m) {
   $('mh-gpu').textContent = fmtPct(m.gpuPercent, 0)
   const tempEl = $('mh-temp')
   if (tempEl) {
-    const temp = fmtTemp(m.temperatureC, 0)
-    tempEl.textContent = temp === na() ? na() : `${temp}°`
+    if (m.tempAvailable === false) {
+      tempEl.textContent = sensorUnavailableLabel()
+    } else {
+      const temp = fmtTemp(m.temperatureC, 0)
+      tempEl.textContent = temp === na() ? sensorUnavailableLabel() : `${temp}°`
+    }
   }
   applyMiniHudPrefs()
 }
@@ -2367,6 +2484,21 @@ function wireUI() {
 
   $('btn-disk-health').addEventListener('click', () => runDiskHealth(selectedDrive, false))
   $('modal-smart-refresh')?.addEventListener('click', () => runDiskHealth(selectedDrive, true))
+  $('hw-ssd-list')?.addEventListener('toggle', (ev) => {
+    const acc = ev.target?.closest?.('.hw-ssd-acc')
+    if (!acc || !acc.open) return
+    fillHwSSDDetails(acc, false)
+  }, true)
+  // Prefetch SMART for the first visible SSD accordion when Hardware opens.
+  document.querySelector('.nav-item[data-tab="hardware"]')?.addEventListener('click', () => {
+    setTimeout(() => {
+      const first = $('hw-ssd-list')?.querySelector('.hw-ssd-acc[open], .hw-ssd-acc')
+      if (first) {
+        first.open = true
+        fillHwSSDDetails(first, false)
+      }
+    }, 80)
+  })
   $('btn-weekly-refresh')?.addEventListener('click', refreshWeekly)
   $('btn-periph-refresh')?.addEventListener('click', refreshPeripherals)
   $('btn-net-diag')?.addEventListener('click', runNetDiag)
