@@ -38,7 +38,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.0
+const MIT_LICENSE = `PulseCore v1.4.0
 
 MIT License
 
@@ -74,7 +74,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.0'
+const APP_VERSION = 'v1.4.0'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -167,7 +167,19 @@ function applyTheme(theme) {
 }
 
 function na() {
+  try {
+    const v = t('na')
+    if (v && v !== 'na') return v
+  } catch (_) {}
   return lang === 'ru' ? 'Н/Д' : 'N/A'
+}
+
+function sensorUnavailableLabel() {
+  try {
+    const v = t('sensorUnavailable')
+    if (v && v !== 'sensorUnavailable') return v
+  } catch (_) {}
+  return na()
 }
 
 function dash() {
@@ -1115,16 +1127,21 @@ function renderPeripherals(items) {
   box.innerHTML = order.filter((g) => groups[g]?.length).map((g) => {
     const meta = periphGroupMeta(g)
     const collapsed = periphCollapsed.has(g)
-    const rows = groups[g].map((p) => `
-      <div class="periph-row">
+    const rows = groups[g].map((p) => {
+      const unavailable = String(p.status || '').toLowerCase() === 'unavailable' ||
+        String(p.name || '').toLowerCase() === 'unavailable'
+      const statusLabel = unavailable ? t('periphUnavailable') : t('periphActive')
+      const name = unavailable ? t('sensorUnavailable') : (p.name || dash())
+      return `
+      <div class="periph-row ${unavailable ? 'unavailable' : ''}">
         <div class="periph-ico">${p.icon || meta.ico}</div>
         <div>
-          <div class="periph-name">${p.name || '-'}</div>
-          <div class="periph-meta">${p.kind || p.class || ''}</div>
+          <div class="periph-name">${name}</div>
+          <div class="periph-meta">${unavailable ? '' : (p.kind || p.class || '')}</div>
         </div>
-        <div class="periph-status">${t('periphActive')}</div>
-      </div>
-    `).join('')
+        <div class="periph-status">${statusLabel}</div>
+      </div>`
+    }).join('')
     return `
       <div class="periph-group ${collapsed ? 'collapsed' : ''}" data-group="${g}">
         <button type="button" class="periph-group-title" data-toggle-group="${g}">
@@ -2052,6 +2069,20 @@ function wireUI() {
   })
 
   document.addEventListener('keydown', async (ev) => {
+    if (ev.key === 'Escape') {
+      const about = $('about-modal')
+      const modal = $('modal')
+      if (about && !about.classList.contains('hidden')) {
+        ev.preventDefault()
+        about.classList.add('hidden')
+        return
+      }
+      if (modal && !modal.classList.contains('hidden')) {
+        ev.preventDefault()
+        modal.classList.add('hidden')
+        return
+      }
+    }
     if (ev.key === 'F11') {
       ev.preventDefault()
       try { await ToggleFullscreen() } catch (_) {}

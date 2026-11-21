@@ -20,15 +20,20 @@ function on(event, cb) {
   return () => listeners.get(event)?.delete(cb)
 }
 
-/** Demo-only hardware matrix (never used by live Wails). */
+/** Demo-only hardware matrix (never used by live Wails).
+ * A: weak SMT desktop iGPU · B: laptop dual GPU (iGPU+dGPU) · C: broken sensors + multi-disk
+ * D: no-SMT CPU (physical == logical) for accordion/thread UI fixtures.
+ */
 const PROFILES = {
   A: {
     id: 'A',
     label: 'Weak',
+    chassis: 'desktop',
     cpuName: 'Intel Core i3-10100',
     gpuName: 'Intel UHD Graphics 630',
+    secondaryGpuName: '',
     physicalCores: 4,
-    logicalCores: 8,
+    logicalCores: 8, // SMT on
     frequencyMHz: 3600,
     ramTotalMB: 8192,
     dedicatedMB: 0,
@@ -43,6 +48,9 @@ const PROFILES = {
     diskPct: 95,
     diskUsed: 456,
     diskTotal: 480,
+    extraDisks: [
+      { mount: 'D:\\', usedGB: 120, totalGB: 500, percent: 24, readMBps: 8.1, writeMBps: 2.2 },
+    ],
     cpuBase: 72,
     gpuBase: 55,
     ramBase: 91,
@@ -54,39 +62,47 @@ const PROFILES = {
   },
   B: {
     id: 'B',
-    label: 'Mid',
-    cpuName: 'AMD Ryzen 7 5700X',
-    gpuName: 'NVIDIA GeForce RTX 3060',
+    label: 'Laptop dual GPU',
+    chassis: 'laptop',
+    cpuName: 'AMD Ryzen 7 5800H',
+    gpuName: 'NVIDIA GeForce RTX 3060 Laptop GPU',
+    secondaryGpuName: 'AMD Radeon Graphics',
     physicalCores: 8,
-    logicalCores: 16,
-    frequencyMHz: 3900,
+    logicalCores: 16, // hybrid/SMT
+    frequencyMHz: 3200,
     ramTotalMB: 16384,
-    dedicatedMB: 8192,
-    sharedMB: 0,
+    dedicatedMB: 6144,
+    sharedMB: 512,
     isIntegrated: false,
     isSingleChannel: false,
     slotsUsed: 2,
-    slotsTotal: 4,
+    slotsTotal: 2,
     ramType: 'DDR4',
     ramSpeed: 3200,
     channelStatus: 'Dual Channel',
     diskPct: 58,
     diskUsed: 552,
     diskTotal: 952,
+    extraDisks: [
+      { mount: 'D:\\', usedGB: 180, totalGB: 512, percent: 35, readMBps: 110, writeMBps: 40 },
+      { mount: 'E:\\', usedGB: 40, totalGB: 128, percent: 31, readMBps: 22, writeMBps: 9 },
+    ],
     cpuBase: 42,
     gpuBase: 58,
     ramBase: 62,
     tempMode: 'normal',
     cpuScore: 68,
     gpuScore: 61,
-    vramGB: 8,
+    vramGB: 6,
     ramGB: 16,
   },
   C: {
     id: 'C',
-    label: 'Top+',
+    label: 'Top+ broken sensors',
+    chassis: 'desktop',
     cpuName: 'AMD Ryzen 9 7950X',
     gpuName: 'NVIDIA GeForce RTX 4090',
+    secondaryGpuName: '',
     physicalCores: 16,
     logicalCores: 32,
     frequencyMHz: 4500,
@@ -103,6 +119,10 @@ const PROFILES = {
     diskPct: 34,
     diskUsed: 680,
     diskTotal: 2000,
+    extraDisks: [
+      { mount: 'D:\\', usedGB: 900, totalGB: 2000, percent: 45, readMBps: 210, writeMBps: 180 },
+      { mount: 'E:\\', usedGB: 100, totalGB: 480, percent: 21, readMBps: 90, writeMBps: 70 },
+    ],
     cpuBase: 28,
     gpuBase: 45,
     ramBase: 48,
@@ -111,6 +131,39 @@ const PROFILES = {
     gpuScore: 100,
     vramGB: 24,
     ramGB: 32,
+  },
+  D: {
+    id: 'D',
+    label: 'No-SMT',
+    chassis: 'desktop',
+    cpuName: 'Intel Core i5-12600 (P-cores fixture)',
+    gpuName: 'NVIDIA GeForce GTX 1660',
+    secondaryGpuName: '',
+    physicalCores: 6,
+    logicalCores: 6, // no SMT
+    frequencyMHz: 3300,
+    ramTotalMB: 16384,
+    dedicatedMB: 6144,
+    sharedMB: 0,
+    isIntegrated: false,
+    isSingleChannel: false,
+    slotsUsed: 2,
+    slotsTotal: 4,
+    ramType: 'DDR4',
+    ramSpeed: 3200,
+    channelStatus: 'Dual Channel',
+    diskPct: 40,
+    diskUsed: 200,
+    diskTotal: 512,
+    extraDisks: [],
+    cpuBase: 35,
+    gpuBase: 40,
+    ramBase: 50,
+    tempMode: 'normal',
+    cpuScore: 55,
+    gpuScore: 48,
+    vramGB: 6,
+    ramGB: 16,
   },
 }
 
@@ -358,9 +411,13 @@ function buildMetrics() {
         writeMBps: p.id === 'A' ? 12 : 4.1,
         freeGB,
       },
+      ...((p.extraDisks || []).map((d) => ({
+        ...d,
+        freeGB: Math.max(0, (d.totalGB || 0) - (d.usedGB || 0)),
+      }))),
     ],
     battery: {
-      available: p.id !== 'C',
+      available: p.chassis === 'laptop' || (p.id !== 'C' && p.id !== 'D'),
       percent: 76,
       pluggedIn: true,
       status: 'charging',
@@ -389,13 +446,15 @@ function buildMetrics() {
         }),
       },
       gpu: {
-        name: p.gpuName,
+        name: p.secondaryGpuName ? `${p.gpuName} + ${p.secondaryGpuName}` : p.gpuName,
         driverVersion: p.isIntegrated ? '31.0.101.5186' : '566.36',
         dedicatedMB: p.dedicatedMB,
         sharedMB: p.sharedMB,
         isIntegrated: p.isIntegrated,
         vramGB: p.vramGB,
         fanRPM: brokenFan,
+        secondaryName: p.secondaryGpuName || '',
+        chassis: p.chassis || 'desktop',
       },
       ram: {
         totalMB: ramTotal,
@@ -409,7 +468,7 @@ function buildMetrics() {
         channelStatus: p.channelStatus,
       },
       power: {
-        hasBattery: p.id !== 'C',
+        hasBattery: p.chassis === 'laptop' || (p.id !== 'C' && p.id !== 'D'),
         deviceName: 'Primary',
         statusText: 'Зарядка',
         percent: 76,
@@ -482,21 +541,31 @@ const App = {
   ResumeProcess: async () => true,
   ToggleEcoMode: async () => true,
   EcoModeByProcessName: async () => true,
-  CheckDiskHealth: async (drive) => ({
-    ok: true,
-    model: 'Samsung SSD 980 PRO 1TB',
-    serialNumber: 'S5GXNX0MOCK01',
-    interfaceType: 'NVMe',
-    mediaType: 'SSD',
-    temperatureC: profile().tempMode === 'broken' ? null : 41,
-    tbwGB: 12_400,
-    powerOnHours: 4820,
-    wearRemaining: 94,
-    hasCriticalErrors: false,
-    verdict: 'Хорошее состояние',
-    verdictBadge: 'OK',
-    drive: drive || 'C',
-  }),
+  CheckDiskHealth: async (drive) => {
+    const letter = String(drive || 'C').replace(':', '').toUpperCase().charAt(0) || 'C'
+    const table = {
+      C: { model: 'Samsung SSD 980 PRO 1TB', serial: 'S5GXNX0MOCK01', temp: 41, wear: 94, tbw: 12400, hours: 4820, media: 'SSD', iface: 'NVMe' },
+      D: { model: 'WD Blue SN570 500GB', serial: 'WDMOCKDISK02', temp: 36, wear: 88, tbw: 4200, hours: 2100, media: 'SSD', iface: 'NVMe' },
+      E: { model: 'Seagate Barracuda 2TB', serial: 'STMOCKDISK03', temp: 32, wear: 99, tbw: 800, hours: 900, media: 'HDD', iface: 'SATA' },
+    }
+    const row = table[letter] || table.C
+    const broken = profile().tempMode === 'broken'
+    return {
+      ok: !broken,
+      model: row.model,
+      serialNumber: row.serial,
+      interfaceType: row.iface,
+      mediaType: row.media,
+      temperatureC: broken ? null : row.temp,
+      tbwGB: row.tbw,
+      powerOnHours: row.hours,
+      wearRemaining: broken ? -1 : row.wear,
+      hasCriticalErrors: false,
+      verdict: broken ? 'Недоступно' : 'Хорошее состояние',
+      verdictBadge: broken ? 'N/A' : 'OK',
+      drive: letter,
+    }
+  },
   GetMonthlyAppReport: async () => ({
     ok: true,
     period: 'последние 7 дней',
@@ -751,6 +820,11 @@ const App = {
     { appId: 'trace1', appName: 'setup.exe', createdAt: '2026-03-21T10:00:00Z', finishedAt: '2026-03-21T10:05:00Z', newKeys: 2, newDirs: 1, file: 'trace1.json' },
   ]),
   CleanupFromTrace: async () => ({ ok: true, removed: [], failed: [], message: 'Удалено: 1, пропущено/ошибок: 0 (реестр только вручную)' }),
+  PreviewSafeDiskCaches: async () => ({
+    ok: true, deletedFiles: 12, deletedBytes: 48_000_000, skipped: 3, errors: 0, dryRun: true,
+    targets: ['%TEMP%', 'D3DSCache'], message: 'К удалению файлов: 12 (45.8 МБ), пропущено: 3, ошибок: 0',
+  }),
+  PreviewDeleteResiduals: async () => ({ ok: true, removed: 2, failed: 0, skipped: 1, dryRun: true, message: 'К удалению: 2, ошибок: 0, пропущено: 1' }),
   CleanSafeDiskCaches: async () => ({
     ok: true,
     deletedFiles: 12,

@@ -48,7 +48,7 @@ func collectBattery() BatteryMetrics {
 		StatusText: "Питание: Стандартный ATX блок питания (От сети 220V)",
 		Available:  false,
 		PluggedIn:  true,
-		Percent:    100,
+		Percent:    0, // never fake a full battery when unavailable
 	}
 
 	st, ok := readSystemPowerStatus()
@@ -59,6 +59,7 @@ func collectBattery() BatteryMetrics {
 	// 255 = unknown / no battery present on most Windows builds.
 	if st.BatteryLifePercent == 255 {
 		out.Available = false
+		out.Percent = 0
 		out.PluggedIn = st.ACLineStatus == 1
 		out.Status = "Desktop"
 		out.StatusText = "Стационарный ПК (Блок питания)"
