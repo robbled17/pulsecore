@@ -419,6 +419,10 @@ func (a *App) LagSpotterCheck(cores []float64, overall float64) []LagEvent {
 		if last, ok := a.lastLagAt[i]; ok && time.Since(last) < 3*time.Second {
 			continue
 		}
+		// Never attribute peak-core lags to AV / critical OS (no Eco Mode banner).
+		if culpritName != "" && isNoiseBackgroundProcess(culpritName) {
+			continue
+		}
 		a.lastLagAt[i] = time.Now()
 		friendly := friendlyProcessName(culpritName)
 		ev := LagEvent{
@@ -476,6 +480,9 @@ func (a *App) GetVampireProcesses() []VampireProcess {
 		}
 		lower := strings.ToLower(filepath.Base(name))
 		if isSelfOrWebView(lower) || lower == "system" || lower == "idle" {
+			continue
+		}
+		if isNoiseBackgroundProcess(name) || isNoiseBackgroundProcess(lower) {
 			continue
 		}
 
@@ -1112,8 +1119,11 @@ func findHottestProcess() (string, int32) {
 		if isSelfOrWebView(name) {
 			continue
 		}
-		lower := strings.ToLower(name)
+		lower := strings.ToLower(filepath.Base(name))
 		if lower == "system" || lower == "idle" || lower == "system idle process" {
+			continue
+		}
+		if isNoiseBackgroundProcess(name) || isNoiseBackgroundProcess(lower) {
 			continue
 		}
 		c, err := p.CPUPercent()

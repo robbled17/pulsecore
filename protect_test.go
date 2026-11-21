@@ -13,6 +13,7 @@ func TestIsProtectedSystemTargetProcesses(t *testing.T) {
 		"SearchHost.exe", "dwm.exe", "csrss.exe", "wininit.exe", "winlogon.exe",
 		"services.exe", "lsass.exe", "svchost.exe", "smss.exe",
 		"MsMpEng.exe", "NisSrv.exe", "SecurityHealthService.exe",
+		"SearchIndexer.exe", "SearchProtocolHost.exe",
 		"ctfmon.exe", "RuntimeBroker.exe", "sihost.exe", "taskmgr.exe",
 		"PulseCore.EXE", "",
 	}
