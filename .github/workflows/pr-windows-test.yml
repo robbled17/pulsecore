@@ -40,6 +40,16 @@ jobs:
         shell: bash
         run: npm run build
 
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        shell: bash
+        run: npx playwright install chromium
+
+      - name: Frontend UI smoke (mock harness)
+        working-directory: frontend
+        shell: bash
+        run: npm run smoke
+
       - name: Go vet
         shell: bash
         run: go vet ./...
