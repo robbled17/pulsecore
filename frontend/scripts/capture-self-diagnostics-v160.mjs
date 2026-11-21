@@ -47,7 +47,7 @@ async function main() {
     await ready
     const browser = await chromium.launch({ headless: true })
     const page = await browser.newPage({ viewport: { width: 1180, height: 760 } })
-    await page.goto(`${BASE}/demo.html`, { waitUntil: 'networkidle' })
+    await page.goto(`${BASE}/demo.html`, { waitUntil: 'load' })
     await page.waitForSelector('#tab-overview.tab.active', { timeout: 25000 })
     await page.waitForTimeout(500)
 
