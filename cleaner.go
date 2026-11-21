@@ -24,6 +24,7 @@ type DiskCleanResult struct {
 	Errors       int      `json:"errors"`
 	Targets      []string `json:"targets"`
 	Message      string   `json:"message"`
+	DryRun       bool     `json:"dryRun"`
 }
 
 type cleanRootKind int
@@ -42,6 +43,15 @@ type cleanRoot struct {
 // CleanSafeDiskCaches deletes only allowlisted temp/cache files with age guards.
 // Never removes the root folders themselves; never touches Packages or system trees.
 func (a *App) CleanSafeDiskCaches() DiskCleanResult {
+	return a.cleanSafeDiskCaches(false)
+}
+
+// PreviewSafeDiskCaches is a dry-run of CleanSafeDiskCaches (no deletes).
+func (a *App) PreviewSafeDiskCaches() DiskCleanResult {
+	return a.cleanSafeDiskCaches(true)
+}
+
+func (a *App) cleanSafeDiskCaches(dryRun bool) DiskCleanResult {
 	roots := listAllowedCleanRoots()
 	var deleted int
 	var bytes int64
@@ -53,15 +63,19 @@ func (a *App) CleanSafeDiskCaches() DiskCleanResult {
 			continue
 		}
 		labels = append(labels, root.label)
-		d, b, s, e := cleanAllowedRoot(root)
+		d, b, s, e := cleanAllowedRoot(root, dryRun)
 		deleted += d
 		bytes += b
 		skipped += s
 		errs += e
 	}
 
-	msg := fmt.Sprintf("Удалено файлов: %d (%.1f МБ), пропущено: %d, ошибок: %d",
-		deleted, float64(bytes)/(1024*1024), skipped, errs)
+	verb := "Удалено"
+	if dryRun {
+		verb = "К удалению"
+	}
+	msg := fmt.Sprintf("%s файлов: %d (%.1f МБ), пропущено: %d, ошибок: %d",
+		verb, deleted, float64(bytes)/(1024*1024), skipped, errs)
 	return DiskCleanResult{
 		OK:           errs == 0,
 		DeletedFiles: deleted,
@@ -70,6 +84,7 @@ func (a *App) CleanSafeDiskCaches() DiskCleanResult {
 		Errors:       errs,
 		Targets:      labels,
 		Message:      msg,
+		DryRun:       dryRun,
 	}
 }
 
@@ -174,7 +189,7 @@ func listBrowserProfiles(userData string) []string {
 	return out
 }
 
-func cleanAllowedRoot(root cleanRoot) (deleted int, bytes int64, skipped, errs int) {
+func cleanAllowedRoot(root cleanRoot, dryRun bool) (deleted int, bytes int64, skipped, errs int) {
 	info, err := os.Stat(root.path)
 	if err != nil || !info.IsDir() {
 		return 0, 0, 1, 0
@@ -197,16 +212,29 @@ func cleanAllowedRoot(root cleanRoot) (deleted int, bytes int64, skipped, errs i
 		if path == root.path {
 			return nil
 		}
-		if isForbiddenCleanPath(path) {
-			skipped++
-			if d.IsDir() {
+		// Do not descend into directory symlinks/junctions (WalkDir already skips
+		// symlinks on some platforms; re-check explicitly for Windows reparse points).
+		if d.IsDir() {
+			if isSymlinkPath(path, d) {
+				skipped++
+				return fs.SkipDir
+			}
+			if isForbiddenCleanPath(path) {
+				skipped++
 				return fs.SkipDir
 			}
 			return nil
 		}
-		// Never remove directories (keep structure); only files.
-		if d.IsDir() {
+		if isForbiddenCleanPath(path) {
+			skipped++
 			return nil
+		}
+		if isSymlinkPath(path, d) {
+			// File symlink: only delete if resolved target stays under allowlisted root.
+			if _, ok := resolveDeletePath(path, root.path); !ok {
+				skipped++
+				return nil
+			}
 		}
 		fi, err := d.Info()
 		if err != nil {
@@ -222,10 +250,12 @@ func cleanAllowedRoot(root cleanRoot) (deleted int, bytes int64, skipped, errs i
 			return nil
 		}
 		sz := fi.Size()
-		if err := os.Remove(path); err != nil {
-			// Open / locked files: skip, do not escalate.
+		if err := safeRemoveFile(path, root.path, dryRun); err != nil {
+			// Open / locked files / escapes: skip, do not escalate.
 			skipped++
-			errs++
+			if !dryRun {
+				errs++
+			}
 			return nil
 		}
 		deleted++
@@ -233,6 +263,17 @@ func cleanAllowedRoot(root cleanRoot) (deleted int, bytes int64, skipped, errs i
 		return nil
 	})
 	return deleted, bytes, skipped, errs
+}
+
+func isSymlinkPath(path string, d fs.DirEntry) bool {
+	if d != nil && d.Type()&fs.ModeSymlink != 0 {
+		return true
+	}
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeSymlink != 0
 }
 
 // isForbiddenCleanRoot blocks cleaning entire AppData / ProgramData / Windows / PF trees.

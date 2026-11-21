@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -90,6 +91,65 @@ func TestIsDangerousInstallRoot(t *testing.T) {
 	}
 	if isDangerousInstallRoot(`C:\Program Files\Acme\Tool`) {
 		t.Fatal("vendor install dir should be ok")
+	}
+}
+
+func TestInstallLocationDepthAndNormalize(t *testing.T) {
+	if installPathDepth(`C:\`) != 0 {
+		t.Fatal("drive root depth 0")
+	}
+	if installPathDepth(`C:\App`) != 1 {
+		t.Fatal("C:\\App depth 1")
+	}
+	if installPathDepth(`C:\Program Files\Acme\Tool`) != 3 {
+		t.Fatal("vendor tool depth 3")
+	}
+	if isValidInstallLocation(``) || isValidInstallLocation(`   `) {
+		t.Fatal("empty InstallLocation must be invalid")
+	}
+	if isValidInstallLocation(`C:\App`) {
+		t.Fatal("depth 1 InstallLocation must be invalid")
+	}
+	if !isValidInstallLocation(`C:\Program Files\Acme\Tool`) {
+		t.Fatal("depth 3 vendor path must be valid")
+	}
+	if !isValidInstallLocation(`C:\Games\MyGame`) {
+		t.Fatal("depth 2 game path must be valid")
+	}
+	// Normalization: \\?\, env, dots, trailing slash
+	t.Setenv("LOCALAPPDATA", `C:\Users\Bob\AppData\Local`)
+	norm := normalizeProtectPath(`\\?\C:\Users\Bob\AppData\Local\Packages\X\`)
+	if !strings.Contains(norm, `\appdata\local\packages`) {
+		t.Fatalf("extended path normalize failed: %q", norm)
+	}
+	envNorm := normalizeProtectPath(`%LOCALAPPDATA%\Temp\..`)
+	if envNorm != `c:\users\bob\appdata\local` {
+		t.Fatalf("env+dot normalize: %q", envNorm)
+	}
+	if !IsProtectedSystemTarget(`C:\ProgramData\Microsoft`) {
+		t.Fatal("ProgramData\\Microsoft must be protected")
+	}
+	if !IsProtectedSystemTarget(`C:\ProgramData\Microsoft\Windows Defender`) {
+		t.Fatal("Defender under ProgramData must be protected")
+	}
+}
+
+func TestResolveDeletePathRejectsEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if _, ok := resolveDeletePath(outside, root); ok {
+		t.Fatal("escape outside allowlisted root must fail")
+	}
+	inside := filepath.Join(root, "cache.tmp")
+	_ = os.WriteFile(inside, []byte("x"), 0o644)
+	if _, ok := resolveDeletePath(inside, root); !ok {
+		t.Fatal("file under allowlisted root must resolve")
+	}
+	if err := safeRemoveFile(inside, root, true); err != nil {
+		t.Fatalf("dry-run remove: %v", err)
+	}
+	if _, err := os.Stat(inside); err != nil {
+		t.Fatal("dry-run must not delete")
 	}
 }
 

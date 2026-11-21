@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -22,6 +23,7 @@ var protectedSystemProcesses = map[string]struct{}{
 	"securityhealthhost.exe": {}, "mssense.exe": {}, "mpcmdrun.exe": {},
 	"sgrmbroker.exe": {}, "smartscreen.exe": {}, "wdavscannerservice.exe": {},
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
+	"msedgewebview2.exe": {},
 }
 
 // Path fragments that mark Windows / Defender / AV / shell critical targets.
@@ -31,10 +33,12 @@ var protectedPathMarkers = []string{
 	`\windows\winsxs`,
 	`\windows\systemapps`,
 	`\windows\immersivecontrolpanel`,
+	`\windows\packages`,
 	`\program files\windows defender`,
 	`\program files\windowsapps`,
 	`\programdata\microsoft\windows defender`,
 	`\programdata\microsoft\windows security health`,
+	`\programdata\microsoft`,
 	`\appdata\local\packages`,
 	`\microsoft\windows defender`,
 	`\windows defender`,
@@ -51,6 +55,9 @@ var forbiddenRegistryPrefixes = []string{
 	`hkcu\software\microsoft\windows\currentversion\explorer`,
 	`hkcu\software\classes\local settings\software\microsoft\windows\currentversion\traynotify`,
 }
+
+// Minimum InstallLocation path depth (segments after drive) for kill/delete.
+const minInstallLocationDepth = 2
 
 // IsProtectedSystemTarget reports whether nameOrPath refers to a critical
 // Windows / Defender / AV / shell process or filesystem location.
@@ -109,6 +116,10 @@ func isDangerousInstallRoot(path string) bool {
 	if norm == `c:\` || norm == `c:` || (len(norm) == 2 && norm[1] == ':') {
 		return true
 	}
+	// Any bare drive letter root (d:\, e:\ …)
+	if len(norm) == 3 && norm[1] == ':' && (norm[2] == '\\' || norm[2] == '/') {
+		return true
+	}
 	dangerousExact := []string{
 		`c:\windows`,
 		`c:\program files`,
@@ -131,12 +142,102 @@ func isDangerousInstallRoot(path string) bool {
 	return false
 }
 
+// installPathDepth counts path segments after the drive (or UNC share).
+// C:\ → 0; C:\Windows → 1; C:\Program Files\App → 2.
+func installPathDepth(path string) int {
+	norm := normalizeProtectPath(path)
+	if norm == "" {
+		return 0
+	}
+	// UNC: \\server\share\rest…
+	if strings.HasPrefix(norm, `\\`) {
+		trim := strings.TrimPrefix(norm, `\\`)
+		parts := strings.Split(trim, `\`)
+		n := 0
+		for _, p := range parts {
+			if p != "" {
+				n++
+			}
+		}
+		// server + share = 2; depth beyond share
+		if n <= 2 {
+			return 0
+		}
+		return n - 2
+	}
+	// Drive path
+	if len(norm) >= 2 && norm[1] == ':' {
+		rest := ""
+		if len(norm) > 2 {
+			rest = strings.TrimPrefix(norm[2:], `\`)
+		}
+		if rest == "" {
+			return 0
+		}
+		parts := strings.Split(rest, `\`)
+		n := 0
+		for _, p := range parts {
+			if p != "" && p != "." {
+				n++
+			}
+		}
+		return n
+	}
+	parts := strings.Split(norm, `\`)
+	n := 0
+	for _, p := range parts {
+		if p != "" && p != "." {
+			n++
+		}
+	}
+	return n
+}
+
+// isValidInstallLocation requires a non-empty, non-dangerous path with depth ≥ 2.
+func isValidInstallLocation(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	if isDangerousInstallRoot(path) || IsProtectedSystemTarget(path) {
+		return false
+	}
+	return installPathDepth(path) >= minInstallLocationDepth
+}
+
+// normalizeProtectPath expands env vars, strips \\?\ / UNC quirks, collapses ..,
+// lowercases, and trims trailing separators (except bare drive roots).
 func normalizeProtectPath(p string) string {
 	p = strings.TrimSpace(p)
+	if p == "" {
+		return ""
+	}
+	// Expand %ENV% tokens before anything else.
+	p = expandWindowsEnv(p)
 	p = strings.ReplaceAll(p, `/`, `\`)
+
+	// Strip extended-length / verbatim prefixes.
+	lower := strings.ToLower(p)
+	switch {
+	case strings.HasPrefix(lower, `\\?\unc\`):
+		p = `\\` + p[len(`\\?\unc\`):]
+	case strings.HasPrefix(lower, `\\?\`):
+		p = p[len(`\\?\`):]
+	}
+
+	// Collapse . and .. segments (do not resolve real symlinks here).
+	p = collapseDotSegments(p)
+
 	p = strings.ToLower(p)
-	// Collapse duplicate separators
 	for strings.Contains(p, `\\`) {
+		// Keep UNC leading \\
+		if strings.HasPrefix(p, `\\`) {
+			rest := p[2:]
+			for strings.Contains(rest, `\\`) {
+				rest = strings.ReplaceAll(rest, `\\`, `\`)
+			}
+			p = `\\` + rest
+			break
+		}
 		p = strings.ReplaceAll(p, `\\`, `\`)
 	}
 	p = strings.TrimRight(p, `\`)
@@ -145,6 +246,72 @@ func normalizeProtectPath(p string) string {
 		return p + `\`
 	}
 	return p
+}
+
+func expandWindowsEnv(p string) string {
+	if !strings.Contains(p, "%") {
+		return p
+	}
+	var b strings.Builder
+	for i := 0; i < len(p); {
+		if p[i] == '%' {
+			j := strings.IndexByte(p[i+1:], '%')
+			if j >= 0 {
+				name := p[i+1 : i+1+j]
+				if name != "" {
+					if v := os.Getenv(name); v != "" {
+						b.WriteString(v)
+						i += j + 2
+						continue
+					}
+				}
+			}
+		}
+		b.WriteByte(p[i])
+		i++
+	}
+	return b.String()
+}
+
+func collapseDotSegments(p string) string {
+	unc := false
+	if strings.HasPrefix(p, `\\`) {
+		unc = true
+		p = p[2:]
+	}
+	drive := ""
+	if len(p) >= 2 && p[1] == ':' {
+		drive = strings.ToUpper(p[:2])
+		p = p[2:]
+		if strings.HasPrefix(p, `\`) {
+			p = p[1:]
+		}
+	}
+	parts := strings.Split(p, `\`)
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		switch part {
+		case "", ".":
+			continue
+		case "..":
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		default:
+			out = append(out, part)
+		}
+	}
+	joined := strings.Join(out, `\`)
+	if unc {
+		return `\\` + joined
+	}
+	if drive != "" {
+		if joined == "" {
+			return drive + `\`
+		}
+		return drive + `\` + joined
+	}
+	return joined
 }
 
 func normalizeRegistryPath(p string) string {
@@ -167,4 +334,71 @@ func normalizeRegistryPath(p string) string {
 		p = strings.ReplaceAll(p, `\\`, `\`)
 	}
 	return strings.TrimRight(p, `\`)
+}
+
+// resolveDeletePath normalizes and optionally EvalSymlinks; rejects escapes
+// outside the allowlisted root (when root is non-empty).
+func resolveDeletePath(path, allowedRoot string) (string, bool) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", false
+	}
+	norm := normalizeProtectPath(path)
+	if norm == "" || isDangerousInstallRoot(norm) || IsProtectedSystemTarget(path) {
+		return "", false
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+	resolved := abs
+	if r, err := filepath.EvalSymlinks(abs); err == nil && r != "" {
+		resolved = r
+	}
+	resNorm := normalizeProtectPath(resolved)
+	if resNorm == "" || isDangerousInstallRoot(resNorm) || IsProtectedSystemTarget(resolved) {
+		return "", false
+	}
+	if allowedRoot != "" {
+		rootNorm := normalizeProtectPath(allowedRoot)
+		rootAbs, err := filepath.Abs(allowedRoot)
+		if err != nil {
+			rootAbs = allowedRoot
+		}
+		if r, err := filepath.EvalSymlinks(rootAbs); err == nil && r != "" {
+			rootAbs = r
+		}
+		rootNorm = normalizeProtectPath(rootAbs)
+		if rootNorm == "" {
+			return "", false
+		}
+		if resNorm != rootNorm && !strings.HasPrefix(resNorm, rootNorm+`\`) {
+			return "", false
+		}
+	}
+	return resolved, true
+}
+
+// safeRemoveFile deletes a single file after path resolve. dryRun skips Remove.
+func safeRemoveFile(path, allowedRoot string, dryRun bool) error {
+	resolved, ok := resolveDeletePath(path, allowedRoot)
+	if !ok {
+		return os.ErrPermission
+	}
+	if dryRun {
+		return nil
+	}
+	return os.Remove(resolved)
+}
+
+// safeRemoveAll deletes a directory tree after path resolve. dryRun skips RemoveAll.
+func safeRemoveAll(path, allowedRoot string, dryRun bool) error {
+	resolved, ok := resolveDeletePath(path, allowedRoot)
+	if !ok {
+		return os.ErrPermission
+	}
+	if dryRun {
+		return nil
+	}
+	return os.RemoveAll(resolved)
 }

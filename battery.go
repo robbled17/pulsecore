@@ -98,117 +98,120 @@ func collectBattery() BatteryMetrics {
 
 func enrichBatteryWMI(base BatteryMetrics) BatteryMetrics {
 	if !base.Available {
+		base.Percent = 0 // never imply a full battery when unavailable
 		return base
 	}
-	ensureOLE()
-
-	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
-	if err != nil {
-		return base
-	}
-	defer locator.Release()
-	dl, err := locator.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return base
-	}
-	defer dl.Release()
-
-	// root\WMI: BatteryStaticData + BatteryFullChargedCapacity
-	wmiRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\WMI`)
-	if err == nil {
-		wmi := wmiRaw.ToIDispatch()
-		defer wmi.Release()
-
-		staticRaw, err := oleutil.CallMethod(wmi, "ExecQuery",
-			"SELECT DeviceName, DesignedCapacity FROM BatteryStaticData")
-		if err == nil {
-			static := staticRaw.ToIDispatch()
-			defer static.Release()
-			if c, _ := oleutil.GetProperty(static, "Count"); int(c.Val) > 0 {
-				itemRaw, err := oleutil.CallMethod(static, "ItemIndex", 0)
-				if err == nil {
-					item := itemRaw.ToIDispatch()
-					nameVar, _ := oleutil.GetProperty(item, "DeviceName")
-					designVar, _ := oleutil.GetProperty(item, "DesignedCapacity")
-					item.Release()
-					base.DeviceName = strings.TrimSpace(nameVar.ToString())
-					base.DesignCapacitymWh = float64(designVar.Val)
-				}
-			}
+	out := base
+	_ = withSensorGate(defaultSensorTimeout, func() {
+		ensureOLE()
+		locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+		if err != nil {
+			return
 		}
-
-		fullRaw, err := oleutil.CallMethod(wmi, "ExecQuery",
-			"SELECT FullChargedCapacity FROM BatteryFullChargedCapacity")
-		if err == nil {
-			full := fullRaw.ToIDispatch()
-			defer full.Release()
-			if c, _ := oleutil.GetProperty(full, "Count"); int(c.Val) > 0 {
-				itemRaw, err := oleutil.CallMethod(full, "ItemIndex", 0)
-				if err == nil {
-					item := itemRaw.ToIDispatch()
-					capVar, _ := oleutil.GetProperty(item, "FullChargedCapacity")
-					item.Release()
-					base.CapacitymWh = float64(capVar.Val)
-				}
-			}
+		defer locator.Release()
+		dl, err := locator.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return
 		}
-	}
+		defer dl.Release()
 
-	// Fallback to Win32_Battery names/capacities when root\WMI is empty.
-	if base.DeviceName == "" || base.DesignCapacitymWh <= 0 || base.CapacitymWh <= 0 {
-		cimRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+		// root\WMI: BatteryStaticData + BatteryFullChargedCapacity
+		wmiRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\WMI`)
 		if err == nil {
-			cim := cimRaw.ToIDispatch()
-			defer cim.Release()
-			qRaw, err := oleutil.CallMethod(cim, "ExecQuery",
-				"SELECT Name, DeviceID, FullChargedCapacity, DesignCapacity, EstimatedChargeRemaining FROM Win32_Battery")
+			wmi := wmiRaw.ToIDispatch()
+			defer wmi.Release()
+
+			staticRaw, err := oleutil.CallMethod(wmi, "ExecQuery",
+				"SELECT DeviceName, DesignedCapacity FROM BatteryStaticData")
 			if err == nil {
-				q := qRaw.ToIDispatch()
-				defer q.Release()
-				if c, _ := oleutil.GetProperty(q, "Count"); int(c.Val) > 0 {
-					itemRaw, err := oleutil.CallMethod(q, "ItemIndex", 0)
+				static := staticRaw.ToIDispatch()
+				defer static.Release()
+				if c, _ := oleutil.GetProperty(static, "Count"); int(c.Val) > 0 {
+					itemRaw, err := oleutil.CallMethod(static, "ItemIndex", 0)
 					if err == nil {
 						item := itemRaw.ToIDispatch()
-						nameVar, _ := oleutil.GetProperty(item, "Name")
-						idVar, _ := oleutil.GetProperty(item, "DeviceID")
-						fullVar, _ := oleutil.GetProperty(item, "FullChargedCapacity")
-						designVar, _ := oleutil.GetProperty(item, "DesignCapacity")
-						pctVar, _ := oleutil.GetProperty(item, "EstimatedChargeRemaining")
+						nameVar, _ := oleutil.GetProperty(item, "DeviceName")
+						designVar, _ := oleutil.GetProperty(item, "DesignedCapacity")
 						item.Release()
-						if base.DeviceName == "" {
-							base.DeviceName = strings.TrimSpace(nameVar.ToString())
-							if base.DeviceName == "" {
-								base.DeviceName = strings.TrimSpace(idVar.ToString())
+						out.DeviceName = strings.TrimSpace(nameVar.ToString())
+						out.DesignCapacitymWh = float64(designVar.Val)
+					}
+				}
+			}
+
+			fullRaw, err := oleutil.CallMethod(wmi, "ExecQuery",
+				"SELECT FullChargedCapacity FROM BatteryFullChargedCapacity")
+			if err == nil {
+				full := fullRaw.ToIDispatch()
+				defer full.Release()
+				if c, _ := oleutil.GetProperty(full, "Count"); int(c.Val) > 0 {
+					itemRaw, err := oleutil.CallMethod(full, "ItemIndex", 0)
+					if err == nil {
+						item := itemRaw.ToIDispatch()
+						capVar, _ := oleutil.GetProperty(item, "FullChargedCapacity")
+						item.Release()
+						out.CapacitymWh = float64(capVar.Val)
+					}
+				}
+			}
+		}
+
+		// Fallback to Win32_Battery names/capacities when root\WMI is empty.
+		if out.DeviceName == "" || out.DesignCapacitymWh <= 0 || out.CapacitymWh <= 0 {
+			cimRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+			if err == nil {
+				cim := cimRaw.ToIDispatch()
+				defer cim.Release()
+				qRaw, err := oleutil.CallMethod(cim, "ExecQuery",
+					"SELECT Name, DeviceID, FullChargedCapacity, DesignCapacity, EstimatedChargeRemaining FROM Win32_Battery")
+				if err == nil {
+					q := qRaw.ToIDispatch()
+					defer q.Release()
+					if c, _ := oleutil.GetProperty(q, "Count"); int(c.Val) > 0 {
+						itemRaw, err := oleutil.CallMethod(q, "ItemIndex", 0)
+						if err == nil {
+							item := itemRaw.ToIDispatch()
+							nameVar, _ := oleutil.GetProperty(item, "Name")
+							idVar, _ := oleutil.GetProperty(item, "DeviceID")
+							fullVar, _ := oleutil.GetProperty(item, "FullChargedCapacity")
+							designVar, _ := oleutil.GetProperty(item, "DesignCapacity")
+							pctVar, _ := oleutil.GetProperty(item, "EstimatedChargeRemaining")
+							item.Release()
+							if out.DeviceName == "" {
+								out.DeviceName = strings.TrimSpace(nameVar.ToString())
+								if out.DeviceName == "" {
+									out.DeviceName = strings.TrimSpace(idVar.ToString())
+								}
 							}
-						}
-						if base.CapacitymWh <= 0 {
-							base.CapacitymWh = float64(fullVar.Val)
-						}
-						if base.DesignCapacitymWh <= 0 {
-							base.DesignCapacitymWh = float64(designVar.Val)
-						}
-						if pct := float64(pctVar.Val); pct > 0 && pct <= 100 {
-							base.Percent = pct
+							if out.CapacitymWh <= 0 {
+								out.CapacitymWh = float64(fullVar.Val)
+							}
+							if out.DesignCapacitymWh <= 0 {
+								out.DesignCapacitymWh = float64(designVar.Val)
+							}
+							if pct := float64(pctVar.Val); pct > 0 && pct <= 100 {
+								out.Percent = pct
+							}
 						}
 					}
 				}
 			}
 		}
-	}
 
-	if base.DesignCapacitymWh > 0 && base.CapacitymWh > 0 {
-		health := (base.CapacitymWh / base.DesignCapacitymWh) * 100.0
-		if health > 100 {
-			health = 100
+		if out.DesignCapacitymWh > 0 && out.CapacitymWh > 0 {
+			health := (out.CapacitymWh / out.DesignCapacitymWh) * 100.0
+			if health > 100 {
+				health = 100
+			}
+			out.WearPercent = 100.0 - health
+			if out.WearPercent < 0 {
+				out.WearPercent = 0
+			}
 		}
-		base.WearPercent = 100.0 - health
-		if base.WearPercent < 0 {
-			base.WearPercent = 0
+		out.WearLabel = fmt.Sprintf("Износ: %.0f%% (%s)", out.WearPercent, wearLabel(out.WearPercent))
+		if out.DeviceName == "" {
+			out.DeviceName = "Аккумулятор ноутбука"
 		}
-	}
-	base.WearLabel = fmt.Sprintf("Износ: %.0f%% (%s)", base.WearPercent, wearLabel(base.WearPercent))
-	if base.DeviceName == "" {
-		base.DeviceName = "Аккумулятор ноутбука"
-	}
-	return base
+	})
+	return out
 }

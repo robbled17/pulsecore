@@ -930,25 +930,27 @@ func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
 	total := float64(a.gpuTotalVRAM) / (1024 * 1024)
 	a.mu.RUnlock()
 
-	// Best-effort via nvidia-smi when present (no heavy SDK).
-	if out, err := runHiddenOutput("nvidia-smi",
-		"--query-gpu=utilization.gpu,memory.used,memory.total",
-		"--format=csv,noheader,nounits"); err == nil {
-		parts := strings.Split(strings.TrimSpace(string(out)), ",")
-		if len(parts) >= 3 {
-			fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
-			fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)
-			fmt.Sscanf(strings.TrimSpace(parts[2]), "%f", &total)
-			dedicatedMB = usedMB
-			if total > usedMB {
-				sharedMB = 0
+	// Best-effort via absolute nvidia-smi path (no PATH lookup / hijack).
+	if smi := nvidiaSMIPath(); smi != "" {
+		if out, err := runHiddenOutput(smi,
+			"--query-gpu=utilization.gpu,memory.used,memory.total",
+			"--format=csv,noheader,nounits"); err == nil {
+			parts := strings.Split(strings.TrimSpace(string(out)), ",")
+			if len(parts) >= 3 {
+				fmt.Sscanf(strings.TrimSpace(parts[0]), "%f", &pct)
+				fmt.Sscanf(strings.TrimSpace(parts[1]), "%f", &usedMB)
+				fmt.Sscanf(strings.TrimSpace(parts[2]), "%f", &total)
+				dedicatedMB = usedMB
+				if total > usedMB {
+					sharedMB = 0
+				}
+				a.mu.Lock()
+				if total > 0 {
+					a.gpuTotalVRAM = uint64(total * 1024 * 1024)
+				}
+				a.mu.Unlock()
+				return pct, usedMB, sharedMB, dedicatedMB
 			}
-			a.mu.Lock()
-			if total > 0 {
-				a.gpuTotalVRAM = uint64(total * 1024 * 1024)
-			}
-			a.mu.Unlock()
-			return pct, usedMB, sharedMB, dedicatedMB
 		}
 	}
 
@@ -1011,61 +1013,57 @@ func readGPUInfo() (string, uint64) {
 }
 
 func readCPUTemperature() float64 {
-	ensureOLE()
-
-	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
-	if err != nil {
-		return 0
-	}
-	defer locator.Release()
-	dl, err := locator.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return 0
-	}
-	defer dl.Release()
-
-	// ACPI thermal zones (may require elevated privileges).
-	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\wmi`)
-	if err != nil {
-		return 0
-	}
-	service := serviceRaw.ToIDispatch()
-	defer service.Release()
-
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature")
-	if err != nil {
-		return 0
-	}
-	result := resultRaw.ToIDispatch()
-	defer result.Release()
-
-	countVar, _ := oleutil.GetProperty(result, "Count")
-	count := int(countVar.Val)
 	var maxC float64
-	for i := 0; i < count; i++ {
-		itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+	ok := withSensorGate(defaultSensorTimeout, func() {
+		ensureOLE()
+		locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 		if err != nil {
-			continue
+			return
 		}
-		item := itemRaw.ToIDispatch()
-		tempVar, _ := oleutil.GetProperty(item, "CurrentTemperature")
-		item.Release()
-		// Value is in tenths of Kelvin.
-		kelvinTenths := float64(tempVar.Val)
-		c := (kelvinTenths / 10.0) - 273.15
-		if c > maxC {
-			maxC = c
+		defer locator.Release()
+		dl, err := locator.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return
 		}
-	}
-	if maxC < 10 || maxC > 125 {
+		defer dl.Release()
+
+		// ACPI thermal zones (may require elevated privileges).
+		serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\wmi`)
+		if err != nil {
+			return
+		}
+		service := serviceRaw.ToIDispatch()
+		defer service.Release()
+
+		resultRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT CurrentTemperature FROM MSAcpi_ThermalZoneTemperature")
+		if err != nil {
+			return
+		}
+		result := resultRaw.ToIDispatch()
+		defer result.Release()
+
+		countVar, _ := oleutil.GetProperty(result, "Count")
+		count := int(countVar.Val)
+		for i := 0; i < count; i++ {
+			itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+			if err != nil {
+				continue
+			}
+			item := itemRaw.ToIDispatch()
+			tempVar, _ := oleutil.GetProperty(item, "CurrentTemperature")
+			item.Release()
+			// Value is in tenths of Kelvin.
+			kelvinTenths := float64(tempVar.Val)
+			c := (kelvinTenths / 10.0) - 273.15
+			if c > maxC {
+				maxC = c
+			}
+		}
+	})
+	if !ok || maxC < 10 || maxC > 125 {
 		return 0
 	}
 	return maxC
-}
-
-func estimateTempFromLoad(cpuPct float64) float64 {
-	// Conservative soft estimate when ACPI sensors are unavailable.
-	return 45.0 + cpuPct*0.45
 }
 
 func isSelfOrWebView(name string) bool {

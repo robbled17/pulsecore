@@ -350,86 +350,87 @@ func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 }
 
 func readRAMSlots() (memType string, used, total, speed int) {
-	ensureOLE()
 	memType = "Unknown"
 	used = 0
 	total = 0
 	speed = 0
-
-	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
-	if err != nil {
-		return
-	}
-	defer locator.Release()
-	dl, err := locator.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return
-	}
-	defer dl.Release()
-	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
-	if err != nil {
-		return
-	}
-	service := serviceRaw.ToIDispatch()
-	defer service.Release()
-
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
-		"SELECT MemoryType, SMBIOSMemoryType, Speed, Capacity FROM Win32_PhysicalMemory")
-	if err != nil {
-		return
-	}
-	result := resultRaw.ToIDispatch()
-	defer result.Release()
-
-	countVar, _ := oleutil.GetProperty(result, "Count")
-	count := int(countVar.Val)
-	used = count
-	total = count
-	if total < 2 {
-		total = 2 // common dual-channel board baseline when slot count is opaque
-	}
-	typeCode := -1
-	for i := 0; i < count; i++ {
-		itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+	_ = withSensorGate(defaultSensorTimeout, func() {
+		ensureOLE()
+		locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 		if err != nil {
-			continue
+			return
 		}
-		item := itemRaw.ToIDispatch()
-		smbiosVar, _ := oleutil.GetProperty(item, "SMBIOSMemoryType")
-		memTypeVar, _ := oleutil.GetProperty(item, "MemoryType")
-		speedVar, _ := oleutil.GetProperty(item, "Speed")
-		item.Release()
-		if typeCode < 0 {
-			typeCode = int(smbiosVar.Val)
-			if typeCode == 0 {
-				typeCode = int(memTypeVar.Val)
+		defer locator.Release()
+		dl, err := locator.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return
+		}
+		defer dl.Release()
+		serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+		if err != nil {
+			return
+		}
+		service := serviceRaw.ToIDispatch()
+		defer service.Release()
+
+		resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
+			"SELECT MemoryType, SMBIOSMemoryType, Speed, Capacity FROM Win32_PhysicalMemory")
+		if err != nil {
+			return
+		}
+		result := resultRaw.ToIDispatch()
+		defer result.Release()
+
+		countVar, _ := oleutil.GetProperty(result, "Count")
+		count := int(countVar.Val)
+		used = count
+		total = count
+		if total < 2 {
+			total = 2 // common dual-channel board baseline when slot count is opaque
+		}
+		typeCode := -1
+		for i := 0; i < count; i++ {
+			itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+			if err != nil {
+				continue
+			}
+			item := itemRaw.ToIDispatch()
+			smbiosVar, _ := oleutil.GetProperty(item, "SMBIOSMemoryType")
+			memTypeVar, _ := oleutil.GetProperty(item, "MemoryType")
+			speedVar, _ := oleutil.GetProperty(item, "Speed")
+			item.Release()
+			if typeCode < 0 {
+				typeCode = int(smbiosVar.Val)
+				if typeCode == 0 {
+					typeCode = int(memTypeVar.Val)
+				}
+			}
+			if sp := int(speedVar.Val); sp > speed {
+				speed = sp
 			}
 		}
-		if sp := int(speedVar.Val); sp > speed {
-			speed = sp
-		}
-	}
-	memType = mapMemoryType(typeCode)
+		memType = mapMemoryType(typeCode)
 
-	// Try to refine total slots via Win32_PhysicalMemoryArray.
-	arrRaw, err := oleutil.CallMethod(service, "ExecQuery",
-		"SELECT MemoryDevices FROM Win32_PhysicalMemoryArray")
-	if err == nil {
-		arr := arrRaw.ToIDispatch()
-		defer arr.Release()
-		cVar, _ := oleutil.GetProperty(arr, "Count")
-		if int(cVar.Val) > 0 {
-			itemRaw, err := oleutil.CallMethod(arr, "ItemIndex", 0)
-			if err == nil {
-				item := itemRaw.ToIDispatch()
-				devVar, _ := oleutil.GetProperty(item, "MemoryDevices")
-				item.Release()
-				if n := int(devVar.Val); n > 0 {
-					total = n
+		// Try to refine total slots via Win32_PhysicalMemoryArray.
+		arrRaw, err := oleutil.CallMethod(service, "ExecQuery",
+			"SELECT MemoryDevices FROM Win32_PhysicalMemoryArray")
+		if err == nil {
+			arr := arrRaw.ToIDispatch()
+			defer arr.Release()
+			cVar, _ := oleutil.GetProperty(arr, "Count")
+			if int(cVar.Val) > 0 {
+				itemRaw, err := oleutil.CallMethod(arr, "ItemIndex", 0)
+				if err == nil {
+					item := itemRaw.ToIDispatch()
+					devVar, _ := oleutil.GetProperty(item, "MemoryDevices")
+					item.Release()
+					if n := int(devVar.Val); n > 0 {
+						total = n
+					}
 				}
 			}
 		}
-	}
+	})
 	return
 }
 
