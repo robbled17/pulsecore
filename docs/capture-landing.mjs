@@ -35,13 +35,14 @@ async function main() {
     })
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 })
     await page.waitForSelector('.hero h1', { timeout: 10000 })
-    await page.waitForTimeout(800)
-    // Exercise tab switch once on desktop for richer state
+    await page.waitForSelector('.preview-tab-pill', { timeout: 10000 })
+    await page.waitForTimeout(900)
+    // Exercise tab switch once on desktop for richer state (pill + fade)
     if (shot.w >= 1000) {
       await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
-      await page.waitForTimeout(400)
+      await page.waitForTimeout(420)
       await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
-      await page.waitForTimeout(350)
+      await page.waitForTimeout(420)
     }
     const outMedia = path.join(MEDIA, shot.file)
     const outLocal = path.join(LOCAL, shot.file)
