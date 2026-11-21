@@ -42,7 +42,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.6.0
+const MIT_LICENSE = `PulseCore v1.6.1
 
 MIT License
 
@@ -78,7 +78,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.6.0'
+const APP_VERSION = 'v1.6.1'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -1924,6 +1924,178 @@ function diagItemTitle(id, fallback) {
   return key ? t(key) : (fallback || id)
 }
 
+function formatDiagTime(iso) {
+  const raw = String(iso || '').trim()
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return raw
+  const locMap = { ru: 'ru-RU', en: 'en-GB', kk: 'kk-KZ', tt: 'ru-RU', de: 'de-DE', ja: 'ja-JP', zh: 'zh-CN' }
+  const loc = locMap[lang] || 'ru-RU'
+  try {
+    return d.toLocaleString(loc, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  } catch (_) {
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${dd}.${mm}.${yyyy}, ${hh}:${mi}`
+  }
+}
+
+function formatMemAmount(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^([\d.]+)\s*(MB|GB|mb|gb)?$/i)
+  if (!m) return s
+  let n = Number(m[1])
+  if (!Number.isFinite(n)) return s
+  const unit = (m[2] || 'MB').toUpperCase()
+  if (unit === 'MB') {
+    if (n >= 1024) {
+      const gb = n / 1024
+      return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} ${lang === 'ru' || lang === 'kk' || lang === 'tt' ? 'ГБ' : 'GB'}`
+    }
+    return `${Math.round(n)} ${lang === 'ru' || lang === 'kk' || lang === 'tt' ? 'МБ' : 'MB'}`
+  }
+  return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)} ${lang === 'ru' || lang === 'kk' || lang === 'tt' ? 'ГБ' : 'GB'}`
+}
+
+function translateDiagDetail(code) {
+  const c = String(code || '').trim()
+  const map = {
+    ok: '',
+    working: '',
+    user: '',
+    admin: '',
+    needs_windows: 'diagDetailNeedsWindows',
+    cpu_missing: 'diagDetailCpuMissing',
+    fallback_acpi: 'diagDetailFallbackAcpi',
+    admin_temp: 'diagDetailAdminTemp',
+    gpu_missing: 'diagDetailGpuMissing',
+    fallback_gpu: 'diagDetailFallbackGpu',
+    ram_missing: 'diagDetailRamMissing',
+    fallback_ram_slots: 'diagDetailRamSlots',
+    drives_missing: 'diagDetailDrivesMissing',
+    admin_smart: 'diagDetailAdminSmart',
+    fallback_smart: 'diagDetailFallbackSmart',
+    registry_missing: 'diagDetailRegistryMissing',
+    fallback_paths: 'diagDetailFallbackPaths',
+    // Legacy English strings from older backends / mock
+    'Working': '',
+    'Normal user': '',
+    'Administrator': '',
+    'Sensors require Windows': 'diagDetailNeedsWindows',
+    'CPU sensors unavailable': 'diagDetailCpuMissing',
+    'Fallback calculation (ACPI temp unavailable)': 'diagDetailFallbackAcpi',
+    'Needs administrator rights for ACPI temperature': 'diagDetailAdminTemp',
+    'GPU not detected': 'diagDetailGpuMissing',
+    'Fallback calculation (vendor load counter missing)': 'diagDetailFallbackGpu',
+    'RAM capacity unavailable': 'diagDetailRamMissing',
+    'Fallback calculation (SMBIOS slots unavailable)': 'diagDetailRamSlots',
+    'No fixed drives listed': 'diagDetailDrivesMissing',
+    'Needs administrator rights for SMART': 'diagDetailAdminSmart',
+    'Fallback calculation (SMART counters unavailable)': 'diagDetailFallbackSmart',
+    'Registry and cleaner paths unreachable': 'diagDetailRegistryMissing',
+    'Fallback calculation (some paths unreachable)': 'diagDetailFallbackPaths',
+    'Windows paths only': 'diagDetailNeedsWindows',
+    'Normal user (non-Windows)': '',
+  }
+  if (Object.prototype.hasOwnProperty.call(map, c)) {
+    const key = map[c]
+    return key ? t(key) : ''
+  }
+  if (/^Working$/i.test(c)) return ''
+  return c
+}
+
+function formatDiagFact(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  const eq = s.indexOf('=')
+  if (eq > 0) {
+    const key = s.slice(0, eq).trim()
+    const val = s.slice(eq + 1).trim()
+    switch (key) {
+      case 'model':
+        return `${t('diagFactModel')}: ${val}`
+      case 'cores':
+        return `${t('diagFactCores')}: ${val.replace('/', ' / ')}`
+      case 'temp':
+        if (val === 'unavailable' || val === 'null') return `${t('diagFactTemp')}: ${t('diagTempUnavailable')}`
+        return `${t('diagFactTemp')}: ${String(val).replace(/C$/i, '')} °C`
+      case 'load':
+        if (val === 'fallback') return `${t('diagFactLoad')}: ${t('diagLoadFallback')}`
+        return `${t('diagFactLoad')}: ${val.includes('%') ? val : `${val}%`}`
+      case 'primary':
+        return `${t('diagFactPrimary')}: ${val}`
+      case 'integrated':
+        return `${t('diagFactIntegrated')}: ${val}`
+      case 'vram':
+        return `${t('diagFactVram')}: ${formatMemAmount(val)}`
+      case 'capacity':
+        return `${t('diagFactCapacity')}: ${formatMemAmount(val)}`
+      case 'slots':
+        return `${t('diagFactSlots')}: ${val.replace('/', ' / ')}`
+      case 'freq':
+        return `${t('diagFactFreq')}: ${String(val).replace(/MHz$/i, '')} ${lang === 'ru' || lang === 'kk' || lang === 'tt' ? 'МГц' : 'MHz'}`
+      case 'cleaner_roots':
+        return `${t('diagFactCleanerRoots')}: ${val.replace('/', ' / ')}`
+      case 'backups':
+        if (val === 'missing') return `${t('diagFactBackups')}: ${t('diagBackupsMissing')}`
+        return `${t('diagFactBackups')}: ${val}`
+      case 'registry':
+        if (val === 'ok') return `${t('diagFactRegistry')}: ${t('diagRegistryOk')}`
+        if (val === 'limited') return `${t('diagFactRegistry')}: ${t('diagRegistryLimited')}`
+        return `${t('diagFactRegistry')}: ${val}`
+      case 'mode':
+        return `${t('diagFactMode')}: ${val === 'admin' ? t('diagRunModeAdmin') : t('diagRunModeUser')}`
+      case 'platform':
+        return `${t('diagFactPlatform')}: ${val}`
+      case 'smart':
+        return `${t('diagFactSmart')}: ${val}`
+      default:
+        break
+    }
+  }
+  // Drive line: "C:\ 200/512GB temp=35C smart=OK"
+  const drive = s.match(/^(\S+)\s+([\d.]+)\/([\d.]+)GB(?:\s+temp=([\d.]+)C)?(?:\s+smart=(.+))?$/i)
+  if (drive) {
+    const parts = [`${t('diagFactDrive')}: ${drive[1]} ${drive[2]} / ${drive[3]} GB`]
+    if (drive[4]) parts.push(`${t('diagFactTemp')}: ${drive[4]} °C`)
+    if (drive[5]) parts.push(`${t('diagFactSmart')}: ${drive[5]}`)
+    return parts.join(' · ')
+  }
+  return s
+}
+
+function buildPolishedDiagText(rep) {
+  const lines = [
+    `PulseCore ${t('diagTitle')}`,
+    `${t('diagCheckedAt')}: ${formatDiagTime(rep?.generatedAt)}`,
+    `${t('diagItemRunMode')}: ${rep?.runMode === 'admin' ? t('diagRunModeAdmin') : t('diagRunModeUser')}`,
+  ]
+  for (const it of (Array.isArray(rep?.items) ? rep.items : [])) {
+    const title = diagItemTitle(it.id, it.title)
+    const badge = diagStatusLabel(it.status)
+    const detail = translateDiagDetail(it.detail)
+    let head = `- ${title}: ${badge}`
+    if (detail) head += ` (${detail})`
+    lines.push(head)
+    for (const f of (Array.isArray(it.facts) ? it.facts : [])) {
+      const pretty = formatDiagFact(f)
+      if (pretty) lines.push(`  ${pretty}`)
+    }
+  }
+  return lines.join('\n')
+}
+
 function closeDiagModal() {
   $('diag-modal')?.classList.add('hidden')
 }
@@ -1935,14 +2107,23 @@ function renderDiagReport(rep) {
   if (!list) return
   const modeKey = rep?.runMode === 'admin' ? 'diagRunModeAdmin' : 'diagRunModeUser'
   if (line) {
-    line.textContent = `${t('diagItemRunMode')}: ${t(modeKey)} · ${rep?.generatedAt || ''}`
+    const when = formatDiagTime(rep?.generatedAt)
+    line.textContent = when
+      ? `${t('diagItemRunMode')}: ${t(modeKey)} · ${t('diagCheckedAt')}: ${when}`
+      : `${t('diagItemRunMode')}: ${t(modeKey)}`
   }
   const items = Array.isArray(rep?.items) ? rep.items : []
   list.innerHTML = items.map((it) => {
     const st = String(it.status || 'unavailable')
-    const facts = Array.isArray(it.facts) ? it.facts : []
+    const detail = translateDiagDetail(it.detail)
+    const facts = (Array.isArray(it.facts) ? it.facts : [])
+      .map(formatDiagFact)
+      .filter(Boolean)
     const factsHtml = facts.length
-      ? `<ul class="diag-item-facts">${facts.map((f) => `<li>${escapeHtml(String(f))}</li>`).join('')}</ul>`
+      ? `<ul class="diag-item-facts">${facts.map((f) => `<li>${escapeHtml(f)}</li>`).join('')}</ul>`
+      : ''
+    const detailHtml = detail
+      ? `<div class="diag-item-detail">${escapeHtml(detail)}</div>`
       : ''
     return `
       <div class="diag-item" data-diag-id="${escapeHtml(it.id || '')}">
@@ -1950,7 +2131,7 @@ function renderDiagReport(rep) {
           <span class="diag-item-title">${escapeHtml(diagItemTitle(it.id, it.title))}</span>
           <span class="diag-badge ${escapeHtml(st)}">${escapeHtml(diagStatusLabel(st))}</span>
         </div>
-        <div class="diag-item-detail">${escapeHtml(it.detail || '')}</div>
+        ${detailHtml}
         ${factsHtml}
       </div>`
   }).join('')
@@ -1973,7 +2154,7 @@ async function openSelfDiagnostics() {
 }
 
 async function copyDiagReport() {
-  const text = lastDiagReport?.textReport || ''
+  const text = lastDiagReport ? buildPolishedDiagText(lastDiagReport) : ''
   if (!text) {
     showToast(t('diagStatusUnavailable'), false)
     return

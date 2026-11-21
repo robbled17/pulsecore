@@ -244,12 +244,12 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 	// Non-Windows: all sensors unavailable, no panic.
 	if snap.Platform != "" && snap.Platform != "windows" {
 		items = append(items,
-			SelfDiagItem{ID: "cpu", Title: "CPU", Status: DiagStatusUnavailable, Detail: "Sensors require Windows", Facts: []string{"platform=" + snap.Platform}},
-			SelfDiagItem{ID: "gpu", Title: "GPU", Status: DiagStatusUnavailable, Detail: "Sensors require Windows", Facts: []string{"platform=" + snap.Platform}},
-			SelfDiagItem{ID: "ram", Title: "RAM", Status: DiagStatusUnavailable, Detail: "Sensors require Windows", Facts: []string{"platform=" + snap.Platform}},
-			SelfDiagItem{ID: "drives", Title: "Drives + SMART", Status: DiagStatusUnavailable, Detail: "Sensors require Windows", Facts: []string{"platform=" + snap.Platform}},
-			SelfDiagItem{ID: "registry", Title: "Program registry + cleaner", Status: DiagStatusUnavailable, Detail: "Windows paths only", Facts: []string{"platform=" + snap.Platform}},
-			SelfDiagItem{ID: "runmode", Title: "Run mode", Status: DiagStatusOK, Detail: "Normal user (non-Windows)", Facts: []string{"mode=user", "platform=" + snap.Platform}},
+			SelfDiagItem{ID: "cpu", Title: "CPU", Status: DiagStatusUnavailable, Detail: "needs_windows", Facts: []string{"platform=" + snap.Platform}},
+			SelfDiagItem{ID: "gpu", Title: "GPU", Status: DiagStatusUnavailable, Detail: "needs_windows", Facts: []string{"platform=" + snap.Platform}},
+			SelfDiagItem{ID: "ram", Title: "RAM", Status: DiagStatusUnavailable, Detail: "needs_windows", Facts: []string{"platform=" + snap.Platform}},
+			SelfDiagItem{ID: "drives", Title: "Drives + SMART", Status: DiagStatusUnavailable, Detail: "needs_windows", Facts: []string{"platform=" + snap.Platform}},
+			SelfDiagItem{ID: "registry", Title: "Program registry + cleaner", Status: DiagStatusUnavailable, Detail: "needs_windows", Facts: []string{"platform=" + snap.Platform}},
+			SelfDiagItem{ID: "runmode", Title: "Run mode", Status: DiagStatusOK, Detail: "user", Facts: []string{"mode=user", "platform=" + snap.Platform}},
 		)
 		rep := SelfDiagnosticsReport{
 			OK:          true,
@@ -275,17 +275,17 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 			facts = append(facts, fmt.Sprintf("load=%.1f%%", snap.CPULoad))
 		}
 		status := DiagStatusOK
-		detail := "Working"
+		detail := "ok"
 		if !snap.CPUNameOK && !snap.CPULoadOK {
 			status = DiagStatusUnavailable
-			detail = "CPU sensors unavailable"
+			detail = "cpu_missing"
 		} else if !snap.CPUTempOK {
 			if snap.IsAdmin {
 				status = DiagStatusFallback
-				detail = "Fallback calculation (ACPI temp unavailable)"
+				detail = "fallback_acpi"
 			} else {
 				status = DiagStatusAdmin
-				detail = "Needs administrator rights for ACPI temperature"
+				detail = "admin_temp"
 			}
 			facts = append(facts, "temp=unavailable")
 		} else {
@@ -307,13 +307,13 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 			facts = append(facts, fmt.Sprintf("vram=%.0fMB", snap.GPUVRAMMB))
 		}
 		status := DiagStatusOK
-		detail := "Working"
+		detail := "ok"
 		if !snap.GPUPrimaryOK {
 			status = DiagStatusUnavailable
-			detail = "GPU not detected"
+			detail = "gpu_missing"
 		} else if snap.GPUUsesFallback || !snap.GPULoadOK {
 			status = DiagStatusFallback
-			detail = "Fallback calculation (vendor load counter missing)"
+			detail = "fallback_gpu"
 			facts = append(facts, "load=fallback")
 		} else {
 			facts = append(facts, fmt.Sprintf("load=%.1f%%", snap.GPULoad))
@@ -334,13 +334,13 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 			facts = append(facts, fmt.Sprintf("freq=%dMHz", snap.RAMSpeedMHz))
 		}
 		status := DiagStatusOK
-		detail := "Working"
+		detail := "ok"
 		if !snap.RAMOK {
 			status = DiagStatusUnavailable
-			detail = "RAM capacity unavailable"
+			detail = "ram_missing"
 		} else if !snap.RAMSlotsOK {
 			status = DiagStatusFallback
-			detail = "Fallback calculation (SMBIOS slots unavailable)"
+			detail = "fallback_ram_slots"
 		}
 		items = append(items, SelfDiagItem{ID: "ram", Title: "RAM", Status: status, Detail: detail, Facts: facts})
 	}
@@ -359,16 +359,16 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 			facts = append(facts, line)
 		}
 		status := DiagStatusOK
-		detail := "Working"
+		detail := "ok"
 		if len(snap.Drives) == 0 {
 			status = DiagStatusUnavailable
-			detail = "No fixed drives listed"
+			detail = "drives_missing"
 		} else if snap.SMARTNeedsAdmin && !snap.SMARTAvailable {
 			status = DiagStatusAdmin
-			detail = "Needs administrator rights for SMART"
+			detail = "admin_smart"
 		} else if !snap.SMARTAvailable {
 			status = DiagStatusFallback
-			detail = "Fallback calculation (SMART counters unavailable)"
+			detail = "fallback_smart"
 		}
 		items = append(items, SelfDiagItem{ID: "drives", Title: "Drives + SMART", Status: status, Detail: detail, Facts: facts})
 	}
@@ -382,13 +382,13 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 			facts = append(facts, "backups="+snap.BackupDir)
 		}
 		status := DiagStatusOK
-		detail := "Working"
+		detail := "ok"
 		if !snap.RegistryEnumOK && snap.CleanRootsReachable == 0 {
 			status = DiagStatusUnavailable
-			detail = "Registry and cleaner paths unreachable"
+			detail = "registry_missing"
 		} else if !snap.RegistryEnumOK || !snap.BackupDirOK || snap.CleanRootsReachable < snap.CleanRootsTotal {
 			status = DiagStatusFallback
-			detail = "Fallback calculation (some paths unreachable)"
+			detail = "fallback_paths"
 			if !snap.RegistryEnumOK {
 				facts = append(facts, "registry=limited")
 			}
@@ -403,10 +403,10 @@ func buildSelfDiagnosticsReport(snap diagSnapshot) SelfDiagnosticsReport {
 
 	// Run mode
 	{
-		detail := "Normal user"
+		detail := "user"
 		facts := []string{"mode=user"}
 		if snap.IsAdmin {
-			detail = "Administrator"
+			detail = "admin"
 			facts = []string{"mode=admin"}
 		}
 		items = append(items, SelfDiagItem{
