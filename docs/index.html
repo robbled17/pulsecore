@@ -692,7 +692,7 @@
     @media (max-width: 480px) {
       .demo-work { padding: 10px; min-height: 360px; }
       .demo-metrics { grid-template-columns: 1fr; }
-      .demo-games { grid-template-columns: 1fr; }
+      .demo-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .demo-fps { grid-template-columns: 1fr 1fr; }
       .demo-proc { grid-template-columns: minmax(0, 1fr) auto; }
       .demo-proc .load { grid-column: 1; text-align: left; color: var(--muted); font-size: 12px; }
@@ -948,81 +948,134 @@
     }
     .lang-switch option { background: #121825; color: #f7f9ff; }
 
-    /* SSD health alerts */
-    .demo-alert.ssd {
-      border-color: rgba(61, 231, 200, 0.28);
-      background: rgba(61, 231, 200, 0.08);
-    }
-    .demo-alert.ssd .badge {
-      font-size: 10.5px;
-      font-weight: 750;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: #9af5e2;
-      background: rgba(61, 231, 200, 0.14);
-      border: 1px solid rgba(61, 231, 200, 0.28);
-      border-radius: 999px;
-      padding: 3px 8px;
-      flex: 0 0 auto;
-    }
-    .demo-hw-card.ssd .big { font-size: 13.5px; white-space: normal; line-height: 1.25; }
-    .demo-ssd-stats {
-      display: grid;
+    /* Hardware SSD accordion */
+    .demo-hw-cards {
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
-      margin-top: 8px;
     }
-    .demo-ssd-stats span {
-      display: block;
+    .demo-ssd-acc {
+      grid-column: 1 / -1;
+      border-radius: 14px;
+      border: 1px solid rgba(61, 231, 200, 0.22);
+      background:
+        linear-gradient(155deg, rgba(61, 231, 200, 0.1), rgba(255,255,255,0.03));
+      overflow: hidden;
+    }
+    .demo-ssd-acc > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      user-select: none;
+    }
+    .demo-ssd-acc > summary::-webkit-details-marker { display: none; }
+    .demo-ssd-acc .ssd-sum-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .demo-ssd-acc .lab {
       font-size: 11px;
       color: var(--muted);
+      font-weight: 650;
+    }
+    .demo-ssd-acc .ssd-compact {
+      font-size: 14px;
+      font-weight: 750;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       font-variant-numeric: tabular-nums;
     }
-    .demo-ssd-stats strong {
-      display: block;
+    .demo-ssd-acc .ssd-chevron {
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid rgba(200, 214, 235, 0.7);
+      border-bottom: 2px solid rgba(200, 214, 235, 0.7);
+      transform: rotate(45deg);
+      transition: transform 0.25s ease;
+      flex: 0 0 auto;
+      margin-right: 4px;
+    }
+    .demo-ssd-acc[open] .ssd-chevron {
+      transform: rotate(-135deg);
+      margin-top: 4px;
+    }
+    .demo-ssd-details {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px 12px;
+      padding: 0 14px 14px;
+      border-top: 1px solid rgba(160, 190, 255, 0.1);
+      padding-top: 12px;
+    }
+    .demo-ssd-details .row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .demo-ssd-details .row strong {
       color: var(--text);
       font-size: 13px;
       font-weight: 750;
-      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    @media (max-width: 640px) {
+      .demo-ssd-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
-    /* GamePulse covers */
+    /* GamePulse covers: Steam header 460x215 */
     .demo-game {
       padding: 0;
       overflow: hidden;
-      position: relative;
-      min-height: 132px;
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
+      background: #0b101b;
     }
-    .demo-game .cover {
+    .demo-game .cover-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 460 / 215;
+      background: #0b101b;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .demo-game .cover-wrap img,
+    .demo-game .cover-wrap .cover-fallback {
       position: absolute;
       inset: 0;
-      background-color: #0b101b;
-      background-size: cover;
-      background-position: center top;
-      background-repeat: no-repeat;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
     }
-    .demo-game .cover::after {
+    .demo-game .cover-wrap::after {
       content: "";
       position: absolute;
       inset: 0;
       background: linear-gradient(180deg,
-        rgba(5, 8, 16, 0.15) 0%,
-        rgba(5, 8, 16, 0.55) 45%,
-        rgba(5, 8, 16, 0.92) 100%);
+        rgba(5, 8, 16, 0.05) 0%,
+        rgba(5, 8, 16, 0.35) 55%,
+        rgba(5, 8, 16, 0.82) 100%);
+      pointer-events: none;
+      z-index: 1;
     }
     .demo-game .gmeta {
       position: relative;
-      z-index: 1;
-      padding: 12px;
+      z-index: 2;
+      padding: 10px 12px 12px;
+      margin-top: -28px;
     }
     .demo-game .gname { text-shadow: 0 1px 8px rgba(0,0,0,0.55); }
     .demo-game .gsub { color: rgba(200, 210, 230, 0.85); }
-    .demo-hw-cards {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 
     /* Tablet / laptop: 768-1440 */
     @media (min-width: 768px) and (max-width: 1440px) {
@@ -1181,9 +1234,6 @@
                 <div class="txt" data-i18n="demoAlertPeak">Пик ядра: Браузер нагружает систему</div>
                 <button type="button" class="btn-eco" id="demo-eco-alert">Eco Mode</button>
               </div>
-              <div class="demo-alert ssd" id="demo-ssd-alert">
-                <span class="badge">SMART</span>
-                <div class="txt" id="demo-ssd-alert-txt">Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0</div>
               </div>
               <div class="demo-metrics" id="demo-metrics">
                 <div class="demo-metric" data-k="cpu">
@@ -1250,27 +1300,35 @@
                 <div class="demo-hw-card">
                   <div class="lab">CPU</div>
                   <div class="big">Ryzen 7 5700X</div>
-                  <div class="sub" id="demo-hw-cpu-sub">8 / 16 · 42%</div>
+                  <div class="sub" id="demo-hw-cpu-sub">8 / 16 • 42%</div>
                 </div>
                 <div class="demo-hw-card">
                   <div class="lab">GPU</div>
                   <div class="big">RTX 3060</div>
-                  <div class="sub" id="demo-hw-gpu-sub">8 GB · 68%</div>
+                  <div class="sub" id="demo-hw-gpu-sub">8 GB • 68%</div>
                 </div>
                 <div class="demo-hw-card">
                   <div class="lab">RAM</div>
                   <div class="big">16 GB DDR4</div>
-                  <div class="sub" id="demo-hw-ram-sub">Dual Channel · 63%</div>
+                  <div class="sub" id="demo-hw-ram-sub">Dual Channel • 63%</div>
                 </div>
-                <div class="demo-hw-card ssd" id="demo-hw-ssd">
-                  <div class="lab" data-i18n="demoSsdLab">SSD health</div>
-                  <div class="big">Samsung 980 PRO 1TB</div>
-                                    <div class="demo-ssd-stats">
-                    <span><span data-i18n="demoSsdHealth">Остаток ресурса</span><strong id="demo-ssd-health">98%</strong></span>
-                    <span><span data-i18n="demoSsdTemp">Температура</span><strong id="demo-ssd-temp">38°C</strong></span>
-                    <span><span data-i18n="demoSsdBad">Плохие сектора</span><strong id="demo-ssd-bad">0</strong></span>
+                <details class="demo-ssd-acc" id="demo-hw-ssd">
+                  <summary>
+                    <span class="ssd-sum-left">
+                      <span class="lab" data-i18n="demoSsdLab">Здоровье SSD</span>
+                      <span class="ssd-compact" id="demo-ssd-compact">Samsung 980 PRO 1TB • 98%</span>
+                    </span>
+                    <span class="ssd-chevron" aria-hidden="true"></span>
+                  </summary>
+                  <div class="demo-ssd-details" id="demo-ssd-details">
+                    <div class="row"><span data-i18n="demoSsdLife">Остаток ресурса</span><strong id="demo-ssd-health">98%</strong></div>
+                    <div class="row"><span data-i18n="demoSsdTemp">Температура</span><strong id="demo-ssd-temp">37°C</strong></div>
+                    <div class="row"><span data-i18n="demoSsdBad">Плохие сектора</span><strong id="demo-ssd-bad">0</strong></div>
+                    <div class="row"><span data-i18n="demoSsdWritten">Записано</span><strong id="demo-ssd-written">14.2 TB</strong></div>
+                    <div class="row"><span data-i18n="demoSsdPowerOn">Время работы</span><strong id="demo-ssd-power">1840 h</strong></div>
+                    <div class="row"><span data-i18n="demoSsdStatusLab">Статус</span><strong id="demo-ssd-status" data-i18n="demoSsdStatus">Отлично</strong></div>
                   </div>
-                </div>
+                </details>
               </div>
               <div class="demo-core-grid" id="demo-core-grid"></div>
             </div>
@@ -1302,7 +1360,7 @@
         </article>
         <article class="card teal reveal" style="--reveal-delay: 300ms">
           <div class="card-icon">💾</div>
-          <h3 data-i18n="featSsdTitle">SSD health</h3>
+          <h3 data-i18n="featSsdTitle">Здоровье SSD</h3>
           <p data-i18n="featSsdBody">Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц</p>
         </article>
         <article class="card reveal" style="--reveal-delay: 400ms">
@@ -1351,7 +1409,7 @@
         <img src="assets/appicon.png" alt="" width="20" height="20" />
         PulseCore
       </div>
-      <div>MIT License · <a href="https://github.com/robbled17/pulsecore">github.com/robbled17/pulsecore</a></div>
+      <div>MIT License • <a href="https://github.com/robbled17/pulsecore">github.com/robbled17/pulsecore</a></div>
     </div>
   </footer>
 
@@ -1378,7 +1436,6 @@
           demoOverviewTitle: "Обзор системы",
           demoOverviewSub: "Живые метрики CPU, GPU, RAM и температуры",
           demoAlertPeak: "Пик ядра: Браузер нагружает систему",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "Динамика",
           demoLagsTitle: "Лаги",
           demoLagsSub: "Фоновые процессы и Eco Mode",
@@ -1386,8 +1443,12 @@
           demoGameTip: "Нажмите на игру, чтобы увидеть пресеты",
           demoHwTitle: "Железо",
           demoHwSub: "Физические ядра и потоки SMT",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "Остаток ресурса",
+          demoSsdLab: "Здоровье SSD",
+          demoSsdStatus: "Отлично",
+          demoSsdStatusLab: "Статус",
+          demoSsdPowerOn: "Время работы",
+          demoSsdWritten: "Записано",
+          demoSsdLife: "Остаток ресурса",
           demoSsdTemp: "Температура",
           demoSsdBad: "Плохие сектора",
           demoCore: "Ядро",
@@ -1413,7 +1474,7 @@
           featFpsBody: "Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках",
           featHudTitle: "Mini-HUD",
           featHudBody: "Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "Здоровье SSD",
           featSsdBody: "Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц",
           featAdminTitle: "Без админа",
           featAdminBody: "Запускается сразу после скачивания без сложных настроек и лишних разрешений системы",
@@ -1448,7 +1509,6 @@
           demoOverviewTitle: "System overview",
           demoOverviewSub: "Live CPU, GPU, RAM and temperature metrics",
           demoAlertPeak: "Core spike: Browser is loading the system",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "Dynamics",
           demoLagsTitle: "Lags",
           demoLagsSub: "Background processes and Eco Mode",
@@ -1457,7 +1517,11 @@
           demoHwTitle: "Hardware",
           demoHwSub: "Physical cores and SMT threads",
           demoSsdLab: "SSD health",
-          demoSsdHealth: "Remaining life",
+          demoSsdStatus: "Excellent",
+          demoSsdStatusLab: "Status",
+          demoSsdPowerOn: "Power-on hours",
+          demoSsdWritten: "Written",
+          demoSsdLife: "Remaining life",
           demoSsdTemp: "Temperature",
           demoSsdBad: "Bad sectors",
           demoCore: "Core",
@@ -1518,7 +1582,6 @@
           demoOverviewTitle: "Жүйе шолуы",
           demoOverviewSub: "CPU, GPU, RAM және температураның тірі метрикалары",
           demoAlertPeak: "Ядро шыңы: Браузер жүйені жүктейді",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "Динамика",
           demoLagsTitle: "Лагтар",
           demoLagsSub: "Фондық процестер және Eco Mode",
@@ -1526,8 +1589,12 @@
           demoGameTip: "Пресеттерді көру үшін ойынды басыңыз",
           demoHwTitle: "Құрылғы",
           demoHwSub: "Физикалық ядролар және SMT ағындар",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "Қалған ресурс",
+          demoSsdLab: "SSD денсаулығы",
+          demoSsdStatus: "Өте жақсы",
+          demoSsdStatusLab: "Күйі",
+          demoSsdPowerOn: "Жұмыс уақыты",
+          demoSsdWritten: "Жазылған",
+          demoSsdLife: "Қалған ресурс",
           demoSsdTemp: "Температура",
           demoSsdBad: "Нашар секторлар",
           demoCore: "Ядро",
@@ -1553,7 +1620,7 @@
           featFpsBody: "Танымал ойындарда төмен, орташа және жоғары параметрлерде қанша кадр шығатынын көрсетеді",
           featHudTitle: "Mini-HUD",
           featHudBody: "Терезелер мен ойындар үстіндегі ықшам панель: CPU температурасы, GPU және жады жүктемесі",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "SSD денсаулығы",
           featSsdBody: "SMART оқиды: қалған ресурс %, температура және нашар секторлар қарапайым тілде",
           featAdminTitle: "Админсіз",
           featAdminBody: "Жүктегеннен кейін бірден іске қосылады, күрделі баптаусыз",
@@ -1588,7 +1655,6 @@
           demoOverviewTitle: "Система күзәтүе",
           demoOverviewSub: "CPU, GPU, RAM һәм температураның тере метрикалары",
           demoAlertPeak: "Төш чыны: Браузер системаны йөкли",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "Динамика",
           demoLagsTitle: "Лаглар",
           demoLagsSub: "Фон процесслары һәм Eco Mode",
@@ -1596,8 +1662,12 @@
           demoGameTip: "Пресетларны күрү өчен уенга басыгыз",
           demoHwTitle: "Тимер",
           demoHwSub: "Физик төшләр һәм SMT җепләр",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "Калган ресурс",
+          demoSsdLab: "SSD сәламәтлеге",
+          demoSsdStatus: "Бик яхшы",
+          demoSsdStatusLab: "Хәл",
+          demoSsdPowerOn: "Эш вакыты",
+          demoSsdWritten: "Язылган",
+          demoSsdLife: "Калган ресурс",
           demoSsdTemp: "Температура",
           demoSsdBad: "Начар секторлар",
           demoCore: "Төш",
@@ -1623,7 +1693,7 @@
           featFpsBody: "Популяр уеннарда түбән, уртача һәм югары көйләүләрдә ничә кадр чыгуын күрсәтә",
           featHudTitle: "Mini-HUD",
           featHudBody: "Тәрәзәләр һәм уеннар өстендәге компакт панель: CPU температурасы, GPU һәм хәтер йөкләнеше",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "SSD сәламәтлеге",
           featSsdBody: "SMART укый: калган ресурс %, температура һәм начар секторлар гади телдә",
           featAdminTitle: "Админсыз",
           featAdminBody: "Йөкләгәннән соң шунда ук эшли, катлаулы көйләүләрсез",
@@ -1658,7 +1728,6 @@
           demoOverviewTitle: "Systemübersicht",
           demoOverviewSub: "Live-Metriken für CPU, GPU, RAM und Temperatur",
           demoAlertPeak: "Kernspitze: Browser belastet das System",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "Dynamik",
           demoLagsTitle: "Ruckler",
           demoLagsSub: "Hintergrundprozesse und Eco Mode",
@@ -1666,8 +1735,12 @@
           demoGameTip: "Spiel antippen, um Presets zu sehen",
           demoHwTitle: "Hardware",
           demoHwSub: "Physische Kerne und SMT-Threads",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "Restlebensdauer",
+          demoSsdLab: "SSD-Zustand",
+          demoSsdStatus: "Ausgezeichnet",
+          demoSsdStatusLab: "Status",
+          demoSsdPowerOn: "Betriebsstunden",
+          demoSsdWritten: "Geschrieben",
+          demoSsdLife: "Restlebensdauer",
           demoSsdTemp: "Temperatur",
           demoSsdBad: "Bad sectors",
           demoCore: "Kern",
@@ -1693,7 +1766,7 @@
           featFpsBody: "Zeigt, wie viele Frames Ihr PC in populären Spielen auf niedrig, mittel und hoch schafft",
           featHudTitle: "Mini-HUD",
           featHudBody: "Kompaktes Overlay für Fenster und Spiele: CPU-Temp, GPU- und Speicherlast immer im Blick",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "SSD-Zustand",
           featSsdBody: "Liest SMART: Restlebensdauer %, Temperatur und Bad sectors in klarer Sprache",
           featAdminTitle: "Ohne Admin",
           featAdminBody: "Startet direkt nach dem Download ohne komplexe Einrichtung",
@@ -1728,7 +1801,6 @@
           demoOverviewTitle: "システム概要",
           demoOverviewSub: "CPU・GPU・RAM・温度のライブ指標",
           demoAlertPeak: "コア急騰: ブラウザが負荷をかけています",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "推移",
           demoLagsTitle: "ラグ",
           demoLagsSub: "バックグラウンド処理と Eco Mode",
@@ -1736,8 +1808,12 @@
           demoGameTip: "ゲームをタップしてプリセットを表示",
           demoHwTitle: "ハードウェア",
           demoHwSub: "物理コアと SMT スレッド",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "残寿命",
+          demoSsdLab: "SSDの健康",
+          demoSsdStatus: "優良",
+          demoSsdStatusLab: "状態",
+          demoSsdPowerOn: "通電時間",
+          demoSsdWritten: "書き込み量",
+          demoSsdLife: "残寿命",
           demoSsdTemp: "温度",
           demoSsdBad: "不良セクタ",
           demoCore: "コア",
@@ -1763,7 +1839,7 @@
           featFpsBody: "人気タイトルの低・中・高設定で何フレーム出せるかを表示",
           featHudTitle: "Mini-HUD",
           featHudBody: "ウィンドウやゲーム上の小型パネル。CPU温度、GPUとメモリ負荷を常に表示",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "SSDの健康",
           featSsdBody: "SMARTを読み取り、残寿命%、温度、不良セクタをわかりやすい言葉で表示",
           featAdminTitle: "管理者不要",
           featAdminBody: "ダウンロード後すぐに起動。複雑な設定や追加権限は不要",
@@ -1798,7 +1874,6 @@
           demoOverviewTitle: "系统总览",
           demoOverviewSub: "CPU、GPU、内存与温度的实时指标",
           demoAlertPeak: "核心尖峰：浏览器正在加重系统负担",
-          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
           demoTrend: "动态",
           demoLagsTitle: "卡顿",
           demoLagsSub: "后台进程与 Eco Mode",
@@ -1806,8 +1881,12 @@
           demoGameTip: "点击游戏查看预设",
           demoHwTitle: "硬件",
           demoHwSub: "物理核心与 SMT 线程",
-          demoSsdLab: "SSD health",
-          demoSsdHealth: "剩余寿命",
+          demoSsdLab: "SSD 健康",
+          demoSsdStatus: "优秀",
+          demoSsdStatusLab: "状态",
+          demoSsdPowerOn: "通电时间",
+          demoSsdWritten: "写入量",
+          demoSsdLife: "剩余寿命",
           demoSsdTemp: "温度",
           demoSsdBad: "坏道",
           demoCore: "核心",
@@ -1833,7 +1912,7 @@
           featFpsBody: "显示热门游戏在低、中、高画质下你的电脑能跑多少帧",
           featHudTitle: "Mini-HUD",
           featHudBody: "覆盖在窗口和游戏上的紧凑面板：CPU 温度、显卡与内存占用一目了然",
-          featSsdTitle: "SSD health",
+          featSsdTitle: "SSD 健康",
           featSsdBody: "读取 SMART：用通俗语言显示剩余寿命百分比、温度和坏道",
           featAdminTitle: "无需管理员",
           featAdminBody: "下载后即可运行，无需复杂设置或额外权限",
@@ -1881,8 +1960,6 @@
         });
         const sw = document.getElementById("lang-switch");
         if (sw) sw.value = lang;
-        const ssdAlert = document.getElementById("demo-ssd-alert-txt");
-        if (ssdAlert) ssdAlert.textContent = t("demoSsdAlert");
         renderCores(true);
         renderGames();
         renderProcs();
@@ -2037,7 +2114,7 @@
       /* ---- Live interactive demo telemetry ---- */
       const rnd = (a, b) => a + Math.random() * (b - a);
       const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-      const HISTORY = 18;
+      const HISTORY = 20;
       const EMA = 0.22;
       const LERP = 0.14;
       const themes = {
@@ -2062,7 +2139,7 @@
           { name: "Explorer.exe", load: 6, eco: false }
         ],
         gameId: "cs2",
-        ssd: { health: 98, temp: 38, bad: 0 }
+        ssd: { health: 98, temp: 37, bad: 0, written: "14.2 TB", powerOn: "1840 h" }
       };
 
       function seedSeries(key, base, wobble) {
@@ -2087,7 +2164,7 @@
         cyber: { name: "Cyberpunk", appId: 1091500, fps: [95, 72, 55, 42], tipKey: "tipCyber", subKey: "gameCyberSub" },
         dota: { name: "Dota 2", appId: 570, fps: [200, 180, 150, 120], tipKey: "tipDota", subKey: "gameDotaSub" }
       };
-      const steamCover = (id) => "https://cdn.cloudflare.steamstatic.com/steam/apps/" + id + "/library_600x900.jpg";
+      const steamCover = (id) => "https://cdn.cloudflare.steamstatic.com/steam/apps/" + id + "/header.jpg";
       const coverFallback = {
         cs2: "linear-gradient(145deg, #1a2a44 0%, #0b101b 55%, #152238 100%)",
         gtav: "linear-gradient(145deg, #244028 0%, #0b101b 55%, #1a3020 100%)",
@@ -2277,21 +2354,23 @@
         host.innerHTML = order.map((id) => {
           const g = games[id];
           return `<button type="button" class="demo-game${state.gameId === id ? " active" : ""}" data-game="${id}">
-            <div class="cover" data-fallback="${id}" style="background-image:url('${steamCover(g.appId)}'), ${coverFallback[id]}"></div>
+            <div class="cover-wrap">
+              <img src="${steamCover(g.appId)}" alt="" width="460" height="215" loading="lazy" decoding="async" data-fallback="${id}" />
+            </div>
             <div class="gmeta">
               <div class="gname">${g.name}</div>
               <div class="gsub">${t(g.subKey)}</div>
             </div>
           </button>`;
         }).join("");
-        host.querySelectorAll(".cover").forEach((node) => {
-          const img = new Image();
-          const id = node.getAttribute("data-fallback");
-          const g = games[id];
-          img.onerror = () => {
-            node.style.backgroundImage = coverFallback[id];
-          };
-          img.src = steamCover(g.appId);
+        host.querySelectorAll(".cover-wrap img").forEach((node) => {
+          node.addEventListener("error", () => {
+            const id = node.getAttribute("data-fallback");
+            const fb = document.createElement("div");
+            fb.className = "cover-fallback";
+            fb.style.background = coverFallback[id] || "#0b101b";
+            node.replaceWith(fb);
+          }, { once: true });
         });
         host.querySelectorAll("[data-game]").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -2381,11 +2460,19 @@
         const hwCpu = el("demo-hw-cpu-sub");
         const hwGpu = el("demo-hw-gpu-sub");
         const hwRam = el("demo-hw-ram-sub");
-        if (hwCpu) hwCpu.textContent = "8 / 16 · " + Math.round(avgCore) + "%";
-        if (hwGpu) hwGpu.textContent = "8 GB · " + Math.round(state.gpu) + "%";
-        if (hwRam) hwRam.textContent = "Dual Channel · " + Math.round(state.ram) + "%";
+        if (hwCpu) hwCpu.textContent = "8 / 16 • " + Math.round(avgCore) + "%";
+        if (hwGpu) hwGpu.textContent = "8 GB • " + Math.round(state.gpu) + "%";
+        if (hwRam) hwRam.textContent = "Dual Channel • " + Math.round(state.ram) + "%";
         const ssdTemp = el("demo-ssd-temp");
         if (ssdTemp) ssdTemp.textContent = Math.round(state.ssd.temp) + "°C";
+        const ssdCompact = el("demo-ssd-compact");
+        if (ssdCompact) ssdCompact.textContent = "Samsung 980 PRO 1TB • " + state.ssd.health + "%";
+        const ssdHealth = el("demo-ssd-health");
+        if (ssdHealth) ssdHealth.textContent = state.ssd.health + "%";
+        const ssdWritten = el("demo-ssd-written");
+        if (ssdWritten) ssdWritten.textContent = state.ssd.written;
+        const ssdPower = el("demo-ssd-power");
+        if (ssdPower) ssdPower.textContent = state.ssd.powerOn;
         renderCores(false);
       }
 
