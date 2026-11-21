@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.1
+
+### Fixed
+- Lags: core-peak capsule padding so timestamp / process / PID stays inside the card
+- Lags: Network and Sleep blockers as a symmetric 2-column grid with sleep `i` tooltip (7 langs)
+- GamePulse: full catalog in a scrollable responsive grid; instant RU+EN search; Steam 2:3 poster cover
+- Settings: unified font family/weight/size; Reset profile moved to power-profile header row
+- Landing Dynamics: live CPU/GPU/RAM legend with percentages and 100%/50%/0% scale grid
+- Landing Upgrade pitfalls: inherit font and card-style markers (no tiny yellow type)
+- Landing Uninstall demo: styled capsule buttons for Kill & remove / Replay demo
+
 ## 1.5.0
 
 ### Fixed

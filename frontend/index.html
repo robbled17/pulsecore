@@ -55,7 +55,7 @@
         <img class="brand-logo" src="./src/assets/logo.svg" alt="PulseCore" />
         <div class="brand-text">
           <div class="brand-name">PulseCore</div>
-          <div class="brand-ver">v1.5.0</div>
+          <div class="brand-ver">v1.5.1</div>
         </div>
       </div>
       <nav class="nav">
@@ -203,19 +203,26 @@
             <div id="vampire-list" class="list dense-table"></div>
           </div>
         </div>
-        <div class="panel">
-          <div class="panel-title row-between">
-            <span data-i18n="netTitle">Сеть</span>
-            <button type="button" class="btn compact" id="btn-net-diag" data-i18n="netCheck">Диагностика</button>
+        <div class="split">
+          <div class="panel">
+            <div class="panel-title row-between">
+              <span class="panel-title-left">
+                <span data-i18n="netTitle">Сеть</span>
+              </span>
+              <button type="button" class="btn compact" id="btn-net-diag" data-i18n="netCheck">Диагностика</button>
+            </div>
+            <div id="net-diag" class="list dense-table action-card-body"><div class="empty" data-i18n="netEmpty">Запустите диагностику сети.</div></div>
           </div>
-          <div id="net-diag" class="list dense-table"><div class="empty" data-i18n="netEmpty">Запустите диагностику сети.</div></div>
-        </div>
-        <div class="panel" id="sleep-panel">
-          <div class="panel-title row-between">
-            <span data-i18n="sleepTitle">Блокировки сна</span>
-            <button type="button" class="btn compact" id="btn-sleep" data-i18n="sleepCheck">Проверить</button>
+          <div class="panel" id="sleep-panel">
+            <div class="panel-title row-between">
+              <span class="panel-title-left">
+                <span data-i18n="sleepTitle">Блокировки сна</span>
+                <span class="tip" tabindex="0" data-i18n-tip="tipSleep">ⓘ</span>
+              </span>
+              <button type="button" class="btn compact" id="btn-sleep" data-i18n="sleepCheck">Проверить</button>
+            </div>
+            <div id="sleep-report" class="list dense-table action-card-body"><div class="empty" data-i18n="sleepEmpty">Проверка блокировок сна Windows.</div></div>
           </div>
-          <div id="sleep-report" class="list dense-table"><div class="empty" data-i18n="sleepEmpty">Проверка блокировок сна Windows.</div></div>
         </div>
       </section>
 
@@ -422,7 +429,10 @@
           <p data-i18n="settingsSub">Питание, опрос, тема и язык</p>
         </header>
         <div class="panel">
-          <div class="panel-title" data-i18n="powerTitle">Профиль питания</div>
+          <div class="panel-title row-between">
+            <span data-i18n="powerTitle">Профиль питания</span>
+            <button type="button" class="btn compact" id="btn-reset-profile" data-i18n="resetProfile">Сбросить профиль</button>
+          </div>
           <div class="btn-row">
             <button type="button" class="btn mode" data-mode="silent">
               <span data-i18n="modeSilent">Энергосбережение</span>
@@ -436,9 +446,6 @@
               <span data-i18n="modeTurbo">Производительность</span>
               <span class="tip" tabindex="0" data-i18n-tip="tipTurbo">ⓘ</span>
             </button>
-          </div>
-          <div class="btn-row settings-reset-row">
-            <button type="button" class="btn compact" id="btn-reset-profile" data-i18n="resetProfile">Сбросить профиль</button>
           </div>
         </div>
         <div class="panel">
@@ -604,7 +611,7 @@
       <div class="modal-body about-body">
         <div class="about-brand">
           <div class="about-app" id="about-app-name">PulseCore</div>
-          <div class="about-ver" id="about-app-ver">v1.5.0</div>
+          <div class="about-ver" id="about-app-ver">v1.5.1</div>
         </div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: <span data-i18n="aboutFOSS">Свободное ПО с открытым исходным кодом</span></div>

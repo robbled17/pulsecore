@@ -39,7 +39,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.5.0
+const MIT_LICENSE = `PulseCore v1.5.1
 
 MIT License
 
@@ -75,7 +75,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.5.0'
+const APP_VERSION = 'v1.5.1'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -87,6 +87,7 @@ let hudEnabled = false
 let gameOverlayOn = false
 let latestDisks = []
 let gameCatalog = []
+let fullGameCatalog = []
 let selectedGameId = ''
 let lastMetrics = null
 const periphCollapsed = new Set(JSON.parse(localStorage.getItem('zp_periph_collapsed') || '[]'))
@@ -1545,11 +1546,62 @@ function sampleFrametime(now) {
   void dt
 }
 
+function expandSearchAliasesLocal(q) {
+  const table = {
+    'как достать соседа': ['neighbours from hell', 'neighbors from hell'],
+    'соседей': ['neighbours from hell'],
+    'герои 3': ['heroes of might and magic iii', 'homm3'],
+    'герои iii': ['heroes of might and magic iii'],
+    'герои 5': ['heroes of might and magic v'],
+    'ведьмак 3': ['witcher 3'],
+    'ведьмак': ['witcher'],
+    'кдло': ['counter-strike', 'cs2'],
+    'кс': ['counter-strike'],
+    'кс го': ['counter-strike'],
+    'дота': ['dota 2'],
+    'танки': ['world of tanks'],
+    'танки блиц': ['world of tanks blitz'],
+    'майкрафт': ['minecraft'],
+    'гта': ['grand theft auto'],
+    'гта 5': ['gta v', 'grand theft auto v'],
+    'гта сан': ['san andreas'],
+    'халф лайф': ['half-life'],
+    'халф-лайф': ['half-life'],
+    'флиаут': ['flatout'],
+    'флэтаут': ['flatout'],
+    'нфс': ['need for speed'],
+    'nfs underground': ['need for speed underground'],
+  }
+  const raw = String(q || '').trim().toLowerCase()
+  if (!raw) return []
+  if (table[raw]) return table[raw]
+  for (const [k, v] of Object.entries(table)) {
+    if (raw.includes(k)) return v
+  }
+  return []
+}
+
+function filterGamesInstant(query, catalog) {
+  const list = Array.isArray(catalog) ? catalog : []
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return list.slice()
+  const aliases = expandSearchAliasesLocal(q)
+  return list.filter((g) => {
+    const name = String(g?.name || '').toLowerCase()
+    const id = String(g?.id || '').toLowerCase()
+    const genre = String(g?.genre || '').toLowerCase()
+    if (name.includes(q) || id.includes(q) || genre.includes(q)) return true
+    return aliases.some((al) => name.includes(al) || id.includes(al))
+  })
+}
+
 async function loadGames() {
   try {
     gameCatalog = await ListGames() || []
+    fullGameCatalog = gameCatalog.slice()
   } catch (_) {
     gameCatalog = []
+    fullGameCatalog = []
   }
   renderGameGrid()
 }
@@ -1572,16 +1624,26 @@ function mergeGameLists(localList, onlineList) {
 }
 
 async function searchGamesLocal(q) {
+  const query = String(q || '').trim()
+  // Instant client-side filter over the full catalog (RU aliases + EN names).
+  if (!query) {
+    gameCatalog = fullGameCatalog.length ? fullGameCatalog.slice() : (await ListGames().catch(() => []) || [])
+    if (!fullGameCatalog.length) fullGameCatalog = gameCatalog.slice()
+    renderGameGrid()
+    return
+  }
+  const base = fullGameCatalog.length ? fullGameCatalog : gameCatalog
+  gameCatalog = filterGamesInstant(query, base)
+  renderGameGrid()
   try {
-    if (!q) {
-      gameCatalog = await ListGames() || []
-    } else {
-      gameCatalog = await SearchGames(q) || []
+    const remote = await SearchGames(query) || []
+    if (remote.length) {
+      gameCatalog = mergeGameLists(filterGamesInstant(query, base), remote)
+      renderGameGrid()
     }
   } catch (_) {
-    gameCatalog = gameCatalog || []
+    // keep instant results
   }
-  renderGameGrid()
 }
 
 async function searchGamesOnlineMerge(q) {
@@ -1611,7 +1673,8 @@ async function searchGamesLive(opts = {}) {
   const q = String($('game-search')?.value || '').trim()
   if (!q) {
     setSearchSpinner(false)
-    gameCatalog = await ListGames() || []
+    gameCatalog = fullGameCatalog.length ? fullGameCatalog.slice() : (await ListGames().catch(() => []) || [])
+    if (!fullGameCatalog.length) fullGameCatalog = gameCatalog.slice()
     renderGameGrid()
     return
   }
@@ -2531,27 +2594,15 @@ function wireUI() {
       searchGamesLive({ online: false })
       return
     }
-    // Local filter immediately, Steam online after 300ms pause.
+    // Instant local filter of the full catalog; Steam online after a short pause.
     searchGamesLocal(q)
-    searchTimer = setTimeout(() => searchGamesLive({ online: true }), 300)
+    searchTimer = setTimeout(() => searchGamesLive({ online: true }), 280)
   })
   searchInput?.addEventListener('keydown', async (ev) => {
     if (ev.key !== 'Enter') return
     clearTimeout(searchTimer)
     await searchGamesLive({ online: true })
   })
-
-  const carousel = $('games-carousel-wrapper') || document.querySelector('.games-carousel-wrapper')
-  if (carousel) {
-    carousel.addEventListener('wheel', (e) => {
-      e.preventDefault()
-      const step = 206
-      carousel.scrollBy({
-        top: e.deltaY > 0 ? step : -step,
-        behavior: 'smooth',
-      })
-    }, { passive: false })
-  }
 
   $('game-grid')?.addEventListener('click', async (ev) => {
     const card = ev.target.closest('[data-game]')

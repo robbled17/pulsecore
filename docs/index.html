@@ -469,20 +469,54 @@
       pointer-events: none;
     }
     .demo-alert .txt { font-size: 12.5px; font-weight: 600; flex: 1 1 180px; }
-    .demo-alert .btn-eco {
+    .btn-eco {
       appearance: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.2;
+      padding: 8px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(110, 168, 255, 0.35);
+      background: rgba(110, 168, 255, 0.18);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .btn-eco:hover {
+      background: rgba(110, 168, 255, 0.3);
+      border-color: rgba(110, 168, 255, 0.5);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    }
+    .demo-alert .btn-eco {
       border: 1px solid rgba(110, 168, 255, 0.4);
       background: rgba(110, 168, 255, 0.16);
       color: #eaf2ff;
-      font: inherit;
       font-size: 12px;
-      font-weight: 700;
       padding: 7px 12px;
       border-radius: 999px;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.2s ease;
     }
     .demo-alert .btn-eco:hover { background: rgba(110, 168, 255, 0.28); }
+    #demo-kill-remove.btn-eco {
+      background: rgba(251, 113, 133, 0.18);
+      border-color: rgba(251, 113, 133, 0.42);
+      color: #fecdd3;
+    }
+    #demo-kill-remove.btn-eco:hover {
+      background: rgba(251, 113, 133, 0.3);
+      border-color: rgba(251, 113, 133, 0.55);
+    }
+    #demo-uninstall-replay.btn-eco {
+      background: rgba(26, 34, 56, 0.92);
+      border-color: rgba(160, 190, 255, 0.28);
+      color: var(--text);
+    }
+    #demo-uninstall-replay.btn-eco:hover {
+      background: rgba(110, 168, 255, 0.22);
+      border-color: rgba(110, 168, 255, 0.45);
+    }
     .demo-chart {
       border-radius: 14px;
       border: 1px solid rgba(160, 190, 255, 0.12);
@@ -491,10 +525,66 @@
       margin-bottom: 4px;
     }
     .demo-chart .ctitle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
       font-size: 12px;
       color: var(--muted);
       font-weight: 650;
       margin-bottom: 8px;
+    }
+    .trend-legend {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-legend .leg {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .trend-legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .trend-legend .dot.cpu { background: #8ec0ff; color: #8ec0ff; }
+    .trend-legend .dot.gpu { background: #5ff0d4; color: #5ff0d4; }
+    .trend-legend .dot.ram { background: #b49bff; color: #b49bff; }
+    .trend-legend b { font-weight: 750; }
+    .demo-chart-plot {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .trend-yscale {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 2px 0;
+      font-size: 10px;
+      font-weight: 650;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      user-select: none;
+    }
+    .demo-chart-canvas-wrap {
+      position: relative;
+      min-width: 0;
     }
     .demo-chart canvas {
       display: block;
@@ -697,11 +787,56 @@
     }
     .demo-upgrade-rec .model { font-size: 15px; font-weight: 750; margin-bottom: 6px; letter-spacing: -0.02em; }
     .demo-upgrade-rec .body { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 8px; }
-    .demo-upgrade-rec .pit {
-      color: #fbbf24; font-size: 12.5px; line-height: 1.4;
+    .demo-upgrade-rec .pit,
+    .demo-upgrade-rec .pit ul,
+    .demo-upgrade-rec .pit li {
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+      letter-spacing: inherit;
+    }
+    .demo-upgrade-rec .pit .pit-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .demo-upgrade-rec .pit .pit-label::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.16);
+      flex-shrink: 0;
     }
     .demo-upgrade-rec .pit ul {
-      margin: 4px 0 0; padding-left: 18px; color: rgba(251, 191, 36, 0.92);
+      margin: 6px 0 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .demo-upgrade-rec .pit li {
+      position: relative;
+      padding-left: 16px;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+    .demo-upgrade-rec .pit li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.7;
     }
     .demo-uninstall-app {
       border: 1px solid var(--line);
@@ -1492,8 +1627,20 @@
                 </div>
               </div>
               <div class="demo-chart">
-                <div class="ctitle" data-i18n="demoTrend">Динамика</div>
-                <canvas id="demo-trend" width="900" height="160" aria-hidden="true"></canvas>
+                <div class="ctitle">
+                  <span data-i18n="demoTrend">Динамика</span>
+                  <div class="trend-legend" id="demo-trend-legend" aria-live="polite">
+                    <span class="leg"><i class="dot cpu" aria-hidden="true"></i>CPU <b id="leg-cpu">48%</b></span>
+                    <span class="leg"><i class="dot gpu" aria-hidden="true"></i>GPU <b id="leg-gpu">68%</b></span>
+                    <span class="leg"><i class="dot ram" aria-hidden="true"></i>RAM <b id="leg-ram">63%</b></span>
+                  </div>
+                </div>
+                <div class="demo-chart-plot">
+                  <div class="trend-yscale" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>
+                  <div class="demo-chart-canvas-wrap">
+                    <canvas id="demo-trend" width="900" height="160" aria-hidden="true"></canvas>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2804,6 +2951,16 @@
         ctx.restore();
       }
 
+      function updateTrendLegend() {
+        const map = { cpu: "leg-cpu", gpu: "leg-gpu", ram: "leg-ram" };
+        Object.keys(map).forEach((key) => {
+          const node = el(map[key]);
+          if (!node) return;
+          const v = state.display[key];
+          node.textContent = `${Math.round(Number.isFinite(v) ? v : 0)}%`;
+        });
+      }
+
       function drawTrend(canvas) {
         if (!canvas) return;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2821,6 +2978,18 @@
         ctx.beginPath();
         ctx.rect(0, 0, w, h);
         ctx.clip();
+        // Thin horizontal scale grid (100% / 50% / 0%).
+        ;[0, 0.5, 1].forEach((frac) => {
+          const y = 6 + (h - 12) * frac;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.strokeStyle = "rgba(160, 190, 255, 0.16)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash(frac === 0.5 ? [4, 4] : []);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
         ["cpu", "gpu", "ram"].forEach((key) => {
           const theme = themes[key];
           const pts = pointsFromValues(state.series[key], w, h, 4, 6, true, state.scrollPhase);
@@ -2835,6 +3004,7 @@
           ctx.shadowBlur = 0;
         });
         ctx.restore();
+        updateTrendLegend();
       }
 
       function renderProcs() {
@@ -3552,7 +3722,7 @@
             <div class="model">${r.model}</div>
             <div class="body">${r.body}</div>
             <div class="pit">
-              <div>${pitLabel}</div>
+              <div class="pit-label">${pitLabel}</div>
               <ul>${r.pits.map((p) => `<li>${p}</li>`).join("")}</ul>
             </div>
           </article>
