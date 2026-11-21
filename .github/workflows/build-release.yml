@@ -1,0 +1,142 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional release tag override (e.g. v1.0.1). Empty uses the push tag or a draft timestamp tag.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows amd64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Wails CLI
+        shell: bash
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install frontend deps
+        working-directory: frontend
+        shell: bash
+        run: npm ci || npm install
+
+      - name: Wails build (windows/amd64)
+        shell: bash
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          wails build -clean -platform windows/amd64 -ldflags "-s -w"
+
+      - name: Verify PulseCore.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          exe=""
+          for cand in \
+            "build/bin/PulseCore.exe" \
+            "build/bin/pulsecore.exe" \
+            "build/bin/PulseCore-amd64.exe" \
+            "build/bin/pulsecore-amd64.exe"; do
+            if [[ -f "$cand" ]]; then
+              exe="$cand"
+              break
+            fi
+          done
+          if [[ -z "$exe" ]]; then
+            echo "No Windows exe found under build/bin:"
+            ls -la build/bin || true
+            exit 1
+          fi
+          size=$(wc -c < "$exe" | tr -d ' ')
+          echo "Found $exe ($size bytes)"
+          if [[ "$size" -lt 1000000 ]]; then
+            echo "Executable looks empty/too small"
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$exe" dist/PulseCore.exe
+          echo "EXE_PATH=dist/PulseCore.exe" >> "$GITHUB_ENV"
+          echo "EXE_SIZE=$size" >> "$GITHUB_ENV"
+
+      - name: Package zip + SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.tag }}"
+          if [[ -z "$tag" ]]; then
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              tag="${GITHUB_REF_NAME}"
+            else
+              tag="v0.0.0-dev.${GITHUB_RUN_NUMBER}"
+            fi
+          fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          zip_name="PulseCore-${tag}-windows-amd64.zip"
+          powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/PulseCore.exe' -DestinationPath '${zip_name}' -Force"
+          sha256sum "${zip_name}" | tee "${zip_name}.sha256"
+          echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
+
+      - name: Build changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## PulseCore ${RELEASE_TAG}"
+            echo
+            echo "Windows amd64 release build."
+            echo
+            echo "- Artifact: \`${ZIP_NAME}\`"
+            echo "- Binary: \`PulseCore.exe\` (${EXE_SIZE} bytes)"
+            echo "- Platform: windows/amd64"
+            echo "- Flags: \`wails build -clean -platform windows/amd64 -ldflags \"-s -w\"\`"
+            echo
+            echo "### Commits"
+            if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+              prev=$(git describe --tags --abbrev=0 2>/dev/null || true)
+              if [[ -n "$prev" && "$prev" != "$RELEASE_TAG" ]]; then
+                git log --pretty=format:'- %s (%h)' "${prev}..HEAD"
+              else
+                git log --pretty=format:'- %s (%h)' -n 20
+              fi
+            else
+              git log --pretty=format:'- %s (%h)' -n 20
+            fi
+            echo
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: PulseCore ${{ env.RELEASE_TAG }}
+          body_path: release-notes.md
+          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag == '' }}
+          files: |
+            ${{ env.ZIP_NAME }}
+            ${{ env.ZIP_NAME }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

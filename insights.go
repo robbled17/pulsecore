@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -92,7 +91,7 @@ func collectUsageFromPowerReports() ([]AppUsageEntry, string) {
 	defer os.Remove(tmp)
 
 	// Prefer batteryreport XML (works on laptops without admin in most cases).
-	_ = runHiddenCommand("powercfg", "/batteryreport", "/xml", "/output", tmp, "/duration", "7")
+	_ = runHiddenCommand(system32("powercfg.exe"), "/batteryreport", "/xml", "/output", tmp, "/duration", "7")
 	if data, err := os.ReadFile(tmp); err == nil && len(data) > 100 {
 		if apps := parseBatteryReportApps(data); len(apps) > 0 {
 			return apps, "Данные из powercfg /batteryreport за 7 дней."
@@ -101,7 +100,7 @@ func collectUsageFromPowerReports() ([]AppUsageEntry, string) {
 
 	sru := filepath.Join(os.TempDir(), fmt.Sprintf("pulsecore-sru-%d.xml", time.Now().UnixNano()))
 	defer os.Remove(sru)
-	_ = runHiddenCommand("powercfg", "/srumutil", "/OUTPUT", sru, "/XML")
+	_ = runHiddenCommand(system32("powercfg.exe"), "/srumutil", "/OUTPUT", sru, "/XML")
 	if data, err := os.ReadFile(sru); err == nil && len(data) > 100 {
 		if apps := parseGenericEnergyApps(string(data)); len(apps) > 0 {
 			return apps, "Данные из powercfg /srumutil (SRUM)."
@@ -203,8 +202,9 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	}
 	diag.GatewayHost = gw
 
-	diag.GatewayMs = pingAverageMs(gw, 4)
-	diag.PublicMs = pingAverageMs(diag.PublicHost, 4)
+	// Short ICMP bursts only (user-initiated). No long-lived sockets / telemetry.
+	diag.GatewayMs = pingAverageMs(gw, 2)
+	diag.PublicMs = pingAverageMs(diag.PublicHost, 2)
 	diag.LocalJitterMs = measureLocalJitterMs()
 
 	diag.GatewayBadgeOK = diag.GatewayMs >= 0 && diag.GatewayMs <= 15
@@ -251,23 +251,18 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	return diag
 }
 
-func defaultGatewayIPv4() string {
-	out, err := runHiddenOutput("powershell", "-NoProfile", "-NonInteractive", "-Command",
-		`(Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric | Select-Object -First 1 -ExpandProperty NextHop)`)
-	if err == nil {
-		gw := strings.TrimSpace(string(out))
-		if net.ParseIP(gw) != nil {
-			return gw
-		}
-	}
-	return ""
-}
-
 func pingAverageMs(host string, count int) float64 {
 	if count < 1 {
+		count = 2
+	}
+	if count > 3 {
 		count = 3
 	}
-	out, err := runHiddenOutput("ping", "-n", strconv.Itoa(count), "-w", "1000", host)
+	host = strings.TrimSpace(host)
+	if host == "" || strings.ContainsAny(host, " \t\"'|&<>") {
+		return -1
+	}
+	out, err := runHiddenOutput(system32("ping.exe"), "-n", strconv.Itoa(count), "-w", "800", host)
 	if err != nil && len(out) == 0 {
 		return -1
 	}
@@ -308,12 +303,8 @@ func measureLocalJitterMs() float64 {
 func (a *App) CheckSleepBlockers() SleepReport {
 	rep := SleepReport{OK: true}
 
-	// PowerShell returns Unicode text reliably (avoids OEM CP866 console mangling).
-	out, err := runHiddenOutput("powershell", "-NoProfile", "-Command", "powercfg /requests")
-	if err != nil && len(out) == 0 {
-		out, err = runHiddenOutput("powershell", "-NoProfile", "-NonInteractive", "-Command",
-			"[Console]::OutputEncoding=[Text.Encoding]::UTF8; powercfg /requests | Out-String")
-	}
+	// Direct System32\powercfg.exe — no PowerShell wrapper (AV hygiene).
+	out, err := runHiddenOutput(system32("powercfg.exe"), "/requests")
 	if err != nil && len(out) == 0 {
 		rep.OK = false
 		rep.Summary = "sleep_query_failed"

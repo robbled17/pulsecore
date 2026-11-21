@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -33,7 +31,6 @@ const (
 	gameOverlayH    = 64
 	mainMinW        = 880
 	mainMinH        = 560
-	createNoWindow  = 0x08000000 // CREATE_NO_WINDOW
 	lagSpikeCore    = 95.0
 	lagSpikeOverall = 70.0
 	vampireCPUPct   = 4.0
@@ -105,6 +102,8 @@ type SystemMetrics struct {
 	Battery        BatteryMetrics     `json:"battery"`
 	Hardware       HardwareInfo       `json:"hardware"`
 	TemperatureC   float64            `json:"temperatureC"`
+	TempAvailable  bool               `json:"tempAvailable"`
+	GPUAvailable   bool               `json:"gpuAvailable"`
 	PowerMode      string             `json:"powerMode"`
 	PollIntervalMS int                `json:"pollIntervalMS"`
 	MiniHUD        bool               `json:"miniHUD"`
@@ -123,6 +122,7 @@ type DiskMetrics struct {
 	ReadMBps   float64 `json:"readMBps"`
 	WriteMBps  float64 `json:"writeMBps"`
 	FreeGB     float64 `json:"freeGB"`
+	Removable  bool    `json:"removable,omitempty"`
 }
 
 // BatteryMetrics describes AC/DC power state.
@@ -231,15 +231,26 @@ func (a *App) metricsWorker() {
 }
 
 func (a *App) collectOnce() {
+	defer func() {
+		if r := recover(); r != nil {
+			// Keep UI alive if a Windows sensor path panics.
+			fmt.Printf("collectOnce recovered: %v\n", r)
+		}
+	}()
 	snapshot := a.buildSnapshot()
 	a.LagSpotterCheck(snapshot.CPUPerCore, snapshot.CPUPercent)
 	vampires := a.GetVampireProcesses()
 	realTemp := snapshot.TemperatureC
 	if realTemp <= 0 {
-		snapshot.TemperatureC = estimateTempFromLoad(snapshot.CPUPercent)
+		// Do not invent a fake ACPI reading — UI shows Н/Д when TempAvailable=false.
+		snapshot.TemperatureC = 0
+		snapshot.TempAvailable = false
 	} else {
+		snapshot.TempAvailable = true
 		a.TriggerThermalCheck(realTemp)
 	}
+	gpuName := strings.TrimSpace(snapshot.GPUName)
+	snapshot.GPUAvailable = gpuName != "" && !strings.EqualFold(gpuName, "Unknown GPU")
 
 	a.mu.Lock()
 	a.metrics = snapshot
@@ -335,6 +346,11 @@ func (a *App) GetMetrics() SystemMetrics {
 	out.LagEvents = append([]LagEvent(nil), a.lagEvents...)
 	out.StutterEvents = append([]StutterEvent(nil), a.stutterEvents...)
 	out.Vampires = append([]VampireProcess(nil), a.vampires...)
+	out.CPUPerCore = append([]float64(nil), a.metrics.CPUPerCore...)
+	out.Disks = append([]DiskMetrics(nil), a.metrics.Disks...)
+	if hw := out.Hardware; hw.CPU.PerCore != nil {
+		out.Hardware.CPU.PerCore = append([]float64(nil), hw.CPU.PerCore...)
+	}
 	out.PowerMode = a.powerMode
 	out.PollIntervalMS = int(a.pollInterval / time.Millisecond)
 	out.MiniHUD = a.miniHUD
@@ -563,14 +579,16 @@ func (a *App) TriggerThermalCheck(temp float64) {
 }
 
 func (a *App) emitThermalAlarm(temp float64) {
+	// Native beep only — no hidden PowerShell toast hosts (AV/SmartScreen hygiene).
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
-	title := "PulseCore Emergency Hardware Alarm"
-	body := fmt.Sprintf("CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.", temp, thermalLimitC, thermalHoldSec)
-	showWindowsToast(title, body)
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "thermal:alarm", map[string]interface{}{
 			"temperature": temp,
 			"limit":       thermalLimitC,
+			"message": fmt.Sprintf(
+				"CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.",
+				temp, thermalLimitC, thermalHoldSec,
+			),
 		})
 	}
 }
@@ -672,6 +690,8 @@ func (a *App) peripheralsWatchdog() {
 	for {
 		select {
 		case <-a.stopWorker:
+			return
+		case <-a.ctx.Done():
 			return
 		case <-ticker.C:
 			items := a.collectConnectedDevices()
@@ -825,6 +845,24 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 	return true
 }
 
+func isNonFixedPartition(p disk.PartitionStat) bool {
+	opts := strings.ToLower(strings.Join(p.Opts, ","))
+	ft := strings.ToLower(p.Fstype)
+	mp := strings.ToLower(p.Mountpoint)
+	if strings.Contains(opts, "removable") || strings.Contains(opts, "cdrom") ||
+		strings.Contains(opts, "remote") || strings.Contains(opts, "ram") ||
+		strings.Contains(opts, "network") {
+		return true
+	}
+	if strings.Contains(ft, "cdfs") || strings.Contains(ft, "udf") || strings.Contains(ft, "iso9660") {
+		return true
+	}
+	if strings.HasPrefix(mp, `\\`) || strings.Contains(mp, "\\\\") {
+		return true
+	}
+	return false
+}
+
 func (a *App) collectDisks(now time.Time) []DiskMetrics {
 	partitions, err := disk.Partitions(true)
 	if err != nil {
@@ -842,6 +880,9 @@ func (a *App) collectDisks(now time.Time) []DiskMetrics {
 
 	out := make([]DiskMetrics, 0, len(partitions))
 	for _, p := range partitions {
+		if isNonFixedPartition(p) {
+			continue
+		}
 		usage, err := disk.Usage(p.Mountpoint)
 		if err != nil {
 			continue
@@ -1103,65 +1144,3 @@ func foregroundPID() int32 {
 	return int32(pid)
 }
 
-func showWindowsToast(title, message string) {
-	// Native toast via PowerShell WinRT (no extra SDK weight in the binary beyond OS).
-	ps := fmt.Sprintf(`
-$ErrorActionPreference='SilentlyContinue'
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
-$template = @"
-<toast>
-  <visual>
-    <binding template="ToastGeneric">
-      <text>%s</text>
-      <text>%s</text>
-    </binding>
-  </visual>
-</toast>
-"@
-$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$xml.LoadXml($template)
-$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("PulseCore").Show($toast)
-`, xmlEscape(title), xmlEscape(message))
-
-	_ = runHiddenStart("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
-}
-
-func runHiddenCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Run()
-}
-
-func runHiddenOutput(name string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Output()
-}
-
-func runHiddenStart(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Start()
-}
-
-func xmlEscape(s string) string {
-	r := strings.NewReplacer(
-		`&`, `&amp;`,
-		`<`, `&lt;`,
-		`>`, `&gt;`,
-		`"`, `&quot;`,
-		`'`, `&apos;`,
-	)
-	return r.Replace(s)
-}

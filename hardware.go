@@ -44,12 +44,16 @@ type HardwareInfo struct {
 }
 
 type CPUDeepInfo struct {
-	Name          string    `json:"name"`
-	PhysicalCores int       `json:"physicalCores"`
-	LogicalCores  int       `json:"logicalCores"`
-	FrequencyMHz  float64   `json:"frequencyMHz"`
-	PerCore       []float64 `json:"perCore"`
-	Percent       float64   `json:"percent"`
+	Name               string    `json:"name"`
+	PhysicalCores      int       `json:"physicalCores"`
+	LogicalCores       int       `json:"logicalCores"`
+	FrequencyMHz       float64   `json:"frequencyMHz"`
+	BaseFrequencyMHz   float64   `json:"baseFrequencyMHz"`
+	CurrentFrequencyMHz float64  `json:"currentFrequencyMHz"`
+	CacheKB            int       `json:"cacheKB"`
+	Architecture       string    `json:"architecture"`
+	PerCore            []float64 `json:"perCore"`
+	Percent            float64   `json:"percent"`
 }
 
 type GPUDeepInfo struct {
@@ -94,6 +98,9 @@ type staticHardware struct {
 	physicalCores  int
 	logicalCores   int
 	frequencyMHz   float64
+	baseFrequency  float64
+	cacheKB        int
+	architecture   string
 	gpuName        string
 	gpuDriver      string
 	gpuVRAM        uint64
@@ -114,20 +121,121 @@ func collectStaticHardware() staticHardware {
 	if logi, err := cpu.Counts(true); err == nil {
 		out.logicalCores = logi
 	}
+	out.architecture = "x64"
 	if info, err := cpu.Info(); err == nil && len(info) > 0 {
 		out.frequencyMHz = info[0].Mhz
+		out.baseFrequency = info[0].Mhz
+		out.cacheKB = int(info[0].CacheSize)
 		if out.cpuName == "" || out.cpuName == "Unknown CPU" {
 			out.cpuName = strings.TrimSpace(info[0].ModelName)
 		}
+		if info[0].Family != "" || info[0].Model != "" {
+			out.architecture = fmt.Sprintf("Family %s · Model %s", info[0].Family, info[0].Model)
+		}
+	}
+	if arch := readCPUArchitecture(); arch != "" {
+		out.architecture = arch
 	}
 	out.gpuName, out.gpuVRAM, out.gpuDriver = readGPUInfoDetailed()
 	out.ramType, out.ramSlotsUsed, out.ramSlotsTotal, out.ramSpeedMHz = readRAMSlots()
 	return out
 }
 
+func readCPUArchitecture() string {
+	ensureOLE()
+	defer func() { _ = recover() }()
+	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	if err != nil {
+		return ""
+	}
+	defer locator.Release()
+	dl, err := locator.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return ""
+	}
+	defer dl.Release()
+	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+	if err != nil {
+		return ""
+	}
+	service := serviceRaw.ToIDispatch()
+	defer service.Release()
+	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT Architecture, Caption, MaxClockSpeed, L2CacheSize, L3CacheSize FROM Win32_Processor")
+	if err != nil {
+		return ""
+	}
+	result := resultRaw.ToIDispatch()
+	defer result.Release()
+	countVar, err := oleutil.GetProperty(result, "Count")
+	if err != nil {
+		return ""
+	}
+	count := int(countVar.Val)
+	countVar.Clear()
+	if count < 1 {
+		return ""
+	}
+	itemRaw, err := oleutil.CallMethod(result, "ItemIndex", 0)
+	if err != nil {
+		return ""
+	}
+	item := itemRaw.ToIDispatch()
+	defer item.Release()
+	archMap := map[int]string{
+		0: "x86", 5: "ARM", 6: "ia64", 9: "x64", 12: "ARM64",
+	}
+	archCode := 9
+	if v, err := oleutil.GetProperty(item, "Architecture"); err == nil {
+		archCode = int(v.Val)
+		v.Clear()
+	}
+	label := archMap[archCode]
+	if label == "" {
+		label = "x64"
+	}
+	return label
+}
+
+func gpuDiscreteRank(name string) int {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if n == "" {
+		return 0
+	}
+	if strings.Contains(n, "microsoft basic") || strings.Contains(n, "remote desktop") {
+		return -1
+	}
+	discrete := []string{
+		"geforce", "rtx", "gtx", "quadro", "tesla", "titan",
+		"radeon rx", "rx 5", "rx 6", "rx 7", "rx 4", "rx 3",
+		"arc a", "arc b", "nvidia",
+	}
+	for _, d := range discrete {
+		if strings.Contains(n, d) {
+			return 3
+		}
+	}
+	integrated := []string{
+		"uhd", "iris", "hd graphics", "intel(r) graphics", "intel graphics",
+		"radeon graphics", "radeon(tm) graphics", "vega ", "graphics family",
+	}
+	for _, d := range integrated {
+		if strings.Contains(n, d) {
+			return 1
+		}
+	}
+	return 2 // unknown vendor — prefer over known iGPU when AdapterRAM ties
+}
+
 func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 	ensureOLE()
 	name = "Unknown GPU"
+	defer func() {
+		if r := recover(); r != nil {
+			name = "Unknown GPU"
+			vram = 0
+			driver = ""
+		}
+	}()
 
 	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
@@ -154,6 +262,7 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 	result := resultRaw.ToIDispatch()
 	defer result.Release()
 
+	bestRank := -2
 	countVar, _ := oleutil.GetProperty(result, "Count")
 	count := int(countVar.Val)
 	for i := 0; i < count; i++ {
@@ -162,25 +271,39 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 			continue
 		}
 		item := itemRaw.ToIDispatch()
+		if item == nil {
+			continue
+		}
 		nameVar, _ := oleutil.GetProperty(item, "Name")
 		ramVar, _ := oleutil.GetProperty(item, "AdapterRAM")
 		drvVar, _ := oleutil.GetProperty(item, "DriverVersion")
 		n := strings.TrimSpace(nameVar.ToString())
+		// AdapterRAM is often a signed/unsigned 32-bit WMI value; widen carefully.
 		ram := uint64(uint32(ramVar.Val))
+		if ramVar.Val < 0 {
+			ram = uint64(uint32(int32(ramVar.Val)))
+		}
 		drv := strings.TrimSpace(drvVar.ToString())
 		item.Release()
 		if n == "" {
 			continue
 		}
-		lower := strings.ToLower(n)
-		if strings.Contains(lower, "microsoft basic") || strings.Contains(lower, "remote desktop") {
+		rank := gpuDiscreteRank(n)
+		if rank < 0 {
 			continue
 		}
-		if ram >= vram {
+		// Prefer discrete (even when AdapterRAM is 0 on Optimus), then higher VRAM.
+		better := false
+		if rank > bestRank {
+			better = true
+		} else if rank == bestRank && ram > vram {
+			better = true
+		} else if rank == bestRank && ram == vram && name == "Unknown GPU" {
+			better = true
+		}
+		if better {
+			bestRank = rank
 			vram = ram
-			name = n
-			driver = drv
-		} else if name == "Unknown GPU" {
 			name = n
 			driver = drv
 		}
@@ -190,8 +313,9 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 
 func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 	n := strings.ToLower(strings.TrimSpace(name))
+	// Unknown with measurable dedicated VRAM is treated as discrete for GamePulse.
 	if n == "" || strings.Contains(n, "unknown") {
-		return true
+		return dedicatedMB <= 0
 	}
 	// Discrete markers win even if AdapterRAM looks small.
 	discrete := []string{
@@ -217,6 +341,10 @@ func detectIntegratedGPU(name string, dedicatedMB float64) bool {
 	// Very small AdapterRAM usually means iGPU / shared pool.
 	if dedicatedMB > 0 && dedicatedMB < 1536 {
 		return true
+	}
+	// Unknown name with ≥2GB dedicated → discrete.
+	if dedicatedMB >= 2048 {
+		return false
 	}
 	return false
 }
@@ -369,14 +497,26 @@ func buildHardwareInfo(static staticHardware, cpuPct float64, perCore []float64,
 		pct = vm.UsedPercent
 	}
 
+	baseFreq := static.baseFrequency
+	if baseFreq <= 0 {
+		baseFreq = static.frequencyMHz
+	}
+	curFreq := freq
+	if curFreq <= 0 {
+		curFreq = static.frequencyMHz
+	}
 	return HardwareInfo{
 		CPU: CPUDeepInfo{
-			Name:          static.cpuName,
-			PhysicalCores: static.physicalCores,
-			LogicalCores:  static.logicalCores,
-			FrequencyMHz:  freq,
-			PerCore:       perCore,
-			Percent:       cpuPct,
+			Name:                static.cpuName,
+			PhysicalCores:       static.physicalCores,
+			LogicalCores:        static.logicalCores,
+			FrequencyMHz:        curFreq,
+			BaseFrequencyMHz:    baseFreq,
+			CurrentFrequencyMHz: curFreq,
+			CacheKB:             static.cacheKB,
+			Architecture:        static.architecture,
+			PerCore:             perCore,
+			Percent:             cpuPct,
 		},
 		GPU: func() GPUDeepInfo {
 			integrated := detectIntegratedGPU(static.gpuName, vramTotal)
@@ -427,22 +567,21 @@ func buildRAMDeepInfo(static staticHardware, totalMB, usedMB, freeMB uint64, pct
 
 // CheckDiskHealth queries real PhysicalDisk + StorageReliabilityCounter data.
 func (a *App) CheckDiskHealth(driveLetter string) DiskHealthReport {
-	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
-	letter = strings.TrimSuffix(letter, `:\`)
-	letter = strings.TrimSuffix(letter, ":")
-	if letter == "" {
-		letter = "C"
-	}
+	letter := sanitizeDriveLetter(driveLetter)
 
-	ps := fmt.Sprintf(`
-$ErrorActionPreference='Stop'
+	// Storage cmdlets require PowerShell; never use -ExecutionPolicy Bypass (AV heuristic).
+	// Drive letter is a single A–Z from sanitizeDriveLetter — no string-concat argv injection.
+	ps := `$ErrorActionPreference='Stop'; $letter='` + letter + `'
 try {
-  $part = Get-Partition -DriveLetter '%s' -ErrorAction Stop
+  $part = Get-Partition -DriveLetter $letter -ErrorAction Stop
   $disk = $part | Get-Disk -ErrorAction Stop
   $phys = $disk | Get-PhysicalDisk -ErrorAction Stop
   $rel = $null
   try { $rel = Get-StorageReliabilityCounter -PhysicalDisk $phys -ErrorAction SilentlyContinue } catch {}
   $bus = [string]$disk.BusType
+  if ($bus -match 'USB|File Backed Virtual|iSCSI|Fibre Channel') {
+    throw "Removable or network disk skipped ($bus)"
+  }
   $media = [string]$phys.MediaType
   $iface = $bus
   if ($media -match 'SSD' -or $media -eq '3' -or $media -eq '4') {
@@ -451,17 +590,6 @@ try {
     else { $iface = 'SSD' }
   } elseif ($media -match 'HDD' -or $media -eq '2' -or $bus -match 'SATA|ATA|USB') {
     $iface = 'HDD'
-  }
-  $tbwGB = 0.0
-  if ($rel -and $rel.WriteLatencyMax -ne $null) { }
-  if ($rel) {
-    try {
-      $bytes = [double]$rel.FlushLatencyMax
-    } catch {}
-    try {
-      if ($rel.PSObject.Properties.Name -contains 'Wear') { }
-      # StorageReliabilityCounter exposes Read/Write errors; TBW approximated from Wear when possible.
-    } catch {}
   }
   $obj = [ordered]@{
     Model = [string]$phys.FriendlyName
@@ -481,10 +609,9 @@ try {
   $obj | ConvertTo-Json -Compress
 } catch {
   @{ Error = $_.Exception.Message } | ConvertTo-Json -Compress
-}
-`, letter)
+}`
 
-	out, err := runHiddenOutput("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps)
+	out, err := runHiddenOutput(systemPowerShell(), "-NoProfile", "-NonInteractive", "-Command", ps)
 	report := DiskHealthReport{
 		DriveLetter: letter + ":",
 		OK:          false,
@@ -577,6 +704,17 @@ func normalizeMediaType(media string) string {
 		}
 		return media
 	}
+}
+
+// sanitizeDriveLetter forces a single A–Z letter for Storage queries (no injection).
+func sanitizeDriveLetter(driveLetter string) string {
+	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
+	letter = strings.TrimSuffix(letter, `:\`)
+	letter = strings.TrimSuffix(letter, ":")
+	if len(letter) != 1 || letter[0] < 'A' || letter[0] > 'Z' {
+		return "C"
+	}
+	return letter
 }
 
 func asString(v interface{}) string {

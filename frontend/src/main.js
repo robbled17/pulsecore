@@ -20,8 +20,13 @@ import {
   SearchGamesOnline,
   PredictGameFPS,
 } from '../wailsjs/go/main/App.js'
-import { EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
+import {
+  initDevMode,
+  getDevState,
+  isDevModeActive,
+} from './devMode.js'
 
 const MIT_LICENSE = `PulseCore v1.0
 
@@ -49,17 +54,21 @@ SOFTWARE.`
 
 const HISTORY_LEN = 60
 const BUFFER_DELAY_MS = 650
-const LERP = 0.08
-const EMA_ALPHA = 0.25
+const LERP = 0.14
+const EMA_ALPHA = 0.22
 
 const chartThemes = {
-  cpu: { stroke: '#94a3b8', top: 'rgba(148, 163, 184, 0.22)', bottom: 'rgba(148, 163, 184, 0.02)' },
-  gpu: { stroke: '#64748b', top: 'rgba(100, 116, 139, 0.22)', bottom: 'rgba(100, 116, 139, 0.02)' },
-  ram: { stroke: '#cbd5e1', top: 'rgba(203, 213, 225, 0.18)', bottom: 'rgba(203, 213, 225, 0.02)' },
-  battery: { stroke: '#fbbf24', top: 'rgba(251, 191, 36, 0.18)', bottom: 'rgba(251, 191, 36, 0.02)' },
+  cpu: { stroke: '#8ec0ff', glow: 'rgba(142, 192, 255, 0.95)', top: 'rgba(110, 168, 255, 0.55)', bottom: 'rgba(110, 168, 255, 0.04)' },
+  gpu: { stroke: '#5ff0d4', glow: 'rgba(95, 240, 212, 0.95)', top: 'rgba(61, 231, 200, 0.5)', bottom: 'rgba(61, 231, 200, 0.04)' },
+  ram: { stroke: '#b49bff', glow: 'rgba(180, 155, 255, 0.95)', top: 'rgba(155, 123, 255, 0.5)', bottom: 'rgba(155, 123, 255, 0.04)' },
+  battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
+const APP_VERSION = 'v1.0'
+const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
+
 let lang = localStorage.getItem('zp_lang') || 'ru'
+let uiTheme = localStorage.getItem('zp_theme') || 'dark'
 let frozen = new Set()
 let activeMetric = 'cpu'
 let selectedDrive = 'C'
@@ -68,11 +77,32 @@ let gameOverlayOn = false
 let latestDisks = []
 let gameCatalog = []
 let selectedGameId = ''
+let lastMetrics = null
 const periphCollapsed = new Set(JSON.parse(localStorage.getItem('zp_periph_collapsed') || '[]'))
 const cachedDiskReport = Object.create(null)
 const whitelist = new Set(JSON.parse(localStorage.getItem('zp_whitelist') || '[]'))
 const chartScroll = { pos: 0, target: 0 }
 const frameSamples = []
+
+function loadHudPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('zp_minihud') || '{}')
+    return {
+      cpu: raw.cpu !== false,
+      gpu: raw.gpu !== false,
+      ram: raw.ram !== false,
+      temps: raw.temps !== false,
+      opacity: Number.isFinite(Number(raw.opacity)) ? Math.min(95, Math.max(35, Number(raw.opacity))) : 78,
+    }
+  } catch (_) {
+    return { cpu: true, gpu: true, ram: true, temps: true, opacity: 78 }
+  }
+}
+let hudPrefs = loadHudPrefs()
+
+function saveHudPrefs() {
+  localStorage.setItem('zp_minihud', JSON.stringify(hudPrefs))
+}
 
 const series = {
   cpu: makeSeries(),
@@ -113,10 +143,25 @@ function applyI18n() {
 }
 
 function syncLangSelects() {
-  ;['lang-select', 'lang-select-settings'].forEach((id) => {
-    const el = $(id)
-    if (el) el.value = lang
+  const el = $('lang-select-settings')
+  if (el) el.value = lang
+}
+
+function applyTheme(theme) {
+  uiTheme = theme === 'light' ? 'light' : 'dark'
+  localStorage.setItem('zp_theme', uiTheme)
+  document.documentElement.setAttribute('data-theme', uiTheme)
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.theme === uiTheme)
   })
+}
+
+function na() {
+  return lang === 'ru' ? 'Н/Д' : 'N/A'
+}
+
+function dash() {
+  return '—'
 }
 
 async function changeLanguage(next) {
@@ -131,7 +176,6 @@ async function changeLanguage(next) {
 
 function setActiveTab(name) {
   document.querySelectorAll('.nav-item').forEach((btn) => {
-    if (btn.classList.contains('nav-hud')) return
     btn.classList.toggle('active', btn.dataset.tab === name)
   })
   document.querySelectorAll('.tab').forEach((tab) => {
@@ -189,8 +233,8 @@ function buildPoints(arr, cssW, cssH, padL = 36, padR = 8, padT = 10, padB = 14)
 }
 
 function batteryTheme(pct) {
-  if (pct < 20) return { stroke: '#d35a66', top: 'rgba(211, 90, 102, 0.28)', bottom: 'rgba(211, 90, 102, 0.02)' }
-  if (pct < 40) return { stroke: '#d4a017', top: 'rgba(212, 160, 23, 0.26)', bottom: 'rgba(212, 160, 23, 0.02)' }
+  if (pct < 20) return { stroke: '#fb7185', glow: 'rgba(251, 113, 133, 0.85)', top: 'rgba(251, 113, 133, 0.34)', bottom: 'rgba(251, 113, 133, 0.02)' }
+  if (pct < 40) return { stroke: '#fbbf24', glow: 'rgba(251, 191, 36, 0.8)', top: 'rgba(251, 191, 36, 0.3)', bottom: 'rgba(251, 191, 36, 0.02)' }
   return chartThemes.battery
 }
 
@@ -251,7 +295,7 @@ function drawTrendFrame() {
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
   const cssW = canvas.clientWidth || 900
-  const cssH = 160
+  const cssH = 190
   if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
     canvas.width = Math.floor(cssW * dpr)
     canvas.height = Math.floor(cssH * dpr)
@@ -259,10 +303,10 @@ function drawTrendFrame() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   ctx.clearRect(0, 0, cssW, cssH)
 
-  const padL = 36
+  const padL = 40
   const padR = 36
-  const padT = 14
-  const padB = 28
+  const padT = 16
+  const padB = 30
   const plotW = cssW - padL - padR
   const plotH = cssH - padT - padB
   const marks = [
@@ -270,17 +314,17 @@ function drawTrendFrame() {
     { pct: 50, label: '50%' },
     { pct: 0, label: '0%' },
   ]
-  ctx.setLineDash([3, 4])
+  ctx.setLineDash([3, 5])
   ctx.lineWidth = 1
-  ctx.font = '10px ui-monospace, Consolas, monospace'
+  ctx.font = '600 11px Inter, Segoe UI, sans-serif'
   marks.forEach((m) => {
     const y = padT + plotH - (m.pct / 100) * plotH
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
+    ctx.strokeStyle = 'rgba(160, 190, 255, 0.12)'
     ctx.beginPath()
     ctx.moveTo(padL, y)
     ctx.lineTo(cssW - padR, y)
     ctx.stroke()
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+    ctx.fillStyle = 'rgba(200, 210, 230, 0.7)'
     ctx.fillText(m.label, 4, y + 3)
   })
   ctx.setLineDash([])
@@ -291,7 +335,7 @@ function drawTrendFrame() {
     { t: 2 / 3, label: '-10s' },
     { t: 1, label: t('nowLabel') },
   ]
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)'
+  ctx.fillStyle = 'rgba(200, 210, 230, 0.7)'
   timeLabels.forEach((m) => {
     const x = padL + m.t * plotW
     const label = m.label
@@ -305,37 +349,329 @@ function drawTrendFrame() {
   let theme = chartThemes[activeMetric] || chartThemes.cpu
   if (activeMetric === 'battery') theme = batteryTheme(last)
 
-  chartScroll.target = Math.max(0, values.length - 1)
-  chartScroll.pos += (chartScroll.target - chartScroll.pos) * 0.1
-  const scrollFrac = chartScroll.target > 0 ? (chartScroll.pos / chartScroll.target) : 1
-  const pts = buildPoints(values, cssW, cssH, padL, padR, padT, padB).map((p, i) => {
-    const ideal = padL + (i / Math.max(HISTORY_LEN - 1, 1)) * plotW
-    return { x: ideal - (1 - scrollFrac) * 8, y: p.y }
-  })
+  // Keep X locked to sample index — only Y is lerped, so Bezier stays stable.
+  const pts = buildPoints(values, cssW, cssH, padL, padR, padT, padB)
 
   fillSmooth(ctx, pts, cssH, theme.top, theme.bottom)
-  ctx.lineWidth = 2.2
+
+  // Neon glow pass
+  ctx.save()
+  ctx.lineWidth = 4.5
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = theme.glow || theme.stroke
+  ctx.shadowColor = theme.glow || theme.stroke
+  ctx.shadowBlur = 18
+  ctx.globalAlpha = 0.55
+  strokeSmooth(ctx, pts)
+  ctx.restore()
+
+  ctx.lineWidth = 2.4
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
   ctx.strokeStyle = theme.stroke
+  ctx.shadowColor = theme.glow || theme.stroke
+  ctx.shadowBlur = 10
   strokeSmooth(ctx, pts)
+  ctx.shadowBlur = 0
 
   const cur = $('chart-current')
-  if (cur) cur.textContent = `${t('currentPct')}: ${fmt(last, 1)}%`
+  if (cur) cur.textContent = `${t('currentPct')}: ${fmtPct(last, 1)}`
 }
 
 function animateChart(now) {
   drainQueues(now)
   lerpSeries()
   drawTrendFrame()
+  renderSparklines()
   sampleFrametime(now)
   requestAnimationFrame(animateChart)
 }
 
 function fmt(n, digits = 1) {
-  const v = Number(n)
-  if (!Number.isFinite(v)) return '--'
+  if (n === null || n === undefined || n === '') return na()
+  const v = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(v)) return na()
   return v.toFixed(digits)
+}
+
+function fmtPct(n, digits = 1) {
+  const s = fmt(n, digits)
+  return s === na() ? s : `${s}%`
+}
+
+function safeNum(n, fallback = 0) {
+  const v = Number(n)
+  return Number.isFinite(v) ? v : fallback
+}
+
+/** Reject null/NaN/0/-1 and absurd temps — always Н/Д or —. */
+function fmtTemp(n, digits = 1) {
+  const v = Number(n)
+  if (!Number.isFinite(v) || v <= 0 || v > 150) return na()
+  return v.toFixed(digits)
+}
+
+function drawSparkline(canvasId, values, theme) {
+  const canvas = $(canvasId)
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = window.devicePixelRatio || 1
+  const cssW = canvas.clientWidth || 160
+  const cssH = 44
+  if (canvas.width !== Math.floor(cssW * dpr) || canvas.height !== Math.floor(cssH * dpr)) {
+    canvas.width = Math.floor(cssW * dpr)
+    canvas.height = Math.floor(cssH * dpr)
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, cssW, cssH)
+  const arr = values || []
+  if (arr.length < 2) return
+  const padX = 2
+  const padY = 3
+  const n = Math.max(arr.length - 1, 1)
+  const pts = arr.map((raw, i) => {
+    const v = Math.min(100, Math.max(0, safeNum(raw, 0)))
+    return {
+      x: padX + (i / n) * (cssW - padX * 2),
+      y: padY + (cssH - padY * 2) - (v / 100) * (cssH - padY * 2),
+    }
+  })
+  const stroke = theme?.stroke || '#6ea8ff'
+  const glow = theme?.glow || stroke
+  const top = theme?.top || 'rgba(110,168,255,0.35)'
+  const bottom = theme?.bottom || 'rgba(110,168,255,0.02)'
+
+  fillSmooth(ctx, pts, cssH, top, bottom)
+
+  ctx.save()
+  ctx.lineWidth = 3
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = glow
+  ctx.shadowColor = glow
+  ctx.shadowBlur = 12
+  ctx.globalAlpha = 0.5
+  strokeSmooth(ctx, pts)
+  ctx.restore()
+
+  ctx.lineWidth = 1.8
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = stroke
+  ctx.shadowColor = glow
+  ctx.shadowBlur = 8
+  strokeSmooth(ctx, pts)
+  ctx.shadowBlur = 0
+}
+
+function renderSparklines() {
+  drawSparkline('spark-cpu', series.cpu.current, chartThemes.cpu)
+  drawSparkline('spark-gpu', series.gpu.current, chartThemes.gpu)
+  drawSparkline('spark-ram', series.ram.current, chartThemes.ram)
+  drawSparkline('spark-battery', series.battery.current, chartThemes.battery)
+}
+
+function validTemp(n, available) {
+  if (available === false) return NaN
+  const v = Number(n)
+  return Number.isFinite(v) && v > 0 && v <= 150 ? v : NaN
+}
+
+function renderStatusStrip(m) {
+  const st = $('st-status')
+  const ramEl = $('st-ram')
+  const procEl = $('st-procs')
+  if (!st || !ramEl || !procEl) return
+
+  const temp = validTemp(m.temperatureC, m.tempAvailable)
+  const cpu = safeNum(m.cpuPercent, 0)
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
+  const vamps = m.vampires || []
+  const bgCount = vamps.reduce((sum, v) => sum + (v.count || (v.pids ? v.pids.length : 1) || 1), 0)
+
+  let state = 'ok'
+  let label = t('statusOk')
+  if (Number.isFinite(temp) && temp >= 90) {
+    state = 'hot'
+    label = t('statusHot')
+  } else if ((Number.isFinite(temp) && temp >= 80) || cpu >= 92 || stutters.length || bgCount >= 5) {
+    state = 'warn'
+    label = t('statusWarn')
+  }
+  st.textContent = label
+  st.dataset.state = state
+
+  const total = safeNum(m.ramTotalMB, 0)
+  const used = safeNum(m.ramUsedMB, 0)
+  if (total > 0) {
+    const free = Math.max(0, total - used)
+    ramEl.textContent = `${fmt(free / 1024, 1)} GB`
+  } else {
+    ramEl.textContent = na()
+  }
+  procEl.textContent = String(bgCount)
+}
+
+let insightsExpanded = false
+
+function insightPriority(it) {
+  if (it.id === 'thermal') return it.level === 'hot' ? 100 : 90
+  if (it.id === 'ram' && it.level === 'hot') return 85
+  if (it.id === 'disk') return 70
+  if (it.id === 'lag' || it.id === 'stutter') return 60
+  if (it.id === 'ram') return 55
+  return 40
+}
+
+function collectInsights(m) {
+  const items = []
+  const dev = getDevState()
+  const throttleC = Number(dev.throttleC) || 85
+  const ramWarn = Number(dev.ramWarn) || 85
+  const diskWarn = Number(dev.diskWarn) || 90
+  const temp = validTemp(m.temperatureC, m.tempAvailable)
+  const ramPct = safeNum(m.ramPercent, 0)
+  const disks = m.disks || []
+  const sysDisk = disks.find((d) => /^C/i.test(String(d.mount || ''))) || disks[0]
+  const diskPct = safeNum(sysDisk?.percent, 0)
+  const lags = m.lagEvents || []
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
+  const vamps = (m.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+
+  if (Number.isFinite(temp) && temp >= throttleC) {
+    items.push({
+      id: 'thermal',
+      level: temp >= throttleC + 5 ? 'hot' : 'warn',
+      title: `${t('insightThermalShort')} • ${fmtTemp(temp, 0)}°C`,
+      body: '',
+      actions: [
+        { id: 'power-silent', label: t('insightActSilent') },
+        { id: 'eco-vampires', label: t('insightActEcoBg') },
+      ].slice(0, 2),
+    })
+  }
+
+  if (ramPct >= ramWarn) {
+    items.push({
+      id: 'ram',
+      level: ramPct >= Math.min(99, ramWarn + 5) ? 'hot' : 'warn',
+      title: `${t('insightRamShort')} • ${fmt(ramPct, 0)}%`,
+      body: '',
+      actions: [
+        { id: 'tab-weekly', label: t('insightActTopProcs') },
+        { id: 'eco-vampires', label: t('ecoAppetite') },
+      ].slice(0, 2),
+    })
+  }
+
+  if (sysDisk && diskPct >= diskWarn) {
+    items.push({
+      id: 'disk',
+      level: 'warn',
+      title: `${t('insightDiskShort')} • ${fmt(diskPct, 0)}%`,
+      body: '',
+      actions: [
+        { id: 'disk-cleanup', label: t('insightActCleanup') },
+        ...(dev.smartEnabled !== false ? [{ id: 'disk-smart', label: t('diskHealthBtn') }] : []),
+      ].slice(0, 2),
+    })
+  }
+
+  if (lags.length) {
+    const e = lags[0]
+    const name = e.culpritFriendly || e.culpritProcess || t('unknownProc')
+    items.push({
+      id: 'lag',
+      level: 'warn',
+      title: `${t('insightLagShort')} • ${name}`,
+      body: '',
+      actions: [
+        ...(e.culpritPID ? [{ id: 'eco-pid', label: t('ecoLower'), pid: e.culpritPID, name: e.culpritProcess }] : []),
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ].slice(0, 2),
+    })
+  } else if (stutters.length) {
+    items.push({
+      id: 'stutter',
+      level: 'warn',
+      title: t('insightStutterShort'),
+      body: '',
+      actions: [{ id: 'tab-lag', label: t('insightActOpenLags') }],
+    })
+  }
+
+  if (vamps.length >= 3 && !items.some((i) => i.id === 'ram' || i.id === 'thermal')) {
+    items.push({
+      id: 'vampires',
+      level: 'warn',
+      title: `${t('insightVampShort')} • ${vamps.length}`,
+      body: '',
+      actions: [
+        { id: 'eco-vampires', label: t('insightActEcoBg') },
+        { id: 'tab-lag', label: t('insightActOpenLags') },
+      ].slice(0, 2),
+    })
+  }
+
+  return items.sort((a, b) => insightPriority(b) - insightPriority(a))
+}
+
+function insightCardHTML(it) {
+  return `
+    <div class="insight-card ${it.level || 'warn'}" data-insight="${it.id}">
+      <div class="insight-text">
+        <div class="insight-title">${it.title}</div>
+      </div>
+      <div class="insight-actions">
+        ${(it.actions || []).slice(0, 2).map((a) => `
+          <button type="button" class="btn compact insight-btn ${a.id.startsWith('eco') ? 'danger' : ''}"
+            data-insight-act="${a.id}"
+            ${a.pid != null ? `data-pid="${a.pid}"` : ''}
+            ${a.name ? `data-eco-name="${a.name}"` : ''}>${a.label}</button>
+        `).join('')}
+      </div>
+    </div>
+  `
+}
+
+function renderInsightHost(hostId, items, { collapse = false } = {}) {
+  const host = $(hostId)
+  if (!host) return
+  const moreBtn = hostId === 'insight-list' ? $('insight-more') : null
+  if (!items.length) {
+    host.innerHTML = ''
+    host.classList.add('hidden')
+    if (moreBtn) {
+      moreBtn.classList.add('hidden')
+      moreBtn.hidden = true
+    }
+    return
+  }
+  host.classList.remove('hidden')
+  const visible = collapse && !insightsExpanded ? items.slice(0, 1) : items
+  host.innerHTML = visible.map(insightCardHTML).join('')
+  if (moreBtn) {
+    const hiddenN = items.length - 1
+    if (collapse && hiddenN > 0) {
+      moreBtn.hidden = false
+      moreBtn.classList.remove('hidden')
+      moreBtn.textContent = insightsExpanded
+        ? t('insightShowLess')
+        : t('insightMore').replace('{n}', String(hiddenN))
+    } else {
+      moreBtn.classList.add('hidden')
+      moreBtn.hidden = true
+    }
+  }
+}
+
+function renderInsights(m) {
+  const items = collectInsights(m)
+  renderInsightHost('insight-list', items, { collapse: true })
+  const lagFocus = items.filter((i) => ['lag', 'stutter', 'thermal', 'vampires'].includes(i.id))
+  renderInsightHost('lag-insight-list', lagFocus.length ? lagFocus : items.slice(0, 2))
 }
 
 function batterySeriesValue(m) {
@@ -349,39 +685,47 @@ function driveLetter(mount) {
 }
 
 function renderOverview(m) {
-  $('ov-cpu').textContent = `${fmt(m.cpuPercent)}%`
-  $('ov-cpu-sub').textContent = m.cpuName || '-'
-  $('ov-cpu-bar').style.width = `${Math.min(100, m.cpuPercent || 0)}%`
+  $('ov-cpu').textContent = fmtPct(m.cpuPercent)
+  $('ov-cpu-sub').textContent = m.cpuName || dash()
+  $('ov-cpu-bar').style.width = `${Math.min(100, safeNum(m.cpuPercent, 0))}%`
 
-  $('ov-gpu').textContent = `${fmt(m.gpuPercent)}%`
-  $('ov-gpu-sub').textContent = m.gpuName || '-'
-  $('ov-gpu-bar').style.width = `${Math.min(100, m.gpuPercent || 0)}%`
+  $('ov-gpu').textContent = fmtPct(m.gpuPercent)
+  $('ov-gpu-sub').textContent = m.gpuName || dash()
+  $('ov-gpu-bar').style.width = `${Math.min(100, safeNum(m.gpuPercent, 0))}%`
 
-  $('ov-ram').textContent = `${fmt(m.ramPercent)}%`
-  $('ov-ram-sub').textContent = `${m.ramUsedMB || 0} / ${m.ramTotalMB || 0} MB`
-  $('ov-ram-bar').style.width = `${Math.min(100, m.ramPercent || 0)}%`
+  $('ov-ram').textContent = fmtPct(m.ramPercent)
+  const used = safeNum(m.ramUsedMB, NaN)
+  const total = safeNum(m.ramTotalMB, NaN)
+  $('ov-ram-sub').textContent = (Number.isFinite(used) && Number.isFinite(total) && total > 0)
+    ? `${fmt(used, 0)} / ${fmt(total, 0)} MB`
+    : na()
+  $('ov-ram-bar').style.width = `${Math.min(100, safeNum(m.ramPercent, 0))}%`
 
   const bat = m.battery || {}
   if (bat.available) {
-    $('ov-bat').textContent = `${fmt(bat.percent, 0)}%`
+    $('ov-bat').textContent = fmtPct(bat.percent, 0)
     const wear = bat.wearLabel ? ` · ${bat.wearLabel}` : ''
-    $('ov-bat-sub').textContent = `${bat.statusText || '-'} · ${bat.deviceName || t('batteryPack')}${wear}`
-    $('ov-bat-bar').style.width = `${Math.min(100, bat.percent || 0)}%`
+    $('ov-bat-sub').textContent = `${bat.statusText || dash()} · ${bat.deviceName || t('batteryPack')}${wear}`
+    $('ov-bat-bar').style.width = `${Math.min(100, safeNum(bat.percent, 0))}%`
   } else {
     $('ov-bat').textContent = 'AC'
     $('ov-bat-sub').textContent = bat.wearLabel || bat.statusText || t('desktopPC')
     $('ov-bat-bar').style.width = '100%'
   }
 
-  $('temp-chip').textContent = `${fmt(m.temperatureC)} °C`
+  const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC)
+  $('temp-chip').textContent = temp === na() ? `${na()} °C` : `${temp} °C`
   $('cpu-name').textContent = m.cpuName || 'CPU'
+
+  renderStatusStrip(m)
+  renderInsights(m)
 
   latestDisks = m.disks || []
   renderDiskTabs(latestDisks)
   const box = $('ov-disks')
   const disks = latestDisks
   if (!disks.length) {
-    box.innerHTML = `<div class="empty">-</div>`
+    box.innerHTML = `<div class="empty">${dash()}</div>`
   } else {
     if (!selectedDrive && disks[0]) selectedDrive = driveLetter(disks[0].mount)
     const activeDisk = disks.find((d) => driveLetter(d.mount) === selectedDrive.toUpperCase()) || disks[0]
@@ -393,7 +737,7 @@ function renderOverview(m) {
           <div class="meta">${fmt(d.usedGB)} / ${fmt(d.totalGB)} GB · ${t('free')} ${fmt(d.freeGB)} GB</div>
           <div class="meta">${t('read')} ${fmt(d.readMBps)} MB/s · ${t('write')} ${fmt(d.writeMBps)} MB/s</div>
         </div>
-        <div class="name">${fmt(d.percent, 0)}%</div>
+        <div class="name metric">${fmtPct(d.percent, 0)}</div>
       </div>
     `
   }
@@ -430,7 +774,7 @@ function lagExplanation(e) {
 }
 
 function renderLag(m) {
-  const stutters = (m.stutterEvents || []).filter((e) => (e.jitterMs || 0) >= 300)
+  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
   const stutterBox = $('stutter-log')
   if (stutterBox) {
     if (!stutters.length) {
@@ -439,8 +783,8 @@ function renderLag(m) {
       stutterBox.innerHTML = stutters.map((e) => `
         <div class="row">
           <div>
-            <div class="name">${e.timestamp} · ${fmt(e.jitterMs, 0)} ms</div>
-            <div class="meta stutter-cause">${e.cause || ''}</div>
+            <div class="name metric">${e.timestamp || dash()} · ${fmt(e.jitterMs, 0)} ms</div>
+            <div class="meta stutter-cause">${e.cause || dash()}</div>
           </div>
           <div class="row-actions">
             ${e.culprit ? `<button type="button" class="btn compact danger" data-eco-name="${e.culprit}">${t('ecoCulprit')}</button>` : ''}
@@ -457,11 +801,10 @@ function renderLag(m) {
   } else {
     lagBox.innerHTML = lags.map((e) => `
       <div class="incident-card">
-        <div class="incident-ico">${e.icon || '⚙️'}</div>
         <div>
           <div class="incident-title">${e.culpritFriendly || e.culpritProcess || t('unknownProc')}</div>
           <div class="incident-explain">${lagExplanation(e)}</div>
-          <div class="meta">${e.timestamp} · ${e.culpritProcess || ''} · PID ${e.culpritPID || '-'}</div>
+          <div class="meta">${e.timestamp || dash()} · ${e.culpritProcess || dash()} · PID ${e.culpritPID || dash()}</div>
         </div>
         <div class="row-actions">
           ${e.culpritPID ? `<button type="button" class="btn compact danger" data-act="freeze" data-pid="${e.culpritPID}">${t('ecoLower')}</button>` : ''}
@@ -479,12 +822,13 @@ function renderLag(m) {
       const isEco = frozen.has(v.pid) || v.ecoMode || v.frozen
       const count = v.count || (v.pids ? v.pids.length : 1) || 1
       const badge = count > 1 ? `<span class="badge-count">${count} ${t('procCount')}</span>` : ''
+      const activeTag = isEco ? '' : ` <span class="badge-count">${t('statusActive')}</span>`
       return `
         <div class="row">
           <div>
-            <div class="name">${v.friendlyName || v.name}${badge}</div>
-            <div class="meta">${v.name}</div>
-            <div class="meta">CPU ${fmt(v.cpuPercent)}% · disk ~${fmt(v.diskMBps)} MB/s</div>
+            <div class="name">${v.friendlyName || v.name}${badge}${activeTag}</div>
+            <div class="meta">${v.name || dash()}</div>
+            <div class="meta">CPU ${fmtPct(v.cpuPercent)} · disk ~${fmt(v.diskMBps)} MB/s</div>
           </div>
           <div class="row-actions">
             <button type="button" class="btn compact ${isEco ? 'eco-on' : 'danger'}" data-vamp-eco="${v.name}" data-act="${isEco ? 'resume' : 'freeze'}" data-pid="${v.pid}">
@@ -504,32 +848,102 @@ function renderHardware(m) {
   const ram = hw.ram || {}
   const pwr = hw.power || {}
 
-  $('hw-cpu-name').textContent = cpu.name || m.cpuName || '-'
-  $('hw-cpu-cores').textContent = `${cpu.physicalCores || '-'} / ${cpu.logicalCores || '-'}`
-  $('hw-cpu-freq').textContent = cpu.frequencyMHz ? `${fmt(cpu.frequencyMHz / 1000, 2)} GHz` : '-'
-  $('hw-cpu-load').textContent = `${fmt(cpu.percent ?? m.cpuPercent)}%`
+  $('hw-cpu-name').textContent = cpu.name || m.cpuName || na()
+  const phys = cpu.physicalCores
+  const logic = cpu.logicalCores
+  $('hw-cpu-cores').textContent = (phys || logic)
+    ? `${phys || na()} / ${logic || na()}`
+    : na()
+  const baseMHz = cpu.baseFrequencyMHz || cpu.frequencyMHz
+  const curMHz = cpu.currentFrequencyMHz || cpu.frequencyMHz
+  if ($('hw-cpu-base')) {
+    $('hw-cpu-base').textContent = baseMHz ? `${fmt(baseMHz / 1000, 2)} GHz` : na()
+  }
+  $('hw-cpu-freq').textContent = curMHz ? `${fmt(curMHz / 1000, 2)} GHz` : na()
+  $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
+  if ($('hw-cpu-temp')) {
+    const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC, 0)
+    $('hw-cpu-temp').textContent = temp === na() ? na() : `${temp} °C`
+  }
+  if ($('hw-cpu-cache')) {
+    const kb = Number(cpu.cacheKB) || 0
+    $('hw-cpu-cache').textContent = kb > 0
+      ? (kb >= 1024 ? `${fmt(kb / 1024, 1)} MB` : `${kb} KB`)
+      : na()
+  }
+  if ($('hw-cpu-arch')) {
+    $('hw-cpu-arch').textContent = cpu.architecture || 'x64'
+  }
 
   const cores = cpu.perCore || m.cpuPerCore || []
-  $('core-grid').innerHTML = cores.map((c, i) => `
-    <div class="core-cell">
-      <div class="id">C${i}</div>
-      <div class="val">${fmt(c, 0)}%</div>
-      <div class="mini-bar"><i style="width:${Math.min(100, c)}%"></i></div>
-    </div>
-  `).join('')
+  const grid = $('core-grid')
+  const wrap = $('core-grid-wrap')
+  const showCores = isDevModeActive() && getDevState().showPerCore
+  if (wrap) wrap.classList.toggle('hidden', !showCores)
+  if (grid && showCores) {
+    const n = cores.length
+    let cols = 0
+    if (n === 16 || n === 32) cols = 8
+    else if (n === 12 || n === 24) cols = 6
+    else if (n === 8 || n === 4) cols = 4
+    else if (n === 6) cols = 6
+    if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
+    else grid.style.gridTemplateColumns = ''
+    grid.dataset.cores = String(n || 0)
+    grid.innerHTML = cores.length
+      ? cores.map((c, i) => {
+        const load = Number.isFinite(Number(c)) ? safeNum(c, 0) : 0
+        const val = Number.isFinite(Number(c)) ? fmtPct(c, 0) : na()
+        return `
+      <div class="core-cell">
+        <div class="id">C${i}</div>
+        <div class="val">${val}</div>
+        <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
+      </div>`
+      }).join('')
+      : `<div class="empty">${na()}</div>`
+  }
 
-  $('hw-gpu-name').textContent = gpu.name || m.gpuName || '-'
-  $('hw-gpu-driver').textContent = gpu.driverVersion || '-'
-  $('hw-gpu-ded').textContent = `${fmt(gpu.dedicatedMB ?? m.vramTotalMB, 0)} MB`
-  $('hw-gpu-shared').textContent = `${fmt(gpu.sharedMB ?? m.vramSharedMB, 0)} MB`
+  let gpuName = gpu.name || m.gpuName || na()
+  const forceAdapter = getDevState().forceAdapter
+  if (forceAdapter && typeof gpuName === 'string' && gpuName !== na()) {
+    // Display-only preference hint when force string matches.
+    if (!gpuName.toLowerCase().includes(String(forceAdapter).toLowerCase())) {
+      gpuName = `${gpuName} · force:${forceAdapter}`
+    }
+  }
+  $('hw-gpu-name').textContent = gpuName
+  $('hw-gpu-driver').textContent = gpu.driverVersion || na()
+  const ded = gpu.dedicatedMB ?? m.vramTotalMB
+  const shared = gpu.sharedMB ?? m.vramSharedMB
+  $('hw-gpu-ded').textContent = Number.isFinite(Number(ded)) && Number(ded) > 0 ? `${fmt(ded, 0)} MB` : na()
+  $('hw-gpu-shared').textContent = Number.isFinite(Number(shared)) ? `${fmt(shared, 0)} MB` : na()
 
-  $('hw-ram-total').textContent = `${ram.totalMB || m.ramTotalMB || 0} MB`
-  $('hw-ram-type').textContent = `${ram.type || 'Unknown'}${ram.speedMHz ? ` · ${ram.speedMHz} MHz` : ''}`
-  $('hw-ram-slots').textContent = `${ram.slotsUsed || 0}/${ram.slotsTotal || 0}`
-  $('hw-ram-use').textContent = `${ram.usedMB || m.ramUsedMB || 0} / ${ram.freeMB || 0} MB`
+  const ramTotal = ram.totalMB || m.ramTotalMB
+  $('hw-ram-total').textContent = ramTotal ? `${ramTotal} MB` : na()
+  const ramType = ram.type || ''
+  const ramSpeed = ram.speedMHz ? `${ram.speedMHz} MHz` : ''
+  $('hw-ram-type').textContent = (ramType || ramSpeed)
+    ? [ramType || na(), ramSpeed].filter(Boolean).join(' · ')
+    : na()
+  const slotsUsed = ram.slotsUsed
+  const slotsTotal = ram.slotsTotal
+  $('hw-ram-slots').textContent = (slotsUsed != null || slotsTotal != null)
+    ? `${slotsUsed ?? na()}/${slotsTotal ?? na()}`
+    : na()
+  const usedMB = ram.usedMB || m.ramUsedMB
+  const freeMB = ram.freeMB
+  $('hw-ram-use').textContent = (usedMB || freeMB)
+    ? `${usedMB || 0} / ${freeMB ?? na()} MB`
+    : na()
   const channel = $('hw-ram-channel')
   if (channel) {
-    channel.textContent = ram.channelStatus || '-'
+    if (ram.isSingleChannel) channel.textContent = t('fpsSingleChannel')
+    else if ((ram.slotsUsed || 0) >= 2 || /dual/i.test(String(ram.channelStatus || ''))) {
+      channel.textContent = t('fpsDualChannel')
+    } else {
+      channel.textContent = ram.channelStatus || na()
+    }
     channel.classList.remove('warn', 'ok')
     if (ram.isSingleChannel) channel.classList.add('warn')
     else if ((ram.slotsUsed || 0) >= 2) channel.classList.add('ok')
@@ -537,18 +951,18 @@ function renderHardware(m) {
 
   if (pwr.hasBattery) {
     $('hw-pwr-name').textContent = pwr.deviceName || t('batteryPack')
-    $('hw-pwr-status').textContent = pwr.statusText || '-'
-    $('hw-pwr-pct').textContent = `${fmt(pwr.percent, 0)}%`
-    $('hw-pwr-wear').textContent = pwr.wearLabel || `${fmt(pwr.wearPercent, 0)}%`
+    $('hw-pwr-status').textContent = pwr.statusText || na()
+    $('hw-pwr-pct').textContent = fmtPct(pwr.percent, 0)
+    $('hw-pwr-wear').textContent = pwr.wearLabel || fmtPct(pwr.wearPercent, 0)
     $('hw-pwr-cap').textContent = pwr.capacitymWh
       ? `${fmt(pwr.capacitymWh, 0)} / ${fmt(pwr.designCapacitymWh, 0)} mWh`
-      : '-'
+      : na()
   } else {
     $('hw-pwr-name').textContent = t('desktopPC')
     $('hw-pwr-status').textContent = 'AC'
     $('hw-pwr-pct').textContent = 'AC'
     $('hw-pwr-wear').textContent = pwr.wearLabel || t('desktopPC')
-    $('hw-pwr-cap').textContent = '-'
+    $('hw-pwr-cap').textContent = na()
   }
 }
 
@@ -750,10 +1164,35 @@ async function runSleepCheck() {
   }
 }
 
+function applyMiniHudPrefs() {
+  const keys = ['cpu', 'gpu', 'ram', 'temps']
+  keys.forEach((k) => {
+    const el = document.querySelector(`.mh-item[data-mh="${k}"]`)
+    el?.classList.toggle('hidden', !hudPrefs[k])
+    const opt = $(`mh-opt-${k}`)
+    if (opt) opt.checked = !!hudPrefs[k]
+  })
+  const visible = [...document.querySelectorAll('.minihud-metrics .mh-item:not(.hidden)')]
+  visible.forEach((el, i) => el.classList.toggle('is-last', i === visible.length - 1))
+  const opacity = hudPrefs.opacity
+  const capsule = document.querySelector('.minihud-capsule')
+  if (capsule) capsule.style.setProperty('--hud-bg-opacity', (opacity / 100).toFixed(2))
+  const slider = $('mh-opacity')
+  const label = $('mh-opacity-val')
+  if (slider) slider.value = String(opacity)
+  if (label) label.textContent = `${opacity}%`
+}
+
 function renderMiniHUD(m) {
-  $('mh-cpu').textContent = `${fmt(m.cpuPercent, 0)}%`
-  $('mh-ram').textContent = `${fmt(m.ramPercent, 0)}%`
-  $('mh-gpu').textContent = `${fmt(m.gpuPercent, 0)}%`
+  $('mh-cpu').textContent = fmtPct(m.cpuPercent, 0)
+  $('mh-ram').textContent = fmtPct(m.ramPercent, 0)
+  $('mh-gpu').textContent = fmtPct(m.gpuPercent, 0)
+  const tempEl = $('mh-temp')
+  if (tempEl) {
+    const temp = fmtTemp(m.temperatureC, 0)
+    tempEl.textContent = temp === na() ? na() : `${temp}°`
+  }
+  applyMiniHudPrefs()
 }
 
 function syncSettings(m) {
@@ -765,21 +1204,32 @@ function syncSettings(m) {
   })
 }
 
+function syncMockProfileButtons(profileId) {
+  const bar = $('mock-profile-bar')
+  if (!bar || !window.__PULSECORE_MOCK__) return
+  const cur = profileId || window.__PULSECORE_MOCK__.getProfile()
+  bar.querySelectorAll('.mock-profile-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.profile === cur)
+  })
+}
+
 function applyMetrics(m) {
   if (!m) return
+  lastMetrics = m
   if (m.language && m.language !== lang && !localStorage.getItem('zp_lang')) {
     lang = m.language
     applyI18n()
   }
-  pushSample('cpu', m.cpuPercent || 0)
-  pushSample('gpu', m.gpuPercent || 0)
-  pushSample('ram', m.ramPercent || 0)
+  pushSample('cpu', safeNum(m.cpuPercent, 0))
+  pushSample('gpu', safeNum(m.gpuPercent, 0))
+  pushSample('ram', safeNum(m.ramPercent, 0))
   pushSample('battery', batterySeriesValue(m))
   renderOverview(m)
   renderLag(m)
   renderHardware(m)
   renderMiniHUD(m)
   syncSettings(m)
+  syncMockProfileButtons(m.mockProfile)
   setHudMode(!!m.miniHUD)
   const sleepPanel = $('sleep-panel')
   if (sleepPanel) {
@@ -959,11 +1409,26 @@ function steamHeaderFromPoster(url) {
     .replace('/library_600x900_2x.jpg', '/header.jpg')
 }
 
+function steamCdnUrls(steamAppId) {
+  const id = Number(steamAppId)
+  if (!Number.isFinite(id) || id <= 0) return { poster: '', header: '' }
+  return {
+    poster: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
+    header: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
+  }
+}
+
+function resolveGameArt(g) {
+  const cdn = steamCdnUrls(g?.steamAppId)
+  const poster = g?.posterUrl || cdn.poster || ''
+  const header = g?.headerUrl || cdn.header || steamHeaderFromPoster(poster) || ''
+  return { poster, header }
+}
+
 function gamePosterHTML(g) {
   const name = String(g.name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const safeName = String(g.name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const primary = g.posterUrl || ''
-  const secondary = g.headerUrl || steamHeaderFromPoster(primary)
+  const { poster: primary, header: secondary } = resolveGameArt(g)
   if (!primary && !secondary) return posterFallbackHTML(g.name, 'game-poster')
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
@@ -973,8 +1438,7 @@ function gamePosterHTML(g) {
 function compactCoverHTML(p) {
   const name = String(p.gameName || 'Game')
   const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const primary = p.posterUrl || ''
-  const secondary = p.headerUrl || steamHeaderFromPoster(primary)
+  const { poster: primary, header: secondary } = resolveGameArt(p)
   if (!primary && !secondary) return posterFallbackHTML(name, 'game-cover')
   const src = primary || secondary
   const fb = secondary && secondary !== src ? secondary : ''
@@ -1019,7 +1483,7 @@ async function predictSelectedGame() {
     }
     const vramLabel = p.isIntegrated ? t('fpsSharedVRAM') : `${fmt(p.vramGB, 1)} GB`
     const ramLabel = p.dualChannel ? t('fpsDualChannel') : t('fpsSingleChannel')
-    const scores = `GPU <b>${fmt(p.gpuScore, 0)}</b> · CPU <b>${fmt(p.cpuScore, 0)}</b> · VRAM <b>${vramLabel}</b> · RAM <b>${ramLabel}</b>`
+    const scores = `${t('fpsScoreGPU')} <b>${fmt(p.gpuScore, 0)}</b> · ${t('fpsScoreCPU')} <b>${fmt(p.cpuScore, 0)}</b> · VRAM <b>${vramLabel}</b> · RAM <b>${ramLabel}</b>`
     const badge = p.badge || p.genre || p.category || ''
     const statusBits = [
       `${t('fpsRec')}: <b>${t(recKey)}</b>`,
@@ -1054,7 +1518,35 @@ async function predictSelectedGame() {
   }
 }
 
+function fillAboutSpecs(m = lastMetrics) {
+  const host = $('about-specs')
+  if (!host) return
+  const hw = m?.hardware || {}
+  const cpu = hw.cpu?.name || m?.cpuName || na()
+  const gpu = hw.gpu?.name || m?.gpuName || na()
+  const ramMB = hw.ram?.totalMB || m?.ramTotalMB
+  const ram = ramMB ? `${Math.round(Number(ramMB) / 1024)} GB` : na()
+  const os = m?.osName || m?.os || 'Windows'
+  host.innerHTML = `
+    <div class="about-line"><b>CPU</b>: ${cpu}</div>
+    <div class="about-line"><b>GPU</b>: ${gpu}</div>
+    <div class="about-line"><b>RAM</b>: ${ram}</div>
+    <div class="about-line"><b>OS</b>: ${os}</div>
+    <div class="about-line"><b>PulseCore</b>: ${APP_VERSION}</div>
+  `
+}
+
 function openAbout() {
+  const name = $('about-app-name')
+  const ver = $('about-app-ver')
+  if (name) name.textContent = 'PulseCore'
+  if (ver) ver.textContent = APP_VERSION
+  const link = $('about-github')
+  if (link) {
+    link.href = GITHUB_URL
+    link.textContent = 'github.com/robbled17/pulsecore'
+  }
+  fillAboutSpecs()
   const box = $('license-box')
   if (box) box.textContent = MIT_LICENSE
   $('about-modal')?.classList.remove('hidden')
@@ -1062,6 +1554,54 @@ function openAbout() {
 
 function closeAbout() {
   $('about-modal')?.classList.add('hidden')
+}
+
+function buildPCConfigLine(m = lastMetrics) {
+  const hw = m?.hardware || {}
+  const cpu = hw.cpu?.name || m?.cpuName || na()
+  const gpu = hw.gpu?.name || m?.gpuName || na()
+  const ramMB = hw.ram?.totalMB || m?.ramTotalMB
+  const ram = ramMB ? `${Math.round(Number(ramMB) / 1024)} GB RAM` : na()
+  const os = m?.osName || m?.os || 'Windows'
+  return `CPU: ${cpu} | GPU: ${gpu} | RAM: ${ram} | OS: ${os} | PulseCore ${APP_VERSION}`
+}
+
+function flashCopyPCButton() {
+  const btn = $('btn-copy-pc')
+  if (!btn) return
+  const prev = btn.dataset.label || btn.textContent
+  btn.dataset.label = prev
+  btn.textContent = t('aboutCopied')
+  btn.classList.add('copied')
+  clearTimeout(flashCopyPCButton._t)
+  flashCopyPCButton._t = setTimeout(() => {
+    btn.textContent = btn.dataset.label || t('aboutCopyPC')
+    btn.classList.remove('copied')
+  }, 2000)
+}
+
+async function copyPCConfig() {
+  const line = buildPCConfigLine()
+  try {
+    await navigator.clipboard.writeText(line)
+    flashCopyPCButton()
+    showToast(t('aboutCopied'), true)
+  } catch (_) {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = line
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+      flashCopyPCButton()
+      showToast(t('aboutCopied'), true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  }
 }
 
 function showToast(text, ok = false) {
@@ -1091,7 +1631,7 @@ function renderDiskHealthBody(r) {
     <div class="modal-row"><span class="k">${t('lblModel')}</span><span class="v">${r.model || '-'}</span></div>
     <div class="modal-row"><span class="k">${t('serial')}</span><span class="v">${r.serialNumber || '-'}</span></div>
     <div class="modal-row"><span class="k">${t('iface')}</span><span class="v">${r.interfaceType || r.mediaType || '-'}</span></div>
-    <div class="modal-row"><span class="k">${t('temp')}</span><span class="v">${r.temperatureC ? fmt(r.temperatureC, 0) + ' °C' : t('noControllerTemp')}</span></div>
+    <div class="modal-row"><span class="k">${t('temp')}</span><span class="v">${(() => { const tt = fmtTemp(r.temperatureC, 0); return tt === na() ? t('noControllerTemp') : tt + ' °C' })()}</span></div>
     <div class="modal-row"><span class="k">${t('tbw')}</span><span class="v">${r.tbwGB > 0 ? tbw : t('noData')}</span></div>
     <div class="modal-row"><span class="k">${t('powerOn')}</span><span class="v">${hours}</span></div>
     <div class="modal-row"><span class="k">${t('wearLeft')}</span><span class="v">${r.wearRemaining >= 0 ? fmt(r.wearRemaining, 0) + '%' : '-'}</span></div>
@@ -1100,6 +1640,10 @@ function renderDiskHealthBody(r) {
 }
 
 async function runDiskHealth(drive, force = false) {
+  if (getDevState().smartEnabled === false) {
+    showToast(t('devSmartOff'), false)
+    return
+  }
   if (drive) selectedDrive = driveLetter(drive)
   const key = (selectedDrive || 'C').toUpperCase()
   renderDiskTabs(latestDisks, 'modal-disk-tabs')
@@ -1134,7 +1678,6 @@ async function refresh() {
 
 function wireUI() {
   document.querySelectorAll('.nav-item').forEach((btn) => {
-    if (btn.classList.contains('nav-hud')) return
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab))
   })
 
@@ -1146,6 +1689,11 @@ function wireUI() {
       document.querySelectorAll('.chart-tab').forEach((c) => c.classList.toggle('active', c === card))
       updateChartTitle()
     })
+  })
+
+  // Keep expand-panel action buttons from toggling <details>
+  document.querySelectorAll('.expand-summary .btn').forEach((btn) => {
+    btn.addEventListener('click', (ev) => ev.stopPropagation())
   })
 
   $('btn-min').addEventListener('click', () => WindowMinimise())
@@ -1168,8 +1716,10 @@ function wireUI() {
     }
   })
 
-  ;['lang-select', 'lang-select-settings'].forEach((id) => {
-    $(id)?.addEventListener('change', (ev) => changeLanguage(ev.target.value))
+  $('lang-select-settings')?.addEventListener('change', (ev) => changeLanguage(ev.target.value))
+
+  document.querySelectorAll('.theme-btn').forEach((btn) => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme))
   })
 
   document.querySelectorAll('.btn.mode').forEach((btn) => {
@@ -1186,6 +1736,18 @@ function wireUI() {
     })
   })
 
+  $('btn-reset-profile')?.addEventListener('click', async () => {
+    try {
+      await SetPowerProfile('balanced')
+      document.querySelectorAll('.btn.mode').forEach((b) => {
+        b.classList.toggle('active', b.dataset.mode === 'balanced')
+      })
+      showToast(t('modeApplied'), true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+
   document.querySelectorAll('.btn.poll').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await SetPollInterval(Number(btn.dataset.poll))
@@ -1194,15 +1756,15 @@ function wireUI() {
   })
 
   const enableHud = async () => {
-    await ToggleMiniHUD(true)
+    try { await ToggleMiniHUD(true) } catch (_) {}
     setHudMode(true)
   }
   const disableHud = async () => {
-    await ToggleMiniHUD(false)
+    try { await ToggleMiniHUD(false) } catch (_) {}
     setHudMode(false)
   }
 
-  $('btn-hud-side').addEventListener('click', enableHud)
+  $('btn-hud-title')?.addEventListener('click', enableHud)
   $('mh-expand').addEventListener('click', disableHud)
   $('btn-toggle-overlay')?.addEventListener('click', toggleGameOverlayPill)
   $('btn-overlay')?.addEventListener('click', enableGameOverlay)
@@ -1213,6 +1775,116 @@ function wireUI() {
   $('about-modal')?.addEventListener('click', (ev) => {
     if (ev.target.id === 'about-modal') closeAbout()
   })
+  $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+  $('about-github')?.addEventListener('click', (ev) => {
+    ev.preventDefault()
+    try {
+      BrowserOpenURL(GITHUB_URL)
+    } catch (_) {
+      window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')
+    }
+  })
+
+  // Demo-only hardware matrix switcher (present only when mock bindings loaded)
+  const mockBar = $('mock-profile-bar')
+  if (mockBar && window.__PULSECORE_MOCK__) {
+    mockBar.classList.remove('hidden')
+    const syncMockBtns = () => {
+      const cur = window.__PULSECORE_MOCK__.getProfile()
+      mockBar.querySelectorAll('.mock-profile-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.profile === cur)
+      })
+    }
+    mockBar.querySelectorAll('.mock-profile-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        window.__PULSECORE_MOCK__.setProfile(btn.dataset.profile)
+        syncMockBtns()
+        if (selectedGameId) {
+          try { await predictSelectedGame() } catch (_) {}
+        }
+      })
+    })
+    syncMockBtns()
+  }
+
+  const onInsightAct = async (ev) => {
+    const btn = ev.target.closest('[data-insight-act]')
+    if (!btn) return
+    const act = btn.dataset.insightAct
+    try {
+      if (act === 'power-silent') {
+        await SetPowerProfile('silent')
+        document.querySelectorAll('.btn.mode').forEach((b) => {
+          b.classList.toggle('active', b.dataset.mode === 'silent')
+        })
+        showToast(t('modeApplied'), true)
+      } else if (act === 'eco-vampires') {
+        const vamps = (lastMetrics?.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+        for (const v of vamps.slice(0, 4)) {
+          try {
+            if (v.name) await EcoModeByProcessName(v.name, true)
+            else if (v.pid) await FreezeProcess(v.pid)
+            if (v.pid) frozen.add(v.pid)
+          } catch (_) {}
+        }
+        showToast(t('insightEcoDone'), true)
+        refresh()
+      } else if (act === 'eco-pid') {
+        const pid = Number(btn.dataset.pid)
+        if (pid) {
+          await FreezeProcess(pid)
+          frozen.add(pid)
+          showToast(t('insightEcoDone'), true)
+          refresh()
+        }
+      } else if (act === 'eco-name') {
+        const name = btn.dataset.ecoName
+        if (name) {
+          await EcoModeByProcessName(name, true)
+          showToast(t('insightEcoDone'), true)
+          refresh()
+        }
+      } else if (act === 'tab-lag') {
+        setActiveTab('lag')
+      } else if (act === 'tab-weekly') {
+        setActiveTab('overview')
+        $('weekly-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else if (act === 'disk-smart') {
+        runDiskHealth(selectedDrive || 'C', false)
+      } else if (act === 'disk-cleanup') {
+        setActiveTab('overview')
+        $('ov-disks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        showToast(t('insightCleanupHint'), true)
+      }
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  }
+  $('insight-list')?.addEventListener('click', onInsightAct)
+  $('lag-insight-list')?.addEventListener('click', onInsightAct)
+  $('insight-more')?.addEventListener('click', () => {
+    insightsExpanded = !insightsExpanded
+    if (lastMetrics) renderInsights(lastMetrics)
+  })
+
+  ;['cpu', 'gpu', 'ram', 'temps'].forEach((key) => {
+    $(`mh-opt-${key}`)?.addEventListener('change', (ev) => {
+      hudPrefs[key] = !!ev.target.checked
+      // keep at least one metric visible
+      if (!hudPrefs.cpu && !hudPrefs.gpu && !hudPrefs.ram && !hudPrefs.temps) {
+        hudPrefs[key] = true
+        ev.target.checked = true
+      }
+      saveHudPrefs()
+      applyMiniHudPrefs()
+    })
+  })
+  $('mh-opacity')?.addEventListener('input', (ev) => {
+    hudPrefs.opacity = Number(ev.target.value) || 78
+    saveHudPrefs()
+    applyMiniHudPrefs()
+  })
+  applyMiniHudPrefs()
 
   $('btn-disk-health').addEventListener('click', () => runDiskHealth(selectedDrive, false))
   $('modal-smart-refresh')?.addEventListener('click', () => runDiskHealth(selectedDrive, true))
@@ -1400,9 +2072,52 @@ function wireTooltips() {
   })
 }
 
+function wireAmbientParallax() {
+  const root = document.documentElement
+  let raf = 0
+  let latestX = 0
+  let latestY = 0
+  const publish = () => {
+    raf = 0
+    root.style.setProperty('--mouse-x', latestX.toFixed(4))
+    root.style.setProperty('--mouse-y', latestY.toFixed(4))
+  }
+  window.addEventListener('pointermove', (ev) => {
+    const w = window.innerWidth || 1
+    const h = window.innerHeight || 1
+    latestX = (ev.clientX / w) * 2 - 1
+    latestY = (ev.clientY / h) * 2 - 1
+    if (!raf) raf = requestAnimationFrame(publish)
+  }, { passive: true })
+  window.addEventListener('pointerleave', () => {
+    latestX = 0
+    latestY = 0
+    if (!raf) raf = requestAnimationFrame(publish)
+  }, { passive: true })
+}
+
 function boot() {
+  applyTheme(uiTheme)
   applyI18n()
   wireUI()
+  wireAmbientParallax()
+  initDevMode({
+    showToast,
+    setActiveTab,
+    t,
+    applyPoll: async (ms) => {
+      await SetPollInterval(Number(ms) || 1000)
+      document.querySelectorAll('.btn.poll').forEach((b) => {
+        b.classList.toggle('active', Number(b.dataset.poll) === Number(ms))
+      })
+    },
+    onChange: () => {
+      if (lastMetrics) {
+        renderHardware(lastMetrics)
+        renderInsights(lastMetrics)
+      }
+    },
+  })
   SetLanguage(lang).catch(() => {})
   refresh()
   refreshWeekly()

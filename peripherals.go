@@ -118,11 +118,12 @@ func humanizePeripheralName(name, kind, deviceID string) string {
 }
 
 func shouldDropPeripheral(name, kind string, seenKinds map[string]bool) bool {
+	_ = kind
 	lower := strings.ToLower(name)
-	if strings.Contains(lower, "input configuration") || strings.Contains(lower, "устройство ввода") && !strings.Contains(lower, "клавиатур") && !strings.Contains(lower, "мыш") {
-		if seenKinds["keyboard"] || seenKinds["mouse"] || seenKinds["hid"] {
-			return true
-		}
+	dropNoise := strings.Contains(lower, "input configuration") ||
+		(strings.Contains(lower, "устройство ввода") && !strings.Contains(lower, "клавиатур") && !strings.Contains(lower, "мыш"))
+	if dropNoise && (seenKinds["keyboard"] || seenKinds["mouse"] || seenKinds["hid"]) {
+		return true
 	}
 	if strings.Contains(lower, "microsoft input configuration") {
 		return true

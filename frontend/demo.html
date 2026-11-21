@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="./src/style.css" />
+  <title>PulseCore (mock)</title>
+</head>
+<body>
+  <script type="module">
+    const res = await fetch('./index.html')
+    const html = await res.text()
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const incoming = doc.body
+    incoming.querySelectorAll('script').forEach((s) => s.remove())
+    document.body.replaceChildren(...incoming.childNodes)
+    await import('./src/demo-boot.js')
+  </script>
+</body>
+</html>
