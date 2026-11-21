@@ -14,8 +14,8 @@ const ARTIFACTS = '/opt/cursor/artifacts'
 const LOCAL = path.join(__dirname, 'screenshots')
 
 const shots = [
-  { file: 'landing-desktop-1440.png', w: 1440, h: 900 },
-  { file: 'landing-phone-390.png', w: 390, h: 844 },
+  { file: 'landing-polish-v2-1440x900.png', w: 1440, h: 900 },
+  { file: 'landing-polish-v2-390x844.png', w: 390, h: 844 },
 ]
 
 async function main() {
@@ -36,13 +36,13 @@ async function main() {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 })
     await page.waitForSelector('.hero h1', { timeout: 10000 })
     await page.waitForSelector('.preview-tab-pill', { timeout: 10000 })
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(1100)
     // Exercise tab switch once on desktop for richer state (pill + fade)
     if (shot.w >= 1000) {
       await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
-      await page.waitForTimeout(420)
+      await page.waitForTimeout(520)
       await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
-      await page.waitForTimeout(420)
+      await page.waitForTimeout(520)
     }
     const outMedia = path.join(MEDIA, shot.file)
     const outLocal = path.join(LOCAL, shot.file)

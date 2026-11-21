@@ -7,12 +7,12 @@
   <meta name="description" content="Лёгкая программа для Windows: контроль ПК, меньше фризов, без лишней нагрузки на систему." />
   <meta property="og:title" content="PulseCore" />
   <meta property="og:description" content="Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы" />
-  <meta property="og:image" content="screenshots/overview.png" />
+  <meta property="og:image" content="screenshots/overview.webp" />
   <link rel="icon" href="assets/appicon.png" />
-  <link rel="preload" as="image" href="screenshots/overview.png" />
-  <link rel="preload" as="image" href="screenshots/lags.png" />
-  <link rel="preload" as="image" href="screenshots/gamepulse.png" />
-  <link rel="preload" as="image" href="screenshots/hardware-16threads.png" />
+  <link rel="preload" as="image" href="screenshots/overview.webp" />
+  <link rel="preload" as="image" href="screenshots/lags.webp" />
+  <link rel="preload" as="image" href="screenshots/gamepulse.webp" />
+  <link rel="preload" as="image" href="screenshots/hardware-16threads.webp" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -298,9 +298,9 @@
       box-shadow: 0 0 20px rgba(110, 168, 255, 0.12);
       pointer-events: none;
       transition:
-        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-        width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-        height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       will-change: transform, width, height;
     }
     .preview-tabs button {
@@ -339,30 +339,29 @@
       isolation: isolate;
       margin: 0;
       padding: 0;
-      aspect-ratio: 1076 / 800;
       width: 100%;
     }
     .preview-frame img {
-      position: absolute;
-      inset: 0;
       width: 100%;
-      height: 100%;
-      max-width: none;
-      object-fit: cover;
-      object-position: top left;
+      height: auto;
       display: block;
       margin: 0;
       padding: 0;
       border: 0;
+      max-width: 100%;
       opacity: 0;
       transform: translateY(6px);
       transition:
-        opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
       pointer-events: none;
+      position: absolute;
+      left: 0;
+      top: 0;
       z-index: 0;
     }
     .preview-frame img.active {
+      position: relative;
       opacity: 1;
       transform: translateY(0);
       pointer-events: auto;
@@ -382,7 +381,7 @@
       backdrop-filter: var(--blur);
       -webkit-backdrop-filter: var(--blur);
       padding: 20px 18px 18px;
-      transition: transform .2s ease, border-color .2s, box-shadow .2s, opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: transform .2s ease, border-color .2s, box-shadow .2s, opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .card:hover {
       transform: translateY(-2px);
@@ -391,10 +390,10 @@
     }
     .reveal {
       opacity: 0;
-      transform: translateY(18px);
+      transform: translateY(24px);
       transition:
-        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
       transition-delay: var(--reveal-delay, 0ms);
       will-change: opacity, transform;
     }
@@ -451,8 +450,8 @@
       padding: 22px 18px;
       position: relative;
       transition:
-        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
       transition-delay: var(--reveal-delay, 0ms);
     }
     .step::before {
@@ -699,7 +698,7 @@
         <h2>Живой интерфейс</h2>
         <p>Так выглядит программа. Переключайте вкладки</p>
       </div>
-      <div class="preview-shell reveal" style="--reveal-delay: 80ms">
+      <div class="preview-shell reveal" style="--reveal-delay: 100ms">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
           <span class="preview-tab-pill" aria-hidden="true"></span>
           <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview">Обзор</button>
@@ -708,10 +707,10 @@
           <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
         </div>
         <div class="preview-frame">
-          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" width="1076" height="800" decoding="async" />
-          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" width="1076" height="800" decoding="async" />
-          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" width="1076" height="800" decoding="async" />
-          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" width="1076" height="800" decoding="async" />
+          <img class="active" data-tab="overview" src="screenshots/overview.webp" alt="Обзор системы PulseCore" width="1076" height="800" decoding="async" />
+          <img data-tab="lags" src="screenshots/lags.webp" alt="Лаги и сеть" width="1076" height="800" decoding="async" />
+          <img data-tab="gamepulse" src="screenshots/gamepulse.webp" alt="GamePulse FPS" width="1076" height="800" decoding="async" />
+          <img data-tab="hardware" src="screenshots/hardware-16threads.webp" alt="Железо: сетка потоков CPU" width="1076" height="800" decoding="async" />
         </div>
       </div>
     </section>
@@ -727,27 +726,27 @@
           <h3>Микролаги + Eco</h3>
           <p>Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия</p>
         </article>
-        <article class="card teal reveal" style="--reveal-delay: 70ms">
+        <article class="card teal reveal" style="--reveal-delay: 100ms">
           <div class="card-icon">🎯</div>
           <h3>FPS</h3>
           <p>Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках</p>
         </article>
-        <article class="card reveal" style="--reveal-delay: 140ms">
+        <article class="card reveal" style="--reveal-delay: 200ms">
           <div class="card-icon">⧉</div>
           <h3>Mini-HUD</h3>
           <p>Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами</p>
         </article>
-        <article class="card teal reveal" style="--reveal-delay: 210ms">
+        <article class="card teal reveal" style="--reveal-delay: 300ms">
           <div class="card-icon">🛡</div>
           <h3>Без админа</h3>
           <p>Запускается сразу после скачивания без сложных настроек и лишних разрешений системы</p>
         </article>
-        <article class="card reveal" style="--reveal-delay: 280ms">
+        <article class="card reveal" style="--reveal-delay: 400ms">
           <div class="card-icon">🔒</div>
           <h3>Приватность</h3>
           <p>Программа работает локально на вашем компьютере и никуда не отправляет личные данные</p>
         </article>
-        <article class="card teal reveal" style="--reveal-delay: 350ms">
+        <article class="card teal reveal" style="--reveal-delay: 500ms">
           <div class="card-icon">💨</div>
           <h3>Ресурсы</h3>
           <p>Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
@@ -765,11 +764,11 @@
           <h3>Скачайте программу</h3>
           <p>Откройте страницу Releases и скачайте архив для Windows.</p>
         </div>
-        <div class="step reveal" style="--reveal-delay: 80ms">
+        <div class="step reveal" style="--reveal-delay: 100ms">
           <h3>Распакуйте архив</h3>
           <p>Распакуйте архив и найдите внутри файл PulseCore.exe.</p>
         </div>
-        <div class="step reveal" style="--reveal-delay: 160ms">
+        <div class="step reveal" style="--reveal-delay: 200ms">
           <h3>Запустите</h3>
           <p>Дважды щёлкните по PulseCore.exe. Готово.</p>
         </div>
