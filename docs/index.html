@@ -58,6 +58,10 @@
     }
 
     a { color: inherit; text-decoration: none; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
 
     .ambient {
       position: fixed;
@@ -124,6 +128,7 @@
     .brand img {
       width: 28px; height: 28px;
       border-radius: 8px;
+      background: #0b101b;
       box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.2), 0 0 24px rgba(110, 168, 255, 0.25);
     }
     .nav-links {
@@ -149,6 +154,7 @@
       border-radius: 18px;
       margin: 0 auto 22px;
       display: block;
+      background: #0b101b;
       box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.25), 0 12px 40px rgba(0,0,0,0.45), 0 0 48px rgba(110, 168, 255, 0.28);
       animation: floatIn .7s ease both;
     }
@@ -826,7 +832,7 @@
       color: var(--text);
       font-weight: 700;
     }
-    .footer-brand img { width: 20px; height: 20px; border-radius: 6px; }
+    .footer-brand img { width: 20px; height: 20px; border-radius: 6px; background: #0b101b; }
 
     @keyframes floatIn {
       from { opacity: 0; transform: translateY(10px); }
@@ -902,6 +908,122 @@
       }
     }
 
+
+    /* Language switcher */
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .lang-switch {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--line-soft);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12.5px;
+      font-weight: 650;
+      padding: 7px 28px 7px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      max-width: 148px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 14px) calc(50% - 2px),
+        calc(100% - 9px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      transition: border-color .2s, background-color .2s;
+    }
+    .lang-switch:hover { border-color: rgba(110, 168, 255, 0.45); }
+    .lang-switch:focus-visible {
+      outline: 2px solid rgba(110, 168, 255, 0.55);
+      outline-offset: 2px;
+    }
+    .lang-switch option { background: #121825; color: #f7f9ff; }
+
+    /* SSD health alerts */
+    .demo-alert.ssd {
+      border-color: rgba(61, 231, 200, 0.28);
+      background: rgba(61, 231, 200, 0.08);
+    }
+    .demo-alert.ssd .badge {
+      font-size: 10.5px;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #9af5e2;
+      background: rgba(61, 231, 200, 0.14);
+      border: 1px solid rgba(61, 231, 200, 0.28);
+      border-radius: 999px;
+      padding: 3px 8px;
+      flex: 0 0 auto;
+    }
+    .demo-hw-card.ssd .big { font-size: 13.5px; white-space: normal; line-height: 1.25; }
+    .demo-ssd-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .demo-ssd-stats span {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .demo-ssd-stats strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+      margin-top: 2px;
+    }
+
+    /* GamePulse covers */
+    .demo-game {
+      padding: 0;
+      overflow: hidden;
+      position: relative;
+      min-height: 132px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .demo-game .cover {
+      position: absolute;
+      inset: 0;
+      background-color: #0b101b;
+      background-size: cover;
+      background-position: center top;
+      background-repeat: no-repeat;
+    }
+    .demo-game .cover::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg,
+        rgba(5, 8, 16, 0.15) 0%,
+        rgba(5, 8, 16, 0.55) 45%,
+        rgba(5, 8, 16, 0.92) 100%);
+    }
+    .demo-game .gmeta {
+      position: relative;
+      z-index: 1;
+      padding: 12px;
+    }
+    .demo-game .gname { text-shadow: 0 1px 8px rgba(0,0,0,0.55); }
+    .demo-game .gsub { color: rgba(200, 210, 230, 0.85); }
+    .demo-hw-cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     /* Tablet / laptop: 768-1440 */
     @media (min-width: 768px) and (max-width: 1440px) {
       .wrap { width: min(1120px, calc(100% - 48px)); }
@@ -920,8 +1042,10 @@
     /* Phone: 320-480 (+ small tablets up to 640) */
     @media (max-width: 640px) {
       .wrap { width: min(100% - 24px, 1320px); }
-      .nav { padding-top: 16px; }
+      .nav { padding-top: 16px; gap: 10px; }
       .nav-links { display: none; }
+      .lang-switch { max-width: 122px; font-size: 12px; padding: 6px 26px 6px 10px; }
+      .demo-hw-cards { grid-template-columns: 1fr; }
       .hero { padding: 28px 0 20px; }
       .hero-logo { width: 56px; height: 56px; margin-bottom: 16px; }
       .hero h1 { font-size: clamp(28px, 9vw, 40px); }
@@ -997,23 +1121,35 @@
         <img src="assets/appicon.png" alt="" width="28" height="28" />
         PulseCore
       </a>
-      <div class="nav-links">
-        <a href="#preview">Интерфейс</a>
-        <a href="#features">Возможности</a>
-        <a href="#start">Старт</a>
-        <a href="https://github.com/robbled17/pulsecore">GitHub</a>
+      <div class="nav-actions">
+        <div class="nav-links">
+          <a href="#preview" data-i18n="navPreview">Интерфейс</a>
+          <a href="#features" data-i18n="navFeatures">Возможности</a>
+          <a href="#start" data-i18n="navStart">Старт</a>
+          <a href="https://github.com/robbled17/pulsecore">GitHub</a>
+        </div>
+        <label class="visually-hidden" for="lang-switch" data-i18n="langLabel">Language</label>
+        <select id="lang-switch" class="lang-switch" aria-label="Language">
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+          <option value="kk">Қазақша</option>
+          <option value="tt">Татарча</option>
+          <option value="de">Deutsch</option>
+          <option value="ja">日本語</option>
+          <option value="zh">简体中文</option>
+        </select>
       </div>
     </nav>
 
     <header class="hero" id="top">
       <img class="hero-logo" src="assets/appicon.png" alt="PulseCore" width="72" height="72" />
       <h1>PulseCore</h1>
-      <p>Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки</p>
+      <p data-i18n="heroSub">Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/robbled17/pulsecore/releases/latest">
+        <a class="btn btn-primary" href="https://github.com/robbled17/pulsecore/releases/latest" data-i18n="ctaDownload">
           Скачать для Windows (.exe)
         </a>
-        <a class="btn btn-ghost" href="https://github.com/robbled17/pulsecore">
+        <a class="btn btn-ghost" href="https://github.com/robbled17/pulsecore" data-i18n="ctaSource">
           Исходный код на GitHub
         </a>
       </div>
@@ -1021,29 +1157,33 @@
 
     <section class="section" id="preview">
       <div class="section-head reveal">
-        <h2>Живой интерфейс</h2>
-        <p>Так выглядит программа. Переключайте вкладки</p>
+        <h2 data-i18n="previewTitle">Живой интерфейс</h2>
+        <p data-i18n="previewSub">Так выглядит программа. Переключайте вкладки</p>
       </div>
       <div class="preview-shell reveal" style="--reveal-delay: 100ms">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
           <span class="preview-tab-pill" aria-hidden="true"></span>
-          <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview">Обзор</button>
-          <button type="button" role="tab" aria-selected="false" data-tab="lags">Лаги</button>
+          <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview" data-i18n="tabOverview">Обзор</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="lags" data-i18n="tabLags">Лаги</button>
           <button type="button" role="tab" aria-selected="false" data-tab="gamepulse">GamePulse</button>
-          <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="hardware" data-i18n="tabHardware">Железо</button>
         </div>
         <div class="preview-frame" id="demo-preview">
           <div class="demo-work" id="demo-work">
             <div class="demo-pane active" data-pane="overview">
               <div class="demo-head">
                 <div>
-                  <h3>Обзор системы</h3>
-                  <p>Живые метрики CPU, GPU, RAM и температуры</p>
+                  <h3 data-i18n="demoOverviewTitle">Обзор системы</h3>
+                  <p data-i18n="demoOverviewSub">Живые метрики CPU, GPU, RAM и температуры</p>
                 </div>
               </div>
               <div class="demo-alert" id="demo-alert">
-                <div class="txt">Пик ядра: Браузер нагружает систему</div>
+                <div class="txt" data-i18n="demoAlertPeak">Пик ядра: Браузер нагружает систему</div>
                 <button type="button" class="btn-eco" id="demo-eco-alert">Eco Mode</button>
+              </div>
+              <div class="demo-alert ssd" id="demo-ssd-alert">
+                <span class="badge">SMART</span>
+                <div class="txt" id="demo-ssd-alert-txt">Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0</div>
               </div>
               <div class="demo-metrics" id="demo-metrics">
                 <div class="demo-metric" data-k="cpu">
@@ -1072,7 +1212,7 @@
                 </div>
               </div>
               <div class="demo-chart">
-                <div class="ctitle">Динамика</div>
+                <div class="ctitle" data-i18n="demoTrend">Динамика</div>
                 <canvas id="demo-trend" width="900" height="160" aria-hidden="true"></canvas>
               </div>
             </div>
@@ -1080,8 +1220,8 @@
             <div class="demo-pane" data-pane="lags">
               <div class="demo-head">
                 <div>
-                  <h3>Лаги</h3>
-                  <p>Фоновые процессы и Eco Mode</p>
+                  <h3 data-i18n="demoLagsTitle">Лаги</h3>
+                  <p data-i18n="demoLagsSub">Фоновые процессы и Eco Mode</p>
                 </div>
               </div>
               <div class="demo-procs" id="demo-procs"></div>
@@ -1091,19 +1231,19 @@
               <div class="demo-head">
                 <div>
                   <h3>GamePulse</h3>
-                  <p>Выберите игру для прогноза FPS</p>
+                  <p data-i18n="demoGameSub">Выберите игру для прогноза FPS</p>
                 </div>
               </div>
               <div class="demo-games" id="demo-games"></div>
               <div class="demo-fps" id="demo-fps"></div>
-              <div class="demo-tip" id="demo-tip">Нажмите на игру, чтобы увидеть пресеты</div>
+              <div class="demo-tip" id="demo-tip" data-i18n="demoGameTip">Нажмите на игру, чтобы увидеть пресеты</div>
             </div>
 
             <div class="demo-pane" data-pane="hardware">
               <div class="demo-head">
                 <div>
-                  <h3>Железо</h3>
-                  <p>Физические ядра и потоки SMT</p>
+                  <h3 data-i18n="demoHwTitle">Железо</h3>
+                  <p data-i18n="demoHwSub">Физические ядра и потоки SMT</p>
                 </div>
               </div>
               <div class="demo-hw-cards">
@@ -1122,6 +1262,15 @@
                   <div class="big">16 GB DDR4</div>
                   <div class="sub" id="demo-hw-ram-sub">Dual Channel · 63%</div>
                 </div>
+                <div class="demo-hw-card ssd" id="demo-hw-ssd">
+                  <div class="lab" data-i18n="demoSsdLab">SSD health</div>
+                  <div class="big">Samsung 980 PRO 1TB</div>
+                                    <div class="demo-ssd-stats">
+                    <span><span data-i18n="demoSsdHealth">Остаток ресурса</span><strong id="demo-ssd-health">98%</strong></span>
+                    <span><span data-i18n="demoSsdTemp">Температура</span><strong id="demo-ssd-temp">38°C</strong></span>
+                    <span><span data-i18n="demoSsdBad">Плохие сектора</span><strong id="demo-ssd-bad">0</strong></span>
+                  </div>
+                </div>
               </div>
               <div class="demo-core-grid" id="demo-core-grid"></div>
             </div>
@@ -1132,60 +1281,65 @@
 
     <section class="section" id="features">
       <div class="section-head reveal">
-        <h2>Всё для контроля и плавной работы ПК</h2>
-        <p>Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы</p>
+        <h2 data-i18n="featTitle">Всё для контроля и плавной работы ПК</h2>
+        <p data-i18n="featSub">Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы</p>
       </div>
       <div class="bento">
         <article class="card span-2 reveal" style="--reveal-delay: 0ms">
           <div class="card-icon">⚡</div>
-          <h3>Микролаги + Eco</h3>
-          <p>Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия</p>
+          <h3 data-i18n="featEcoTitle">Микролаги + Eco</h3>
+          <p data-i18n="featEcoBody">Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия</p>
         </article>
         <article class="card teal reveal" style="--reveal-delay: 100ms">
           <div class="card-icon">🎯</div>
-          <h3>FPS</h3>
-          <p>Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках</p>
+          <h3 data-i18n="featFpsTitle">FPS</h3>
+          <p data-i18n="featFpsBody">Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках</p>
         </article>
         <article class="card reveal" style="--reveal-delay: 200ms">
           <div class="card-icon">⧉</div>
-          <h3>Mini-HUD</h3>
-          <p>Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами</p>
+          <h3 data-i18n="featHudTitle">Mini-HUD</h3>
+          <p data-i18n="featHudBody">Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами</p>
         </article>
         <article class="card teal reveal" style="--reveal-delay: 300ms">
-          <div class="card-icon">🛡</div>
-          <h3>Без админа</h3>
-          <p>Запускается сразу после скачивания без сложных настроек и лишних разрешений системы</p>
+          <div class="card-icon">💾</div>
+          <h3 data-i18n="featSsdTitle">SSD health</h3>
+          <p data-i18n="featSsdBody">Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц</p>
         </article>
         <article class="card reveal" style="--reveal-delay: 400ms">
-          <div class="card-icon">🔒</div>
-          <h3>Приватность</h3>
-          <p>Программа работает локально на вашем компьютере и никуда не отправляет личные данные</p>
+          <div class="card-icon">🛡</div>
+          <h3 data-i18n="featAdminTitle">Без админа</h3>
+          <p data-i18n="featAdminBody">Запускается сразу после скачивания без сложных настроек и лишних разрешений системы</p>
         </article>
         <article class="card teal reveal" style="--reveal-delay: 500ms">
+          <div class="card-icon">🔒</div>
+          <h3 data-i18n="featPrivTitle">Приватность</h3>
+          <p data-i18n="featPrivBody">Программа работает локально на вашем компьютере и никуда не отправляет личные данные</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 600ms">
           <div class="card-icon">💨</div>
-          <h3>Ресурсы</h3>
-          <p>Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
+          <h3 data-i18n="featResTitle">Ресурсы</h3>
+          <p data-i18n="featResBody">Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
         </article>
       </div>
     </section>
 
     <section class="section" id="start">
       <div class="section-head reveal">
-        <h2>Быстрый старт</h2>
-        <p>Три простых шага на Windows 10 или 11</p>
+        <h2 data-i18n="startTitle">Быстрый старт</h2>
+        <p data-i18n="startSub">Три простых шага на Windows 10 или 11</p>
       </div>
       <div class="steps">
         <div class="step reveal" style="--reveal-delay: 0ms">
-          <h3>Скачайте программу</h3>
-          <p>Откройте страницу Releases и скачайте архив для Windows.</p>
+          <h3 data-i18n="step1Title">Скачайте программу</h3>
+          <p data-i18n="step1Body">Откройте страницу Releases и скачайте архив для Windows.</p>
         </div>
         <div class="step reveal" style="--reveal-delay: 100ms">
-          <h3>Распакуйте архив</h3>
-          <p>Распакуйте архив и найдите внутри файл PulseCore.exe.</p>
+          <h3 data-i18n="step2Title">Распакуйте архив</h3>
+          <p data-i18n="step2Body">Распакуйте архив и найдите внутри файл PulseCore.exe.</p>
         </div>
         <div class="step reveal" style="--reveal-delay: 200ms">
-          <h3>Запустите</h3>
-          <p>Дважды щёлкните по PulseCore.exe. Готово.</p>
+          <h3 data-i18n="step3Title">Запустите</h3>
+          <p data-i18n="step3Body">Дважды щёлкните по PulseCore.exe. Готово.</p>
         </div>
       </div>
     </section>
@@ -1203,6 +1357,556 @@
 
   <script>
     (function () {
+      const LANGS = ["ru", "en", "kk", "tt", "de", "ja", "zh"];
+      const LANG_STORAGE = "zp_lang";
+      const I18N = {
+        ru: {
+          pageTitle: "PulseCore: лёгкий системный монитор для Windows",
+          pageDesc: "Лёгкая программа для Windows: контроль ПК, меньше фризов, без лишней нагрузки на систему.",
+          langLabel: "Язык",
+          navPreview: "Интерфейс",
+          navFeatures: "Возможности",
+          navStart: "Старт",
+          heroSub: "Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки",
+          ctaDownload: "Скачать для Windows (.exe)",
+          ctaSource: "Исходный код на GitHub",
+          previewTitle: "Живой интерфейс",
+          previewSub: "Так выглядит программа. Переключайте вкладки",
+          tabOverview: "Обзор",
+          tabLags: "Лаги",
+          tabHardware: "Железо",
+          demoOverviewTitle: "Обзор системы",
+          demoOverviewSub: "Живые метрики CPU, GPU, RAM и температуры",
+          demoAlertPeak: "Пик ядра: Браузер нагружает систему",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лаги",
+          demoLagsSub: "Фоновые процессы и Eco Mode",
+          demoGameSub: "Выберите игру для прогноза FPS",
+          demoGameTip: "Нажмите на игру, чтобы увидеть пресеты",
+          demoHwTitle: "Железо",
+          demoHwSub: "Физические ядра и потоки SMT",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "Остаток ресурса",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Плохие сектора",
+          demoCore: "Ядро",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Стабильные 165+ на высоких",
+          tipGta: "Комфортные 120 на средних",
+          tipCyber: "DLSS держит 60 на высоких",
+          tipDota: "Запас FPS для турниров",
+          featTitle: "Всё для контроля и плавной работы ПК",
+          featSub: "Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы",
+          featEcoTitle: "Микролаги + Eco",
+          featEcoBody: "Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия",
+          featFpsTitle: "FPS",
+          featFpsBody: "Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами",
+          featSsdTitle: "SSD health",
+          featSsdBody: "Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц",
+          featAdminTitle: "Без админа",
+          featAdminBody: "Запускается сразу после скачивания без сложных настроек и лишних разрешений системы",
+          featPrivTitle: "Приватность",
+          featPrivBody: "Программа работает локально на вашем компьютере и никуда не отправляет личные данные",
+          featResTitle: "Ресурсы",
+          featResBody: "Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга",
+          startTitle: "Быстрый старт",
+          startSub: "Три простых шага на Windows 10 или 11",
+          step1Title: "Скачайте программу",
+          step1Body: "Откройте страницу Releases и скачайте архив для Windows.",
+          step2Title: "Распакуйте архив",
+          step2Body: "Распакуйте архив и найдите внутри файл PulseCore.exe.",
+          step3Title: "Запустите",
+          step3Body: "Дважды щёлкните по PulseCore.exe. Готово."
+        },
+        en: {
+          pageTitle: "PulseCore: lightweight system monitor for Windows",
+          pageDesc: "A light Windows app: watch your PC, cut freezes, without extra system load.",
+          langLabel: "Language",
+          navPreview: "Interface",
+          navFeatures: "Features",
+          navStart: "Start",
+          heroSub: "A light Windows app: watch your PC and cut freezes without extra load",
+          ctaDownload: "Download for Windows (.exe)",
+          ctaSource: "Source on GitHub",
+          previewTitle: "Live interface",
+          previewSub: "This is how the app looks. Switch the tabs",
+          tabOverview: "Overview",
+          tabLags: "Lags",
+          tabHardware: "Hardware",
+          demoOverviewTitle: "System overview",
+          demoOverviewSub: "Live CPU, GPU, RAM and temperature metrics",
+          demoAlertPeak: "Core spike: Browser is loading the system",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "Dynamics",
+          demoLagsTitle: "Lags",
+          demoLagsSub: "Background processes and Eco Mode",
+          demoGameSub: "Pick a game for an FPS forecast",
+          demoGameTip: "Tap a game to see presets",
+          demoHwTitle: "Hardware",
+          demoHwSub: "Physical cores and SMT threads",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "Remaining life",
+          demoSsdTemp: "Temperature",
+          demoSsdBad: "Bad sectors",
+          demoCore: "Core",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Stable 165+ on high",
+          tipGta: "Comfortable 120 on medium",
+          tipCyber: "DLSS holds 60 on high",
+          tipDota: "FPS headroom for tournaments",
+          featTitle: "Everything for control and smooth PC work",
+          featSub: "A light Windows app that stays out of the way and helps clear freezes",
+          featEcoTitle: "Micro-lags + Eco",
+          featEcoBody: "Finds apps that make games hitch and cuts their appetite in one click without closing them",
+          featFpsTitle: "FPS",
+          featFpsBody: "Shows how many frames your PC can hold in popular games on low, medium and high settings",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "A compact overlay for windows and games: CPU temp, GPU and memory load always in view",
+          featSsdTitle: "SSD health",
+          featSsdBody: "Reads SMART: remaining life %, temperature and bad sectors in plain language, not cryptic tables",
+          featAdminTitle: "No admin",
+          featAdminBody: "Runs right after download with no complex setup or extra system permissions",
+          featPrivTitle: "Privacy",
+          featPrivBody: "Runs locally on your PC and never sends personal data away",
+          featResTitle: "Resources",
+          featResBody: "Uses little memory and stays out of games, unlike heavy monitoring suites",
+          startTitle: "Quick start",
+          startSub: "Three simple steps on Windows 10 or 11",
+          step1Title: "Download the app",
+          step1Body: "Open the Releases page and download the Windows archive.",
+          step2Title: "Unpack the archive",
+          step2Body: "Unpack it and find PulseCore.exe inside.",
+          step3Title: "Launch",
+          step3Body: "Double-click PulseCore.exe. Done."
+        },
+        kk: {
+          pageTitle: "PulseCore: Windows үшін жеңіл жүйелік монитор",
+          pageDesc: "Windows үшін жеңіл бағдарлама: ПК бақылау, фриздерді азайту, артық жүктемесіз.",
+          langLabel: "Тіл",
+          navPreview: "Интерфейс",
+          navFeatures: "Мүмкіндіктер",
+          navStart: "Бастау",
+          heroSub: "Windows үшін жеңіл бағдарлама: ПК бақылау және фриздерді артық жүктемесіз азайту",
+          ctaDownload: "Windows үшін жүктеу (.exe)",
+          ctaSource: "GitHub бастапқы коды",
+          previewTitle: "Тірі интерфейс",
+          previewSub: "Бағдарлама осылай көрінеді. Қойындыларды ауыстырыңыз",
+          tabOverview: "Шолу",
+          tabLags: "Лагтар",
+          tabHardware: "Құрылғы",
+          demoOverviewTitle: "Жүйе шолуы",
+          demoOverviewSub: "CPU, GPU, RAM және температураның тірі метрикалары",
+          demoAlertPeak: "Ядро шыңы: Браузер жүйені жүктейді",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лагтар",
+          demoLagsSub: "Фондық процестер және Eco Mode",
+          demoGameSub: "FPS болжамы үшін ойынды таңдаңыз",
+          demoGameTip: "Пресеттерді көру үшін ойынды басыңыз",
+          demoHwTitle: "Құрылғы",
+          demoHwSub: "Физикалық ядролар және SMT ағындар",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "Қалған ресурс",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Нашар секторлар",
+          demoCore: "Ядро",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Жоғарыда тұрақты 165+",
+          tipGta: "Орташада ыңғайлы 120",
+          tipCyber: "DLSS жоғарыда 60 ұстайды",
+          tipDota: "Турнирлерге FPS қоры",
+          featTitle: "ПК бақылау және бірқалыпты жұмыс үшін",
+          featSub: "Жүйені жүктемейтін және фриздерді азайтатын жеңіл Windows бағдарламасы",
+          featEcoTitle: "Микролаг + Eco",
+          featEcoBody: "Ойынды жыбырлататын бағдарламаларды тауып, бір басумен жаппай тұтынуын шектейді",
+          featFpsTitle: "FPS",
+          featFpsBody: "Танымал ойындарда төмен, орташа және жоғары параметрлерде қанша кадр шығатынын көрсетеді",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Терезелер мен ойындар үстіндегі ықшам панель: CPU температурасы, GPU және жады жүктемесі",
+          featSsdTitle: "SSD health",
+          featSsdBody: "SMART оқиды: қалған ресурс %, температура және нашар секторлар қарапайым тілде",
+          featAdminTitle: "Админсіз",
+          featAdminBody: "Жүктегеннен кейін бірден іске қосылады, күрделі баптаусыз",
+          featPrivTitle: "Құпиялылық",
+          featPrivBody: "Компьютеріңізде жергілікті жұмыс істейді және жеке деректерді жібермейді",
+          featResTitle: "Ресурстар",
+          featResBody: "Аз жады алады және ойындарға кедергі жасамайды",
+          startTitle: "Жылдам бастау",
+          startSub: "Windows 10 немесе 11-те үш қарапайым қадам",
+          step1Title: "Бағдарламаны жүктеңіз",
+          step1Body: "Releases бетін ашып, Windows архивін жүктеңіз.",
+          step2Title: "Архивті ашыңыз",
+          step2Body: "Архивті ашып, PulseCore.exe файлын табыңыз.",
+          step3Title: "Іске қосыңыз",
+          step3Body: "PulseCore.exe-ге екі рет басыңыз. Дайын."
+        },
+        tt: {
+          pageTitle: "PulseCore: Windows өчен җиңел система мониторы",
+          pageDesc: "Windows өчен җиңел программа: ПК контроль, фризларны киметү, артык йөкләүсез.",
+          langLabel: "Тел",
+          navPreview: "Интерфейс",
+          navFeatures: "Мөмкинлекләр",
+          navStart: "Старт",
+          heroSub: "Windows өчен җиңел программа: ПК контроль һәм фризларны артык йөкләүсез киметү",
+          ctaDownload: "Windows өчен йөкләү (.exe)",
+          ctaSource: "GitHub чыганак коды",
+          previewTitle: "Тере интерфейс",
+          previewSub: "Программа шулай күренә. Табларны алмаштырыгыз",
+          tabOverview: "Күзәтү",
+          tabLags: "Лаглар",
+          tabHardware: "Тимер",
+          demoOverviewTitle: "Система күзәтүе",
+          demoOverviewSub: "CPU, GPU, RAM һәм температураның тере метрикалары",
+          demoAlertPeak: "Төш чыны: Браузер системаны йөкли",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лаглар",
+          demoLagsSub: "Фон процесслары һәм Eco Mode",
+          demoGameSub: "FPS прогнозы өчен уен сайлагыз",
+          demoGameTip: "Пресетларны күрү өчен уенга басыгыз",
+          demoHwTitle: "Тимер",
+          demoHwSub: "Физик төшләр һәм SMT җепләр",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "Калган ресурс",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Начар секторлар",
+          demoCore: "Төш",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Югарыда тотрыклы 165+",
+          tipGta: "Уртачада уңайлы 120",
+          tipCyber: "DLSS югарыда 60 тота",
+          tipDota: "Турнирларга FPS запасы",
+          featTitle: "ПК контроль һәм шома эш өчен барысы",
+          featSub: "Системаны йөкләми торган һәм фризларны киметә торган җиңел Windows программасы",
+          featEcoTitle: "Микролаг + Eco",
+          featEcoBody: "Уенны селкетеп җибәрә торган программаларны таба һәм бер басу белән аларны чикли",
+          featFpsTitle: "FPS",
+          featFpsBody: "Популяр уеннарда түбән, уртача һәм югары көйләүләрдә ничә кадр чыгуын күрсәтә",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Тәрәзәләр һәм уеннар өстендәге компакт панель: CPU температурасы, GPU һәм хәтер йөкләнеше",
+          featSsdTitle: "SSD health",
+          featSsdBody: "SMART укый: калган ресурс %, температура һәм начар секторлар гади телдә",
+          featAdminTitle: "Админсыз",
+          featAdminBody: "Йөкләгәннән соң шунда ук эшли, катлаулы көйләүләрсез",
+          featPrivTitle: "Хосусыйлык",
+          featPrivBody: "Компьютерыгызда җирле эшли һәм шәхси мәгълүматны җибәрми",
+          featResTitle: "Ресурслар",
+          featResBody: "Аз хәтер ала һәм уеннарга комачауламый",
+          startTitle: "Тиз старт",
+          startSub: "Windows 10 яки 11тә өч гади адым",
+          step1Title: "Программаны йөкләгез",
+          step1Body: "Releases битен ачып, Windows архивын йөкләгез.",
+          step2Title: "Архивны ачыгыз",
+          step2Body: "Архивны ачып, эчендә PulseCore.exe табыгыз.",
+          step3Title: "Эшләтегез",
+          step3Body: "PulseCore.exeга ике тапкыр басыгыз. Әзер."
+        },
+        de: {
+          pageTitle: "PulseCore: leichter Systemmonitor für Windows",
+          pageDesc: "Leichte Windows-App: PC im Blick, weniger Ruckler, ohne Extra-Last.",
+          langLabel: "Sprache",
+          navPreview: "Oberfläche",
+          navFeatures: "Funktionen",
+          navStart: "Start",
+          heroSub: "Leichte Windows-App: PC im Blick und weniger Ruckler ohne Extra-Last",
+          ctaDownload: "Für Windows laden (.exe)",
+          ctaSource: "Quellcode auf GitHub",
+          previewTitle: "Live-Oberfläche",
+          previewSub: "So sieht die App aus. Tabs wechseln",
+          tabOverview: "Übersicht",
+          tabLags: "Ruckler",
+          tabHardware: "Hardware",
+          demoOverviewTitle: "Systemübersicht",
+          demoOverviewSub: "Live-Metriken für CPU, GPU, RAM und Temperatur",
+          demoAlertPeak: "Kernspitze: Browser belastet das System",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "Dynamik",
+          demoLagsTitle: "Ruckler",
+          demoLagsSub: "Hintergrundprozesse und Eco Mode",
+          demoGameSub: "Spiel für FPS-Prognose wählen",
+          demoGameTip: "Spiel antippen, um Presets zu sehen",
+          demoHwTitle: "Hardware",
+          demoHwSub: "Physische Kerne und SMT-Threads",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "Restlebensdauer",
+          demoSsdTemp: "Temperatur",
+          demoSsdBad: "Bad sectors",
+          demoCore: "Kern",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Stabile 165+ auf hoch",
+          tipGta: "Komfortable 120 auf mittel",
+          tipCyber: "DLSS hält 60 auf hoch",
+          tipDota: "FPS-Reserve für Turniere",
+          featTitle: "Alles für Kontrolle und flüssige PC-Arbeit",
+          featSub: "Leichte Windows-App, die das System schont und Ruckler mindert",
+          featEcoTitle: "Mikro-Ruckler + Eco",
+          featEcoBody: "Findet Apps, die Spiele ruckeln lassen, und drosselt sie mit einem Klick ohne Schließen",
+          featFpsTitle: "FPS",
+          featFpsBody: "Zeigt, wie viele Frames Ihr PC in populären Spielen auf niedrig, mittel und hoch schafft",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Kompaktes Overlay für Fenster und Spiele: CPU-Temp, GPU- und Speicherlast immer im Blick",
+          featSsdTitle: "SSD health",
+          featSsdBody: "Liest SMART: Restlebensdauer %, Temperatur und Bad sectors in klarer Sprache",
+          featAdminTitle: "Ohne Admin",
+          featAdminBody: "Startet direkt nach dem Download ohne komplexe Einrichtung",
+          featPrivTitle: "Privatsphäre",
+          featPrivBody: "Läuft lokal auf Ihrem PC und sendet keine persönlichen Daten",
+          featResTitle: "Ressourcen",
+          featResBody: "Braucht wenig Speicher und stört Spiele nicht, anders als schwere Monitore",
+          startTitle: "Schnellstart",
+          startSub: "Drei einfache Schritte unter Windows 10 oder 11",
+          step1Title: "App laden",
+          step1Body: "Öffnen Sie Releases und laden Sie das Windows-Archiv.",
+          step2Title: "Archiv entpacken",
+          step2Body: "Entpacken und PulseCore.exe darin finden.",
+          step3Title: "Starten",
+          step3Body: "Doppelklick auf PulseCore.exe. Fertig."
+        },
+        ja: {
+          pageTitle: "PulseCore: Windows向け軽量システムモニタ",
+          pageDesc: "軽いWindowsアプリ。PCを見守り、フリーズを減らし、余分な負荷をかけません。",
+          langLabel: "言語",
+          navPreview: "画面",
+          navFeatures: "機能",
+          navStart: "開始",
+          heroSub: "軽いWindowsアプリ。PCを見守り、余分な負荷なくフリーズを減らします",
+          ctaDownload: "Windows用をダウンロード (.exe)",
+          ctaSource: "GitHubのソース",
+          previewTitle: "ライブ画面",
+          previewSub: "アプリはこの見た目です。タブを切り替えてください",
+          tabOverview: "概要",
+          tabLags: "ラグ",
+          tabHardware: "ハードウェア",
+          demoOverviewTitle: "システム概要",
+          demoOverviewSub: "CPU・GPU・RAM・温度のライブ指標",
+          demoAlertPeak: "コア急騰: ブラウザが負荷をかけています",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "推移",
+          demoLagsTitle: "ラグ",
+          demoLagsSub: "バックグラウンド処理と Eco Mode",
+          demoGameSub: "FPS予測するゲームを選ぶ",
+          demoGameTip: "ゲームをタップしてプリセットを表示",
+          demoHwTitle: "ハードウェア",
+          demoHwSub: "物理コアと SMT スレッド",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "残寿命",
+          demoSsdTemp: "温度",
+          demoSsdBad: "不良セクタ",
+          demoCore: "コア",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "高設定で安定165+",
+          tipGta: "中設定で快適120",
+          tipCyber: "高設定でDLSSが60を維持",
+          tipDota: "大会向けのFPS余裕",
+          featTitle: "制御となめらかな動作のために",
+          featSub: "システムを重くせず、フリーズ対策を助ける軽いWindowsアプリ",
+          featEcoTitle: "マイクロラグ + Eco",
+          featEcoBody: "ゲームをカクつかせるアプリを見つけ、閉じずにワンクリックで抑制",
+          featFpsTitle: "FPS",
+          featFpsBody: "人気タイトルの低・中・高設定で何フレーム出せるかを表示",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "ウィンドウやゲーム上の小型パネル。CPU温度、GPUとメモリ負荷を常に表示",
+          featSsdTitle: "SSD health",
+          featSsdBody: "SMARTを読み取り、残寿命%、温度、不良セクタをわかりやすい言葉で表示",
+          featAdminTitle: "管理者不要",
+          featAdminBody: "ダウンロード後すぐに起動。複雑な設定や追加権限は不要",
+          featPrivTitle: "プライバシー",
+          featPrivBody: "PC上でローカル動作し、個人データを送信しません",
+          featResTitle: "リソース",
+          featResBody: "メモリ使用が少なく、重い監視ソフトと違いゲームを妨げません",
+          startTitle: "クイックスタート",
+          startSub: "Windows 10 / 11 での3ステップ",
+          step1Title: "アプリをダウンロード",
+          step1Body: "Releasesを開き、Windows用アーカイブを取得します。",
+          step2Title: "展開する",
+          step2Body: "展開し、PulseCore.exeを見つけます。",
+          step3Title: "起動",
+          step3Body: "PulseCore.exeをダブルクリック。完了です。"
+        },
+        zh: {
+          pageTitle: "PulseCore: 轻量级 Windows 系统监控",
+          pageDesc: "轻量 Windows 应用：盯住电脑、减少卡顿，不额外拖慢系统。",
+          langLabel: "语言",
+          navPreview: "界面",
+          navFeatures: "功能",
+          navStart: "开始",
+          heroSub: "轻量 Windows 应用：盯住电脑，减少卡顿，不额外加重负担",
+          ctaDownload: "下载 Windows 版 (.exe)",
+          ctaSource: "GitHub 源码",
+          previewTitle: "实时界面",
+          previewSub: "应用就是这样。切换标签查看",
+          tabOverview: "总览",
+          tabLags: "卡顿",
+          tabHardware: "硬件",
+          demoOverviewTitle: "系统总览",
+          demoOverviewSub: "CPU、GPU、内存与温度的实时指标",
+          demoAlertPeak: "核心尖峰：浏览器正在加重系统负担",
+          demoSsdAlert: "Samsung 980 PRO 1TB · health 98% · 38°C · bad sectors 0",
+          demoTrend: "动态",
+          demoLagsTitle: "卡顿",
+          demoLagsSub: "后台进程与 Eco Mode",
+          demoGameSub: "选择游戏查看 FPS 预估",
+          demoGameTip: "点击游戏查看预设",
+          demoHwTitle: "硬件",
+          demoHwSub: "物理核心与 SMT 线程",
+          demoSsdLab: "SSD health",
+          demoSsdHealth: "剩余寿命",
+          demoSsdTemp: "温度",
+          demoSsdBad: "坏道",
+          demoCore: "核心",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "高画质稳定 165+",
+          tipGta: "中画质舒适 120",
+          tipCyber: "高画质 DLSS 稳住 60",
+          tipDota: "比赛留有 FPS 余量",
+          featTitle: "掌控电脑、流畅运行所需的一切",
+          featSub: "轻量 Windows 应用，不拖慢系统，并帮助减少卡顿",
+          featEcoTitle: "微卡顿 + Eco",
+          featEcoBody: "找出让游戏卡顿的程序，一键限制占用，无需关闭",
+          featFpsTitle: "FPS",
+          featFpsBody: "显示热门游戏在低、中、高画质下你的电脑能跑多少帧",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "覆盖在窗口和游戏上的紧凑面板：CPU 温度、显卡与内存占用一目了然",
+          featSsdTitle: "SSD health",
+          featSsdBody: "读取 SMART：用通俗语言显示剩余寿命百分比、温度和坏道",
+          featAdminTitle: "无需管理员",
+          featAdminBody: "下载后即可运行，无需复杂设置或额外权限",
+          featPrivTitle: "隐私",
+          featPrivBody: "在本地运行，不会发送个人数据",
+          featResTitle: "资源",
+          featResBody: "占用内存很少，不像沉重的监控套件那样干扰游戏",
+          startTitle: "快速开始",
+          startSub: "在 Windows 10 或 11 上三步搞定",
+          step1Title: "下载应用",
+          step1Body: "打开 Releases 页面，下载 Windows 压缩包。",
+          step2Title: "解压",
+          step2Body: "解压后找到 PulseCore.exe。",
+          step3Title: "启动",
+          step3Body: "双击 PulseCore.exe。完成。"
+        }
+      };
+
+      let lang = "ru";
+      const t = (key) => (I18N[lang] && I18N[lang][key]) || I18N.en[key] || I18N.ru[key] || key;
+
+      function detectLang() {
+        try {
+          const saved = localStorage.getItem(LANG_STORAGE);
+          if (saved && LANGS.includes(saved)) return saved;
+        } catch (_) {}
+        const nav = (navigator.language || navigator.userLanguage || "en").toLowerCase();
+        const short = nav.slice(0, 2);
+        if (LANGS.includes(short)) return short;
+        if (nav.startsWith("zh")) return "zh";
+        return "en";
+      }
+
+      function applyI18n() {
+        document.documentElement.lang = lang;
+        document.title = t("pageTitle");
+        const desc = document.querySelector('meta[name="description"]');
+        if (desc) desc.setAttribute("content", t("pageDesc"));
+        const og = document.querySelector('meta[property="og:description"]');
+        if (og) og.setAttribute("content", t("pageDesc"));
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          if (!key) return;
+          el.textContent = t(key);
+        });
+        const sw = document.getElementById("lang-switch");
+        if (sw) sw.value = lang;
+        const ssdAlert = document.getElementById("demo-ssd-alert-txt");
+        if (ssdAlert) ssdAlert.textContent = t("demoSsdAlert");
+        renderCores(true);
+        renderGames();
+        renderProcs();
+        const ecoAlert = document.getElementById("demo-eco-alert");
+        if (ecoAlert) ecoAlert.textContent = t("ecoMode");
+        requestAnimationFrame(() => {
+          const active = document.querySelector(".preview-tabs button.active");
+          if (active && typeof window.__pcMovePill === "function") window.__pcMovePill(active, true);
+        });
+      }
+
+      function setLang(next) {
+        lang = LANGS.includes(next) ? next : "en";
+        try { localStorage.setItem(LANG_STORAGE, lang); } catch (_) {}
+        applyI18n();
+      }
+
+      lang = detectLang();
+      const langSwitch = document.getElementById("lang-switch");
+      if (langSwitch) {
+        langSwitch.value = lang;
+        langSwitch.addEventListener("change", (e) => setLang(e.target.value));
+      }
+
       const root = document.documentElement;
       const coarseOrNarrow = window.matchMedia("(hover: none), (max-width: 768px)");
       let raf = 0;
@@ -1252,6 +1956,7 @@
           pill.style.transition = "";
         }
       };
+      window.__pcMovePill = movePill;
 
       const activate = (id) => {
         let activeBtn = null;
@@ -1332,33 +2037,62 @@
       /* ---- Live interactive demo telemetry ---- */
       const rnd = (a, b) => a + Math.random() * (b - a);
       const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-      const HISTORY = 40;
+      const HISTORY = 18;
+      const EMA = 0.22;
+      const LERP = 0.14;
+      const themes = {
+        cpu: { stroke: "rgba(142,192,255,0.98)", glow: "rgba(110,168,255,0.85)", top: "rgba(110,168,255,0.34)", bottom: "rgba(110,168,255,0.02)" },
+        gpu: { stroke: "rgba(95,240,212,0.95)", glow: "rgba(61,231,200,0.8)", top: "rgba(61,231,200,0.3)", bottom: "rgba(61,231,200,0.02)" },
+        ram: { stroke: "rgba(180,155,255,0.95)", glow: "rgba(155,123,255,0.8)", top: "rgba(155,123,255,0.3)", bottom: "rgba(155,123,255,0.02)" },
+        temp: { stroke: "rgba(255,209,102,0.95)", glow: "rgba(251,191,36,0.8)", top: "rgba(251,191,36,0.28)", bottom: "rgba(251,191,36,0.02)" }
+      };
       const state = {
         eco: false,
-        cpu: 50,
-        gpu: 69,
+        cpu: 48,
+        gpu: 68,
         ram: 63.5,
         temp: 58,
         series: { cpu: [], gpu: [], ram: [], temp: [] },
-        display: { cpu: 50, gpu: 69, ram: 63.5, temp: 58 },
+        display: { cpu: 48, gpu: 68, ram: 63.5, temp: 58 },
         cores: Array.from({ length: 8 }, () => ({ t0: 30, t1: 28 })),
         procs: [
           { name: "chrome.exe", load: 38, eco: false },
           { name: "Discord.exe", load: 22, eco: false },
           { name: "Steam.exe", load: 14, eco: false },
-          { name: "Explorer.exe", load: 6, eco: false },
+          { name: "Explorer.exe", load: 6, eco: false }
         ],
         gameId: "cs2",
+        ssd: { health: 98, temp: 38, bad: 0 }
       };
-      ["cpu", "gpu", "ram", "temp"].forEach((k) => {
-        state.series[k] = Array(HISTORY).fill(state[k]);
-      });
+
+      function seedSeries(key, base, wobble) {
+        const arr = [];
+        let v = base;
+        for (let i = 0; i < HISTORY; i++) {
+          v = clamp(v + rnd(-wobble, wobble), 5, 96);
+          arr.push(v);
+        }
+        state.series[key] = arr;
+        state[key] = v;
+        state.display[key] = v;
+      }
+      seedSeries("cpu", 48, 3.2);
+      seedSeries("gpu", 68, 2.4);
+      seedSeries("ram", 63.5, 0.6);
+      seedSeries("temp", 58, 0.8);
 
       const games = {
-        cs2: { name: "CS2", sub: "Competitive", fps: [240, 210, 165, 120], tip: "Стабильные 165+ на высоких" },
-        gtav: { name: "GTA V", sub: "Open world", fps: [144, 120, 90, 72], tip: "Комфортные 120 на средних" },
-        cyber: { name: "Cyberpunk", sub: "RTX ready", fps: [95, 72, 55, 42], tip: "DLSS держит 60 на высоких" },
-        dota: { name: "Dota 2", sub: "MOBA", fps: [200, 180, 150, 120], tip: "Запас FPS для турниров" },
+        cs2: { name: "CS2", appId: 730, fps: [240, 210, 165, 120], tipKey: "tipCs2", subKey: "gameCs2Sub" },
+        gtav: { name: "GTA V", appId: 271590, fps: [144, 120, 90, 72], tipKey: "tipGta", subKey: "gameGtaSub" },
+        cyber: { name: "Cyberpunk", appId: 1091500, fps: [95, 72, 55, 42], tipKey: "tipCyber", subKey: "gameCyberSub" },
+        dota: { name: "Dota 2", appId: 570, fps: [200, 180, 150, 120], tipKey: "tipDota", subKey: "gameDotaSub" }
+      };
+      const steamCover = (id) => "https://cdn.cloudflare.steamstatic.com/steam/apps/" + id + "/library_600x900.jpg";
+      const coverFallback = {
+        cs2: "linear-gradient(145deg, #1a2a44 0%, #0b101b 55%, #152238 100%)",
+        gtav: "linear-gradient(145deg, #244028 0%, #0b101b 55%, #1a3020 100%)",
+        cyber: "linear-gradient(145deg, #3a1840 0%, #0b101b 55%, #241030 100%)",
+        dota: "linear-gradient(145deg, #402018 0%, #0b101b 55%, #301810 100%)"
       };
 
       const el = (id) => document.getElementById(id);
@@ -1366,17 +2100,91 @@
         cpu: "spark-demo-cpu",
         gpu: "spark-demo-gpu",
         ram: "spark-demo-ram",
-        temp: "spark-demo-temp",
+        temp: "spark-demo-temp"
       };
 
-      function pushSeries(key, v) {
+      function pushSeries(key, raw) {
         const arr = state.series[key];
+        const last = arr.length ? arr[arr.length - 1] : raw;
+        const v = EMA * raw + (1 - EMA) * last;
         arr.push(v);
         if (arr.length > HISTORY) arr.shift();
+        state[key] = v;
       }
 
-      function drawSpark(canvas, values, color) {
-        if (!canvas) return;
+      function strokeSmooth(ctx, points) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i === 0 ? i : i - 1];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2] || p2;
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y
+          );
+        }
+        ctx.stroke();
+      }
+
+      function fillSmooth(ctx, points, cssH, colorTop, colorBottom) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i === 0 ? i : i - 1];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2] || p2;
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y
+          );
+        }
+        const last = points[points.length - 1];
+        const first = points[0];
+        ctx.lineTo(last.x, cssH);
+        ctx.lineTo(first.x, cssH);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 0, 0, cssH);
+        grad.addColorStop(0, colorTop);
+        grad.addColorStop(1, colorBottom);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      function pointsFromValues(values, w, h, padX, padY, absScale) {
+        const n = Math.max(values.length - 1, 1);
+        if (absScale) {
+          return values.map((raw, i) => {
+            const v = clamp(raw, 0, 100);
+            return {
+              x: padX + (i / n) * (w - padX * 2),
+              y: padY + (h - padY * 2) - (v / 100) * (h - padY * 2)
+            };
+          });
+        }
+        const min = Math.min(...values) - 2;
+        const max = Math.max(...values) + 2;
+        const span = Math.max(1, max - min);
+        return values.map((v, i) => ({
+          x: padX + (i / n) * (w - padX * 2),
+          y: padY + (h - padY * 2) - ((v - min) / span) * (h - padY * 2)
+        }));
+      }
+
+      function drawSpark(canvas, values, theme) {
+        if (!canvas || !values || values.length < 2) return;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const w = canvas.clientWidth || 160;
         const h = canvas.clientHeight || 28;
@@ -1388,21 +2196,26 @@
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        if (!values.length) return;
-        const min = Math.min(...values) - 2;
-        const max = Math.max(...values) + 2;
-        const span = Math.max(1, max - min);
-        ctx.beginPath();
-        values.forEach((v, i) => {
-          const x = (i / Math.max(1, values.length - 1)) * w;
-          const y = h - ((v - min) / span) * (h - 4) - 2;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        });
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.6;
+        const pts = pointsFromValues(values, w, h, 2, 3, false);
+        fillSmooth(ctx, pts, h, theme.top, theme.bottom);
+        ctx.save();
+        ctx.lineWidth = 2.6;
         ctx.lineJoin = "round";
-        ctx.stroke();
+        ctx.lineCap = "round";
+        ctx.strokeStyle = theme.glow;
+        ctx.shadowColor = theme.glow;
+        ctx.shadowBlur = 10;
+        ctx.globalAlpha = 0.45;
+        strokeSmooth(ctx, pts);
+        ctx.restore();
+        ctx.lineWidth = 1.7;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.strokeStyle = theme.stroke;
+        ctx.shadowColor = theme.glow;
+        ctx.shadowBlur = 6;
+        strokeSmooth(ctx, pts);
+        ctx.shadowBlur = 0;
       }
 
       function drawTrend(canvas) {
@@ -1418,23 +2231,18 @@
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        const series = [
-          { key: "cpu", color: "rgba(142,192,255,0.95)" },
-          { key: "gpu", color: "rgba(95,240,212,0.9)" },
-          { key: "ram", color: "rgba(180,155,255,0.85)" },
-        ];
-        series.forEach((s) => {
-          const values = state.series[s.key];
-          ctx.beginPath();
-          values.forEach((v, i) => {
-            const x = (i / Math.max(1, values.length - 1)) * w;
-            const y = h - (clamp(v, 0, 100) / 100) * (h - 8) - 4;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          });
-          ctx.strokeStyle = s.color;
-          ctx.lineWidth = 1.8;
-          ctx.stroke();
+        ["cpu", "gpu", "ram"].forEach((key) => {
+          const theme = themes[key];
+          const pts = pointsFromValues(state.series[key], w, h, 4, 6, true);
+          fillSmooth(ctx, pts, h, theme.top, theme.bottom);
+          ctx.lineWidth = 2;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.strokeStyle = theme.stroke;
+          ctx.shadowColor = theme.glow;
+          ctx.shadowBlur = 8;
+          strokeSmooth(ctx, pts);
+          ctx.shadowBlur = 0;
         });
       }
 
@@ -1445,7 +2253,7 @@
           <div class="demo-proc" data-i="${i}">
             <div class="name">${p.name}</div>
             <div class="load">${Math.round(p.load)}%</div>
-            <button type="button" class="btn-eco${p.eco ? " on" : ""}" data-eco="${i}">${p.eco ? "Eco ON" : "Eco Mode"}</button>
+            <button type="button" class="btn-eco${p.eco ? " on" : ""}" data-eco="${i}">${p.eco ? t("ecoOn") : t("ecoMode")}</button>
           </div>`).join("");
         host.querySelectorAll("[data-eco]").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -1469,20 +2277,30 @@
         host.innerHTML = order.map((id) => {
           const g = games[id];
           return `<button type="button" class="demo-game${state.gameId === id ? " active" : ""}" data-game="${id}">
-            <div class="gname">${g.name}</div>
-            <div class="gsub">${g.sub}</div>
+            <div class="cover" data-fallback="${id}" style="background-image:url('${steamCover(g.appId)}'), ${coverFallback[id]}"></div>
+            <div class="gmeta">
+              <div class="gname">${g.name}</div>
+              <div class="gsub">${t(g.subKey)}</div>
+            </div>
           </button>`;
         }).join("");
+        host.querySelectorAll(".cover").forEach((node) => {
+          const img = new Image();
+          const id = node.getAttribute("data-fallback");
+          const g = games[id];
+          img.onerror = () => {
+            node.style.backgroundImage = coverFallback[id];
+          };
+          img.src = steamCover(g.appId);
+        });
         host.querySelectorAll("[data-game]").forEach((btn) => {
           btn.addEventListener("click", () => {
             state.gameId = btn.getAttribute("data-game");
             renderGames();
             if (tip) {
               tip.classList.add("flash");
-              tip.textContent = games[state.gameId].tip;
-              requestAnimationFrame(() => {
-                tip.classList.remove("flash");
-              });
+              tip.textContent = t(games[state.gameId].tipKey);
+              requestAnimationFrame(() => tip.classList.remove("flash"));
             }
             fpsHost.querySelectorAll(".f").forEach((n) => {
               n.classList.remove("pop");
@@ -1492,19 +2310,19 @@
           });
         });
         const g = games[state.gameId];
-        const labels = ["Low", "Med", "High", "Ultra"];
+        const labels = [t("fpsLow"), t("fpsMed"), t("fpsHigh"), t("fpsUltra")];
         fpsHost.innerHTML = g.fps.map((f, i) => `
           <div class="cell"><div class="q">${labels[i]}</div><div class="f">${f}</div></div>`).join("");
-        if (tip) tip.textContent = g.tip;
+        if (tip) tip.textContent = t(g.tipKey);
       }
 
-      function renderCores() {
+      function renderCores(forceLabels) {
         const host = el("demo-core-grid");
         if (!host) return;
-        if (!host.childElementCount) {
+        if (!host.childElementCount || forceLabels) {
           host.innerHTML = state.cores.map((_, i) => `
             <div class="demo-core" data-c="${i}">
-              <div class="ch"><span class="id">Ядро ${i}</span><span class="v">0%</span></div>
+              <div class="ch"><span class="id">${t("demoCore")} ${i}</span><span class="v">0%</span></div>
               <div class="pbar"><i></i></div>
               <div class="thr"><span class="tid">T0</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
               <div class="thr"><span class="tid">T1</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
@@ -1525,28 +2343,27 @@
       }
 
       function sampleMetrics() {
-        if (state.eco) {
-          state.cpu = rnd(18, 24);
-        } else {
-          state.cpu = rnd(42, 58);
-        }
-        state.gpu = rnd(64, 74);
-        state.ram = rnd(62, 65);
-        state.temp = rnd(56, 61);
-        pushSeries("cpu", state.cpu);
-        pushSeries("gpu", state.gpu);
-        pushSeries("ram", state.ram);
-        pushSeries("temp", state.temp);
+        // Natural random-walk dynamics (no sawtooth jumps)
+        const cpuTarget = state.eco ? rnd(16, 26) : rnd(40, 58);
+        const nextCpu = clamp(state.cpu + (cpuTarget - state.cpu) * 0.35 + rnd(-2.2, 2.2), state.eco ? 12 : 28, state.eco ? 32 : 72);
+        const nextGpu = clamp(state.gpu + rnd(-1.8, 1.8), 58, 78);
+        const nextRam = clamp(state.ram + rnd(-0.35, 0.35), 60, 67);
+        const nextTemp = clamp(state.temp + (nextCpu - state.cpu) * 0.08 + rnd(-0.4, 0.4), 52, 68);
+
+        pushSeries("cpu", nextCpu);
+        pushSeries("gpu", nextGpu);
+        pushSeries("ram", nextRam);
+        pushSeries("temp", nextTemp);
 
         state.cores.forEach((c) => {
-          const base = state.eco ? rnd(8, 22) : rnd(18, 72);
-          c.t0 = clamp(base + rnd(-8, 10), 4, 96);
-          c.t1 = clamp(base + rnd(-10, 8), 4, 96);
+          const base = state.eco ? rnd(8, 22) : clamp(state.cpu + rnd(-18, 18), 10, 90);
+          c.t0 = clamp(c.t0 + (base - c.t0) * 0.4 + rnd(-4, 4), 4, 96);
+          c.t1 = clamp(c.t1 + (base - c.t1) * 0.4 + rnd(-5, 5), 4, 96);
         });
 
         state.procs.forEach((p) => {
-          if (p.eco) p.load = clamp(p.load + rnd(-1.2, 1.2), 2, 14);
-          else p.load = clamp(p.load + rnd(-3, 3), 5, 48);
+          if (p.eco) p.load = clamp(p.load + rnd(-1.0, 1.0), 2, 14);
+          else p.load = clamp(p.load + rnd(-2.2, 2.2), 5, 48);
         });
         const procsHost = el("demo-procs");
         if (procsHost && procsHost.querySelector(".demo-proc")) {
@@ -1558,6 +2375,8 @@
           });
         }
 
+        // Soft SSD jitter (still healthy)
+        state.ssd.temp = clamp(state.ssd.temp + rnd(-0.25, 0.25), 36, 41);
         const avgCore = state.cores.reduce((s, c) => s + (c.t0 + c.t1) / 2, 0) / state.cores.length;
         const hwCpu = el("demo-hw-cpu-sub");
         const hwGpu = el("demo-hw-gpu-sub");
@@ -1565,44 +2384,40 @@
         if (hwCpu) hwCpu.textContent = "8 / 16 · " + Math.round(avgCore) + "%";
         if (hwGpu) hwGpu.textContent = "8 GB · " + Math.round(state.gpu) + "%";
         if (hwRam) hwRam.textContent = "Dual Channel · " + Math.round(state.ram) + "%";
-        renderCores();
+        const ssdTemp = el("demo-ssd-temp");
+        if (ssdTemp) ssdTemp.textContent = Math.round(state.ssd.temp) + "°C";
+        renderCores(false);
       }
 
       function paintUI() {
         const keys = [
-          { k: "cpu", id: "demo-cpu", bar: "demo-cpu-bar", unit: "%", color: "rgba(142,192,255,0.95)" },
-          { k: "gpu", id: "demo-gpu", bar: "demo-gpu-bar", unit: "%", color: "rgba(95,240,212,0.95)" },
-          { k: "ram", id: "demo-ram", bar: "demo-ram-bar", unit: "%", color: "rgba(180,155,255,0.95)" },
-          { k: "temp", id: "demo-temp", bar: "demo-temp-bar", unit: "°C", color: "rgba(255,209,102,0.95)", max: 100 },
+          { k: "cpu", id: "demo-cpu", bar: "demo-cpu-bar" },
+          { k: "gpu", id: "demo-gpu", bar: "demo-gpu-bar" },
+          { k: "ram", id: "demo-ram", bar: "demo-ram-bar" },
+          { k: "temp", id: "demo-temp", bar: "demo-temp-bar" }
         ];
         keys.forEach((item) => {
           const target = state[item.k];
-          state.display[item.k] += (target - state.display[item.k]) * (reduceMotion.matches ? 1 : 0.12);
+          state.display[item.k] += (target - state.display[item.k]) * (reduceMotion.matches ? 1 : LERP);
           const v = state.display[item.k];
           const node = el(item.id);
           if (node) {
-            node.textContent = item.k === "temp"
-              ? Math.round(v) + "°C"
-              : Math.round(v) + "%";
+            node.textContent = item.k === "temp" ? Math.round(v) + "°C" : Math.round(v) + "%";
           }
           const bar = el(item.bar);
-          if (bar) {
-            const pct = item.k === "temp" ? (v / 100) * 100 : v;
-            bar.style.width = clamp(pct, 0, 100) + "%";
-          }
-          drawSpark(el(sparkIds[item.k]), state.series[item.k], item.color);
+          if (bar) bar.style.width = clamp(item.k === "temp" ? v : v, 0, 100) + "%";
+          drawSpark(el(sparkIds[item.k]), state.series[item.k], themes[item.k]);
         });
         drawTrend(el("demo-trend"));
       }
 
       let simTimer = 0;
       let paintRaf = 0;
-      let previewInView = false;
 
       function startSim() {
         if (simTimer) return;
         sampleMetrics();
-        simTimer = window.setInterval(sampleMetrics, 1200);
+        simTimer = window.setInterval(sampleMetrics, 1100);
         const loop = () => {
           paintUI();
           paintRaf = requestAnimationFrame(loop);
@@ -1625,7 +2440,6 @@
       if (ecoAlertBtn) {
         ecoAlertBtn.addEventListener("click", () => {
           state.eco = true;
-          state.cpu = rnd(18, 24);
           if (alertEl) alertEl.classList.add("hidden");
           const browser = state.procs.find((p) => p.name === "chrome.exe");
           if (browser) {
@@ -1636,9 +2450,10 @@
         });
       }
 
+      applyI18n();
       renderProcs();
       renderGames();
-      renderCores();
+      renderCores(true);
       sampleMetrics();
       paintUI();
 
@@ -1646,8 +2461,7 @@
       if (previewShell && "IntersectionObserver" in window) {
         const simIo = new IntersectionObserver((entries) => {
           entries.forEach((entry) => {
-            previewInView = entry.isIntersecting;
-            if (previewInView) startSim();
+            if (entry.isIntersecting) startSim();
             else stopSim();
           });
         }, { threshold: 0.12 });
@@ -1662,5 +2476,6 @@
       }, { passive: true });
     })();
   </script>
+
 </body>
 </html>
