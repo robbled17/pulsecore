@@ -545,6 +545,111 @@ const App = {
   },
   SearchGamesOnline: async (q) => App.SearchGames(q),
   PredictGameFPS: async (id) => predictFPS(id),
+  GetPCPassport: async () => {
+    const p = profile()
+    return {
+      chassis: p.id === 'A' ? 'laptop' : 'desktop',
+      chassisRaw: p.id === 'A' ? '9' : '3',
+      isLaptop: p.id === 'A',
+      motherboard: p.id === 'A' ? 'Laptop Board' : 'B550M Pro',
+      manufacturer: p.id === 'A' ? 'OEM' : 'ASUS',
+      chipset: p.id === 'A' ? 'Unknown' : 'B550',
+      socket: p.id === 'A' ? 'BGA' : (p.cpuName.includes('7950') ? 'AM5' : 'AM4'),
+      cpuName: p.cpuName,
+      physicalCores: p.physicalCores,
+      logicalCores: p.logicalCores,
+      ramType: p.ramType,
+      ramSpeedMHz: p.ramSpeed,
+      ramTotalGB: p.ramGB,
+      ramSlotsUsed: p.slotsUsed,
+      ramSlotsTotal: p.slotsTotal,
+      ramSlotsFree: Math.max(0, p.slotsTotal - p.slotsUsed),
+      isSingleChannel: p.isSingleChannel,
+      gpuName: p.gpuName,
+      vramGB: p.vramGB,
+      gpuIntegrated: p.isIntegrated,
+      storage: [
+        { model: 'Samsung 980 PRO 1TB', interfaceType: 'NVMe', mediaType: 'SSD', sizeGB: 1000 },
+      ],
+      hasFreeM2: true,
+      notes: p.id === 'A'
+        ? ['Ноутбук: процессор и видеокарта обычно впаяны. Менять их нельзя без замены всей платы.']
+        : [],
+    }
+  },
+  GetUpgradeAdvice: async (goal) => {
+    const passport = await App.GetPCPassport()
+    const g = String(goal || 'max_fps')
+    const laptop = passport.isLaptop
+    const recommendations = laptop ? [
+      {
+        id: 'laptop-soldered', title: 'Честно про впаянное железо', part: 'other', priority: 1,
+        body: 'В большинстве ноутбуков CPU и GPU впаяны. Реальный апгрейд: RAM, SSD и охлаждение.',
+        pitfalls: ['Не покупайте мобильный процессор отдельно.', 'Замена платы часто дороже нового ноутбука.', 'Проверьте сервисное руководство.'],
+      },
+      {
+        id: 'laptop-ram', title: 'RAM: dual-channel', part: 'ram', priority: 2,
+        body: 'Вторая планка той же частоты включает dual-channel.',
+        pitfalls: [`Тип памяти: ${passport.ramType}.`, 'Берите одинаковые модули.', 'В BIOS включите XMP/EXPO.'],
+      },
+    ] : [
+      {
+        id: 'desktop-gpu', title: 'Сбалансированная видеокарта', part: 'gpu', priority: 1,
+        body: g === 'quiet_cool' ? 'Карта с тихим охлаждением и умеренным TDP.' : 'Главный прирост FPS даёт видеокарта под ваше разрешение.',
+        pitfalls: ['Измерьте длину корпуса.', 'Проверьте разъёмы БП.', 'Обновите драйвер после установки.'],
+      },
+      {
+        id: 'desktop-cpu', title: 'Процессор под текущий сокет', part: 'cpu', priority: 2,
+        body: `Для сокета ${passport.socket} берите совместимый процессор.`,
+        pitfalls: ['Обновите BIOS.', 'Проверьте VRM.', `Сокет: ${passport.socket}.`],
+      },
+    ]
+    return {
+      goal: g,
+      chassis: passport.chassis,
+      isLaptop: laptop,
+      passport,
+      recommendations,
+      summary: laptop ? 'Ноутбук: упор на RAM, SSD и охлаждение.' : 'ПК: видеокарта и процессор под текущий сокет.',
+    }
+  },
+  ListInstalledApps: async () => ([
+    { id: 'mock1', displayName: 'Demo Editor', publisher: 'Acme Soft', installLocation: 'C:\\Program Files\\DemoEditor', uninstallString: 'uninstall.exe', displayVersion: '3.2.1', estimatedMB: 420, isMsi: false },
+    { id: 'mock2', displayName: 'Chatty', publisher: 'Chatty Inc', installLocation: 'C:\\Users\\Demo\\AppData\\Local\\Chatty', uninstallString: 'msiexec /x {GUID}', displayVersion: '1.8.0', estimatedMB: 180, isMsi: true },
+    { id: 'mock3', displayName: 'Old Launcher', publisher: 'Games Co', installLocation: 'C:\\Games\\OldLauncher', uninstallString: 'unins000.exe', displayVersion: '0.9.4', estimatedMB: 95, isMsi: false },
+  ]),
+  PrecheckUninstall: async (id) => {
+    const apps = await App.ListInstalledApps()
+    const app = apps.find((a) => a.id === id) || apps[0]
+    const running = id === 'mock2' ? [{ pid: 4412, name: 'Chatty.exe', imagePath: app.installLocation + '\\Chatty.exe' }] : []
+    return {
+      ok: true,
+      app,
+      running,
+      canKill: running.length > 0,
+      warning: running.length ? `Найдено запущенных процессов: ${running.length}. Завершите их перед удалением или нажмите «Завершить и удалить».` : '',
+    }
+  },
+  KillAppProcesses: async () => ({ ok: true, killed: 1, failed: 0, message: 'Завершено: 1, ошибок: 0' }),
+  UninstallApp: async () => ({ ok: true, message: 'Запущен официальный деинсталлятор', appName: 'Demo' }),
+  ScanResiduals: async (name) => ({
+    ok: true,
+    appName: name || 'Demo',
+    message: 'Найдено остатков: 3',
+    items: [
+      { id: 'fs:1', kind: 'folder', path: '%LOCALAPPDATA%\\DemoEditor', label: 'Local · DemoEditor', safe: true, selected: true },
+      { id: 'fs:2', kind: 'folder', path: '%APPDATA%\\DemoEditor', label: 'Roaming · DemoEditor', safe: true, selected: true },
+      { id: 'reg:1', kind: 'registry', path: 'HKCU\\Software\\DemoEditor', label: 'HKCU\\Software\\DemoEditor', safe: true, selected: true },
+      { id: 'reg:2', kind: 'registry', path: 'HKLM\\Software\\Microsoft', label: 'HKLM\\Software\\Microsoft', safe: false, selected: false },
+    ],
+  }),
+  DeleteResiduals: async () => ({ ok: true, removed: 3, failed: 0, skipped: 1, message: 'Удалено: 3, ошибок: 0, пропущено: 1' }),
+  StartTracedInstall: async () => ({ ok: true, appId: 'trace1', appName: 'setup.exe', message: 'Установщик запущен. После установки нажмите «Завершить трассировку».' }),
+  FinishTracedInstall: async () => ({ ok: true, appId: 'trace1', path: 'traces/trace1.json', newKeys: 2, newDirs: 1, message: 'Трассировка сохранена: trace1.json' }),
+  ListInstallTraces: async () => ([
+    { appId: 'trace1', appName: 'setup.exe', createdAt: '2026-03-21T10:00:00Z', finishedAt: '2026-03-21T10:05:00Z', newKeys: 2, newDirs: 1, file: 'trace1.json' },
+  ]),
+  CleanupFromTrace: async () => ({ ok: true, removed: [], failed: [], message: 'Удалено: 1, ошибок: 0' }),
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,

@@ -41,6 +41,18 @@ const TABS = [
     expectHidden: ['#demo-metrics', '#demo-procs', '#demo-games'],
     openSsd: true,
   },
+  {
+    id: 'upgrade',
+    file: 'live-demo-tab-upgrade-1440x900.png',
+    expectVisible: ['#demo-upgrade-goals', '#demo-upgrade-rec'],
+    expectHidden: ['#demo-metrics', '#demo-procs', '#demo-games', '#demo-hw-ssd'],
+  },
+  {
+    id: 'uninstall',
+    file: 'live-demo-tab-uninstall-1440x900.png',
+    expectVisible: ['#demo-residual', '#demo-kill-remove'],
+    expectHidden: ['#demo-metrics', '#demo-procs', '#demo-games', '#demo-hw-ssd'],
+  },
 ]
 
 async function assertDisplay(page, sel, wantVisible, label) {
@@ -172,7 +184,8 @@ async function main() {
     console.log('OK', tab.id, panel.display, 'opacity=' + panel.opacity, '->', tab.file)
   }
 
-  // Also verify inactive panes are display:none when on hardware
+  // Also verify inactive panes are display:none when on the last exercised tab
+  const lastTabId = TABS[TABS.length - 1].id
   const inactive = await page.evaluate(() => {
     return [...document.querySelectorAll('.demo-pane')].map((p) => ({
       panel: p.dataset.panel,
@@ -182,8 +195,8 @@ async function main() {
     }))
   })
   for (const p of inactive) {
-    if (p.panel === 'hardware') {
-      if (p.display === 'none') throw new Error('active hardware hidden')
+    if (p.panel === lastTabId) {
+      if (p.display === 'none') throw new Error(`active ${lastTabId} hidden`)
     } else if (p.display !== 'none') {
       throw new Error(`inactive panel ${p.panel} display=${p.display}`)
     }

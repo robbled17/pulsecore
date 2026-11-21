@@ -58,6 +58,54 @@ export function GetVampireProcesses() {
   return window['go']['main']['App']['GetVampireProcesses']();
 }
 
+export function GetPCPassport() {
+  return window['go']['main']['App']['GetPCPassport']();
+}
+
+export function GetUpgradeAdvice(arg1) {
+  return window['go']['main']['App']['GetUpgradeAdvice'](arg1);
+}
+
+export function ListInstalledApps() {
+  return window['go']['main']['App']['ListInstalledApps']();
+}
+
+export function PrecheckUninstall(arg1) {
+  return window['go']['main']['App']['PrecheckUninstall'](arg1);
+}
+
+export function KillAppProcesses(arg1) {
+  return window['go']['main']['App']['KillAppProcesses'](arg1);
+}
+
+export function UninstallApp(arg1, arg2) {
+  return window['go']['main']['App']['UninstallApp'](arg1, arg2);
+}
+
+export function ScanResiduals(arg1, arg2) {
+  return window['go']['main']['App']['ScanResiduals'](arg1, arg2);
+}
+
+export function DeleteResiduals(arg1) {
+  return window['go']['main']['App']['DeleteResiduals'](arg1);
+}
+
+export function StartTracedInstall() {
+  return window['go']['main']['App']['StartTracedInstall']();
+}
+
+export function FinishTracedInstall() {
+  return window['go']['main']['App']['FinishTracedInstall']();
+}
+
+export function ListInstallTraces() {
+  return window['go']['main']['App']['ListInstallTraces']();
+}
+
+export function CleanupFromTrace(arg1) {
+  return window['go']['main']['App']['CleanupFromTrace'](arg1);
+}
+
 export function HideToTray() {
   return window['go']['main']['App']['HideToTray']();
 }

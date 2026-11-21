@@ -30,6 +30,30 @@ export function GetSystemPowerProfile():Promise<main.SystemPowerProfile>;
 
 export function GetVampireProcesses():Promise<Array<main.VampireProcess>>;
 
+export function GetPCPassport():Promise<Record<string, any>>;
+
+export function GetUpgradeAdvice(arg1:string):Promise<Record<string, any>>;
+
+export function ListInstalledApps():Promise<Array<Record<string, any>>>;
+
+export function PrecheckUninstall(arg1:string):Promise<Record<string, any>>;
+
+export function KillAppProcesses(arg1:string):Promise<Record<string, any>>;
+
+export function UninstallApp(arg1:string,arg2:boolean):Promise<Record<string, any>>;
+
+export function ScanResiduals(arg1:string,arg2:string):Promise<Record<string, any>>;
+
+export function DeleteResiduals(arg1:Array<Record<string, any>>):Promise<Record<string, any>>;
+
+export function StartTracedInstall():Promise<Record<string, any>>;
+
+export function FinishTracedInstall():Promise<Record<string, any>>;
+
+export function ListInstallTraces():Promise<Array<Record<string, any>>>;
+
+export function CleanupFromTrace(arg1:string):Promise<Record<string, any>>;
+
 export function HideToTray():Promise<void>;
 
 export function IsFullscreen():Promise<boolean>;
