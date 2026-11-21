@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.3
+
+### Fixed
+- Windows build: remove duplicate `isProcessElevated` so `go test` / `go vet` compile again
+
+
 ## 1.6.2
 
 ### Added

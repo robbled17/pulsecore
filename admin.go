@@ -11,31 +11,12 @@ import (
 )
 
 var (
-	modShell32           = windows.NewLazySystemDLL("shell32.dll")
-	procShellExecuteW    = modShell32.NewProc("ShellExecuteW")
-	elevatedCacheOnce    bool
-	elevatedCacheValue   bool
+	modShell32        = windows.NewLazySystemDLL("shell32.dll")
+	procShellExecuteW = modShell32.NewProc("ShellExecuteW")
 )
 
-// isProcessElevated reports whether the current process token is elevated.
-func isProcessElevated() bool {
-	if elevatedCacheOnce {
-		return elevatedCacheValue
-	}
-	var token windows.Token
-	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
-	if err != nil {
-		elevatedCacheOnce = true
-		elevatedCacheValue = false
-		return false
-	}
-	defer token.Close()
-	elevatedCacheOnce = true
-	elevatedCacheValue = token.IsElevated()
-	return elevatedCacheValue
-}
-
 // IsElevated is bound for the frontend sensor tip / restart-as-admin button.
+// Uses the shared isProcessElevated helper in diagnostics_win.go.
 func (a *App) IsElevated() bool {
 	return isProcessElevated()
 }
