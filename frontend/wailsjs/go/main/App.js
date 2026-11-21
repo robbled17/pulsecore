@@ -110,6 +110,14 @@ export function CleanSafeDiskCaches() {
   return window['go']['main']['App']['CleanSafeDiskCaches']();
 }
 
+export function PreviewSafeDiskCaches() {
+  return window['go']['main']['App']['PreviewSafeDiskCaches']();
+}
+
+export function PreviewDeleteResiduals(arg1) {
+  return window['go']['main']['App']['PreviewDeleteResiduals'](arg1);
+}
+
 export function HideToTray() {
   return window['go']['main']['App']['HideToTray']();
 }
