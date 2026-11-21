@@ -205,102 +205,113 @@ func (a *App) GetConnectedDevices() []PeripheralItem {
 }
 
 func (a *App) collectConnectedDevices() []PeripheralItem {
-	ensureOLE()
 	out := make([]PeripheralItem, 0, 16)
-
-	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
-	if err != nil {
-		return out
-	}
-	defer locator.Release()
-	dl, err := locator.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return out
-	}
-	defer dl.Release()
-
-	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
-	if err != nil {
-		return out
-	}
-	service := serviceRaw.ToIDispatch()
-	defer service.Release()
-
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
-		"SELECT Name, DeviceID, Service, PNPClass, Status FROM Win32_PnPEntity WHERE Status = 'OK'")
-	if err != nil {
-		return out
-	}
-	result := resultRaw.ToIDispatch()
-	defer result.Release()
-
-	countVar, _ := oleutil.GetProperty(result, "Count")
-	count := int(countVar.Val)
-	seen := make(map[string]struct{})
-	seenKinds := make(map[string]bool)
-
-	for i := 0; i < count; i++ {
-		itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+	finished := withSensorGate(defaultSensorTimeout, func() {
+		ensureOLE()
+		locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 		if err != nil {
-			continue
+			return
 		}
-		item := itemRaw.ToIDispatch()
-		nameVar, _ := oleutil.GetProperty(item, "Name")
-		idVar, _ := oleutil.GetProperty(item, "DeviceID")
-		svcVar, _ := oleutil.GetProperty(item, "Service")
-		clsVar, _ := oleutil.GetProperty(item, "PNPClass")
-		name := strings.TrimSpace(nameVar.ToString())
-		deviceID := strings.TrimSpace(idVar.ToString())
-		serviceName := strings.TrimSpace(svcVar.ToString())
-		pnpClass := strings.TrimSpace(clsVar.ToString())
-		item.Release()
+		defer locator.Release()
+		dl, err := locator.QueryInterface(ole.IID_IDispatch)
+		if err != nil {
+			return
+		}
+		defer dl.Release()
 
-		if isJunkPeripheralName(name) {
-			continue
+		serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+		if err != nil {
+			return
 		}
-		kind, ok := classifyCleanPeripheral(pnpClass, name, deviceID, serviceName)
-		if !ok {
-			continue
+		service := serviceRaw.ToIDispatch()
+		defer service.Release()
+
+		resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
+			"SELECT Name, DeviceID, Service, PNPClass, Status FROM Win32_PnPEntity WHERE Status = 'OK'")
+		if err != nil {
+			return
 		}
-		if shouldDropPeripheral(name, kind, seenKinds) {
-			continue
+		result := resultRaw.ToIDispatch()
+		defer result.Release()
+
+		countVar, _ := oleutil.GetProperty(result, "Count")
+		count := int(countVar.Val)
+		seen := make(map[string]struct{})
+		seenKinds := make(map[string]bool)
+
+		for i := 0; i < count; i++ {
+			itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+			if err != nil {
+				continue
+			}
+			item := itemRaw.ToIDispatch()
+			nameVar, _ := oleutil.GetProperty(item, "Name")
+			idVar, _ := oleutil.GetProperty(item, "DeviceID")
+			svcVar, _ := oleutil.GetProperty(item, "Service")
+			clsVar, _ := oleutil.GetProperty(item, "PNPClass")
+			name := strings.TrimSpace(nameVar.ToString())
+			deviceID := strings.TrimSpace(idVar.ToString())
+			serviceName := strings.TrimSpace(svcVar.ToString())
+			pnpClass := strings.TrimSpace(clsVar.ToString())
+			item.Release()
+
+			if isJunkPeripheralName(name) {
+				continue
+			}
+			kind, ok := classifyCleanPeripheral(pnpClass, name, deviceID, serviceName)
+			if !ok {
+				continue
+			}
+			if shouldDropPeripheral(name, kind, seenKinds) {
+				continue
+			}
+			group := peripheralGroup(kind)
+			if group == "" {
+				continue
+			}
+			display := humanizePeripheralName(name, kind, deviceID)
+			if shouldDropPeripheral(display, kind, seenKinds) {
+				continue
+			}
+			key := strings.ToLower(display + "|" + group)
+			if _, dup := seen[key]; dup {
+				continue
+			}
+			seen[key] = struct{}{}
+			seenKinds[kind] = true
+			out = append(out, PeripheralItem{
+				Name:     display,
+				DeviceID: deviceID,
+				Service:  serviceName,
+				Class:    pnpClass,
+				Kind:     kind,
+				Group:    group,
+				Icon:     peripheralIcon(kind, display),
+				Status:   "connected",
+			})
+			if len(out) >= 28 {
+				break
+			}
 		}
-		group := peripheralGroup(kind)
-		if group == "" {
-			continue
+
+		order := map[string]int{"input": 0, "audio": 1, "storage": 2, "display": 3}
+		for i := 1; i < len(out); i++ {
+			j := i
+			for j > 0 && order[out[j].Group] < order[out[j-1].Group] {
+				out[j], out[j-1] = out[j-1], out[j]
+				j--
+			}
 		}
-		display := humanizePeripheralName(name, kind, deviceID)
-		if shouldDropPeripheral(display, kind, seenKinds) {
-			continue
-		}
-		key := strings.ToLower(display + "|" + group)
-		if _, dup := seen[key]; dup {
-			continue
-		}
-		seen[key] = struct{}{}
-		seenKinds[kind] = true
+	})
+	if !finished && len(out) == 0 {
+		// Probe timed out / panicked: surface explicit unavailable status for UI.
 		out = append(out, PeripheralItem{
-			Name:     display,
-			DeviceID: deviceID,
-			Service:  serviceName,
-			Class:    pnpClass,
-			Kind:     kind,
-			Group:    group,
-			Icon:     peripheralIcon(kind, display),
-			Status:   "connected",
+			Name:   "unavailable",
+			Kind:   "unknown",
+			Group:  "input",
+			Icon:   "na",
+			Status: "unavailable",
 		})
-		if len(out) >= 28 {
-			break
-		}
-	}
-
-	order := map[string]int{"input": 0, "audio": 1, "storage": 2, "display": 3}
-	for i := 1; i < len(out); i++ {
-		j := i
-		for j > 0 && order[out[j].Group] < order[out[j-1].Group] {
-			out[j], out[j-1] = out[j-1], out[j]
-			j--
-		}
 	}
 	return out
 }

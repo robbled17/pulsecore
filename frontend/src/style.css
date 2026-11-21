@@ -259,6 +259,11 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
   border-radius: 10px;
   flex: 0 0 auto;
   box-shadow: var(--shadow-soft);
+  border: none;
+  background: transparent;
+  object-fit: contain;
+  /* Avoid white square borders from opaque icon assets */
+  mix-blend-mode: normal;
 }
 .brand-text { display: flex; flex-direction: column; gap: 2px; }
 .brand-name {
@@ -1343,6 +1348,8 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 .periph-name { font-size: 13px; font-weight: 650; color: var(--text); }
 .periph-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .periph-status { font-size: 11px; color: var(--ok); font-weight: 600; white-space: nowrap; }
+.periph-row.unavailable .periph-status { color: var(--muted); }
+.periph-row.unavailable .periph-name { color: var(--muted); }
 
 .game-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .game-search-wrap {

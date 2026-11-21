@@ -37,6 +37,29 @@ func systemPowerShell() string {
 	return filepath.Join(windowsRoot(), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 }
 
+// nvidiaSMIPath returns a known absolute nvidia-smi location or empty if missing.
+// Never relies on PATH to avoid hijack.
+func nvidiaSMIPath() string {
+	pf := os.Getenv("ProgramFiles")
+	candidates := []string{
+		filepath.Join(windowsRoot(), "System32", "nvidia-smi.exe"),
+	}
+	if pf != "" {
+		candidates = append([]string{
+			filepath.Join(pf, "NVIDIA Corporation", "NVSMI", "nvidia-smi.exe"),
+		}, candidates...)
+	}
+	for _, c := range candidates {
+		if strings.TrimSpace(c) == "" {
+			continue
+		}
+		if st, err := os.Stat(c); err == nil && !st.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
 func hiddenSysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{
 		HideWindow:    true,

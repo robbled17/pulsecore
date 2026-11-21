@@ -289,21 +289,21 @@ func queryProcessImagePath(pid uint32) string {
 }
 
 // KillAppProcesses terminates processes under InstallLocation.
-// Never kills protected system / Defender / shell processes.
+// Never kills protected system / Defender / shell / PulseCore / parent processes.
 func (a *App) KillAppProcesses(appID string) map[string]interface{} {
 	app, ok := findInstalledApp(a, appID)
 	if !ok {
 		return map[string]interface{}{"ok": false, "message": "Приложение не найдено"}
 	}
-	if isDangerousInstallRoot(app.InstallLocation) || IsProtectedSystemTarget(app.InstallLocation) {
-		return map[string]interface{}{"ok": false, "message": "InstallLocation защищён — завершение процессов запрещено"}
+	if !isValidInstallLocation(app.InstallLocation) {
+		return map[string]interface{}{"ok": false, "message": "InstallLocation защищён или слишком мелкий - завершение процессов запрещено"}
 	}
 	running := findProcessesUnder(app.InstallLocation)
 	killed := 0
 	failed := 0
 	skipped := 0
 	for _, p := range running {
-		if IsProtectedSystemTarget(p.Name) || IsProtectedSystemTarget(p.ImagePath) {
+		if IsProtectedSystemTarget(p.Name) || IsProtectedSystemTarget(p.ImagePath) || isSelfOrParentPID(p.PID) {
 			skipped++
 			continue
 		}
@@ -323,8 +323,12 @@ func (a *App) KillAppProcesses(appID string) map[string]interface{} {
 }
 
 func terminatePID(pid uint32) error {
-	// Re-check image path before terminate.
-	if path := queryProcessImagePath(pid); path != "" && IsProtectedSystemTarget(path) {
+	if pid == 0 || isSelfOrParentPID(pid) {
+		return fmt.Errorf("protected process")
+	}
+	path := queryProcessImagePath(pid)
+	// Unknown image path: refuse TerminateProcess (fail closed).
+	if path == "" || IsProtectedSystemTarget(path) || IsProtectedSystemTarget(filepath.Base(path)) {
 		return fmt.Errorf("protected process")
 	}
 	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
@@ -332,7 +336,48 @@ func terminatePID(pid uint32) error {
 		return err
 	}
 	defer windows.CloseHandle(h)
+	// Re-query after open in case of PID reuse.
+	if path2 := queryProcessImagePath(pid); path2 == "" || IsProtectedSystemTarget(path2) {
+		return fmt.Errorf("protected process")
+	}
 	return windows.TerminateProcess(h, 1)
+}
+
+func isSelfOrParentPID(pid uint32) bool {
+	self := uint32(os.Getpid())
+	if pid == self {
+		return true
+	}
+	if ppid := currentParentPID(); ppid != 0 && pid == ppid {
+		return true
+	}
+	path := queryProcessImagePath(pid)
+	if path != "" && isSelfOrWebView(filepath.Base(path)) {
+		return true
+	}
+	return false
+}
+
+func currentParentPID() uint32 {
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return 0
+	}
+	defer windows.CloseHandle(snap)
+	var pe windows.ProcessEntry32
+	pe.Size = uint32(unsafe.Sizeof(pe))
+	self := uint32(os.Getpid())
+	if err := windows.Process32First(snap, &pe); err != nil {
+		return 0
+	}
+	for {
+		if pe.ProcessID == self {
+			return pe.ParentProcessID
+		}
+		if err := windows.Process32Next(snap, &pe); err != nil {
+			return 0
+		}
+	}
 }
 
 // UninstallApp launches the official uninstaller. If killFirst, terminates matching processes.
@@ -342,11 +387,10 @@ func (a *App) UninstallApp(appID string, killFirst bool) map[string]interface{} 
 		return map[string]interface{}{"ok": false, "message": "Приложение не найдено"}
 	}
 	if killFirst {
-		if loc := strings.TrimSpace(app.InstallLocation); loc != "" &&
-			(isDangerousInstallRoot(loc) || IsProtectedSystemTarget(loc)) {
+		if !isValidInstallLocation(app.InstallLocation) {
 			return map[string]interface{}{
 				"ok":      false,
-				"message": "InstallLocation указывает на системный каталог — принудительное завершение запрещено",
+				"message": "InstallLocation указывает на системный каталог или слишком мелкий - принудительное завершение запрещено",
 			}
 		}
 		_ = a.KillAppProcesses(appID)
@@ -550,8 +594,14 @@ func isSafeResidualPath(fullPath, name string) bool {
 	if IsProtectedSystemTarget(fullPath) || isDangerousInstallRoot(fullPath) {
 		return false
 	}
+	if installPathDepth(fullPath) < minInstallLocationDepth {
+		return false
+	}
 	norm := normalizeProtectPath(fullPath)
 	if strings.Contains(norm, `\appdata\local\packages`) {
+		return false
+	}
+	if strings.Contains(norm, `\programdata\microsoft`) {
 		return false
 	}
 	// Never delete entire Local/Roaming/ProgramData roots
@@ -632,7 +682,7 @@ func scanRunValues(root registry.Key, path, label string, needles []string) []Re
 		if !nameMatchesAny(blob, needles) {
 			continue
 		}
-		// Run keys live under HK*\\SOFTWARE\\Microsoft\\Windows\\... — never auto-safe.
+		// Run keys live under HK*\\SOFTWARE\\Microsoft\\Windows\\... - never auto-safe.
 		fullPath := label
 		if strings.HasPrefix(label, "HKCU") {
 			fullPath = `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\` + name
@@ -655,6 +705,15 @@ func scanRunValues(root registry.Key, path, label string, needles []string) []Re
 // DeleteResiduals removes selected safe leftover items.
 // Registry changes always require Selected=true and write a .reg backup first.
 func (a *App) DeleteResiduals(items []ResidualItem) map[string]interface{} {
+	return a.deleteResiduals(items, false)
+}
+
+// PreviewDeleteResiduals dry-runs DeleteResiduals (no filesystem/registry mutation).
+func (a *App) PreviewDeleteResiduals(items []ResidualItem) map[string]interface{} {
+	return a.deleteResiduals(items, true)
+}
+
+func (a *App) deleteResiduals(items []ResidualItem, dryRun bool) map[string]interface{} {
 	removed := 0
 	failed := 0
 	skipped := 0
@@ -668,7 +727,13 @@ func (a *App) DeleteResiduals(items []ResidualItem) map[string]interface{} {
 				skipped++
 				continue
 			}
-			if err := os.RemoveAll(it.Path); err != nil {
+			var err error
+			if it.Kind == "file" {
+				err = safeRemoveFile(it.Path, "", dryRun)
+			} else {
+				err = safeRemoveAll(it.Path, "", dryRun)
+			}
+			if err != nil {
 				failed++
 			} else {
 				removed++
@@ -676,6 +741,14 @@ func (a *App) DeleteResiduals(items []ResidualItem) map[string]interface{} {
 		case "registry":
 			if !it.Safe || !isSafeResidualRegistry(it.Path, it.Label) {
 				skipped++
+				continue
+			}
+			if dryRun {
+				if IsForbiddenRegistryPath(it.Path) {
+					failed++
+				} else {
+					removed++
+				}
 				continue
 			}
 			if err := deleteResidualRegistry(it); err != nil {
@@ -687,12 +760,17 @@ func (a *App) DeleteResiduals(items []ResidualItem) map[string]interface{} {
 			skipped++
 		}
 	}
+	verb := "Удалено"
+	if dryRun {
+		verb = "К удалению"
+	}
 	return map[string]interface{}{
 		"ok":      failed == 0,
 		"removed": removed,
 		"failed":  failed,
 		"skipped": skipped,
-		"message": fmt.Sprintf("Удалено: %d, ошибок: %d, пропущено: %d", removed, failed, skipped),
+		"dryRun":  dryRun,
+		"message": fmt.Sprintf("%s: %d, ошибок: %d, пропущено: %d", verb, removed, failed, skipped),
 	}
 }
 
@@ -834,9 +912,18 @@ func (a *App) FinishTracedInstall() map[string]interface{} {
 	trace.After = after
 	trace.FinishedAt = time.Now().Format(time.RFC3339)
 	trace.NewKeys = diffStrings(trace.Before.UninstallKeys, after.UninstallKeys)
-	trace.NewKeys = append(trace.NewKeys, diffStrings(trace.Before.RunKeys, after.RunKeys)...)
-	trace.NewServices = diffStrings(trace.Before.Services, after.Services)
+	// Run keys live under Microsoft\Windows - never include in auto-diff for cleanup.
+	trace.NewServices = nil // system service hive; never auto-diff for deletion
 	trace.NewDirs = diffStrings(trace.Before.Dirs, after.Dirs)
+	// Drop forbidden registry-looking entries from the persisted diff.
+	filtered := make([]string, 0, len(trace.NewKeys))
+	for _, k := range trace.NewKeys {
+		if IsForbiddenRegistryPath(k) || IsForbiddenRegistryPath(`HKLM\SOFTWARE\`+k) {
+			continue
+		}
+		filtered = append(filtered, k)
+	}
+	trace.NewKeys = filtered
 
 	path := filepath.Join(a.tracesDir(), trace.AppID+".json")
 	raw, err := json.MarshalIndent(trace, "", "  ")
@@ -892,9 +979,16 @@ func (a *App) ListInstallTraces() []map[string]interface{} {
 	return out
 }
 
+const (
+	traceCleanupTimeout = 30 * time.Second
+	traceCleanupMaxDepth = 8
+	traceCleanupMaxDirs  = 64
+)
+
 // CleanupFromTrace removes new dirs recorded in a trace (whitelist + protect guards).
-// Registry keys from traces are never auto-deleted — they must go through DeleteResiduals
+// Registry keys from traces are never auto-deleted - they must go through DeleteResiduals
 // with explicit user selection and .reg backup.
+// Bounded by timeout, max depth, and max dir count; cancellable via context deadline.
 func (a *App) CleanupFromTrace(appID string) TraceCleanupResult {
 	path := filepath.Join(a.tracesDir(), appID+".json")
 	raw, err := os.ReadFile(path)
@@ -907,22 +1001,46 @@ func (a *App) CleanupFromTrace(appID string) TraceCleanupResult {
 	}
 	removed := make([]ResidualItem, 0)
 	failed := make([]ResidualItem, 0)
-	for _, dir := range tr.NewDirs {
+	deadline := time.Now().Add(traceCleanupTimeout)
+	dirs := tr.NewDirs
+	if len(dirs) > traceCleanupMaxDirs {
+		for _, dir := range dirs[traceCleanupMaxDirs:] {
+			it := ResidualItem{ID: "fs:" + dir, Kind: "folder", Path: dir, Label: dir, Safe: false, Selected: false}
+			failed = append(failed, it)
+		}
+		dirs = dirs[:traceCleanupMaxDirs]
+	}
+	for _, dir := range dirs {
+		if time.Now().After(deadline) {
+			it := ResidualItem{ID: "fs:" + dir, Kind: "folder", Path: dir, Label: dir + " (timeout)", Safe: false, Selected: false}
+			failed = append(failed, it)
+			continue
+		}
 		safe := isSafeResidualPath(dir, filepath.Base(dir))
 		it := ResidualItem{ID: "fs:" + dir, Kind: "folder", Path: dir, Label: dir, Safe: safe, Selected: true}
-		if !safe || isDangerousInstallRoot(dir) || IsProtectedSystemTarget(dir) {
+		if !safe || isDangerousInstallRoot(dir) || IsProtectedSystemTarget(dir) || installPathDepth(dir) < minInstallLocationDepth {
 			it.Safe = false
 			failed = append(failed, it)
 			continue
 		}
-		if err := os.RemoveAll(dir); err != nil {
+		if installPathDepth(dir) > traceCleanupMaxDepth {
+			it.Safe = false
+			it.Label = dir + " (depth)"
+			failed = append(failed, it)
+			continue
+		}
+		if err := safeRemoveAll(dir, "", false); err != nil {
 			failed = append(failed, it)
 		} else {
 			removed = append(removed, it)
 		}
 	}
 	// Refuse automatic registry deletes from traces (require explicit UI selection).
+	// System keys must never appear as deletable in the diff.
 	for _, key := range tr.NewKeys {
+		if IsForbiddenRegistryPath(key) {
+			continue // omit system keys from cleanup diff entirely
+		}
 		it := ResidualItem{ID: "reg:" + key, Kind: "registry", Path: key, Label: key, Safe: false, Selected: false}
 		failed = append(failed, it)
 	}
@@ -945,12 +1063,32 @@ func deleteTraceRegistryKey(key string) error {
 }
 
 func captureTraceSnapshot() TraceSnapshot {
-	return TraceSnapshot{
-		UninstallKeys: listUninstallKeyNames(),
-		RunKeys:       listRunValueNames(),
-		Services:      listServiceNames(),
-		Dirs:          listCommonInstallDirs(),
+	var snap TraceSnapshot
+	_ = withRecoverTimeout(8*time.Second, func() {
+		snap = TraceSnapshot{
+			UninstallKeys: filterNonSystemUninstallKeys(listUninstallKeyNames()),
+			RunKeys:       listRunValueNames(),
+			// Services under SYSTEM are never used for auto-delete; keep empty in diff basis
+			// to avoid surfacing system keys. Listing remains available for diagnostics only.
+			Services: nil,
+			Dirs:     listCommonInstallDirs(),
+		}
+	})
+	return snap
+}
+
+func filterNonSystemUninstallKeys(keys []string) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		// Keys are like HKLM\AppName - not full registry paths; skip obvious system names.
+		base := strings.ToLower(k)
+		if strings.Contains(base, "microsoft") || strings.Contains(base, "windows") ||
+			strings.Contains(base, "defender") || strings.Contains(base, "pulsecore") {
+			continue
+		}
+		out = append(out, k)
 	}
+	return out
 }
 
 func listUninstallKeyNames() []string {
