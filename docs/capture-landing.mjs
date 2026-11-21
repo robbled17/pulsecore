@@ -14,9 +14,45 @@ const ARTIFACTS = '/opt/cursor/artifacts'
 const LOCAL = path.join(__dirname, 'screenshots')
 
 const shots = [
-  { file: 'landing-live-demo-1440x900.png', w: 1440, h: 900 },
-  { file: 'landing-live-demo-390x844.png', w: 390, h: 844 },
+  { file: 'landing-live-demo-1440x900.png', w: 1440, h: 900, prep: 'desktop' },
+  { file: 'landing-live-demo-390x844.png', w: 390, h: 844, prep: 'mobile' },
+  { file: 'landing-gamepulse-covers-1440x900.png', w: 1440, h: 900, prep: 'gamepulse' },
+  { file: 'landing-lang-switcher-1440x900.png', w: 1440, h: 900, prep: 'lang' },
+  { file: 'landing-icon-hero-1440x900.png', w: 1440, h: 900, prep: 'icon' },
 ]
+
+async function prep(page, kind) {
+  await page.waitForSelector('.hero h1', { timeout: 10000 })
+  await page.waitForSelector('.preview-tab-pill', { timeout: 10000 })
+  await page.waitForTimeout(900)
+  if (kind === 'gamepulse') {
+    await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
+    await page.waitForTimeout(700)
+    await page.evaluate(() => {
+      document.getElementById('preview')?.scrollIntoView({ block: 'start' })
+    })
+    await page.waitForTimeout(400)
+  } else if (kind === 'lang') {
+    await page.selectOption('#lang-switch', 'en').catch(() => {})
+    await page.waitForTimeout(400)
+    await page.selectOption('#lang-switch', 'de').catch(() => {})
+    await page.waitForTimeout(350)
+    await page.evaluate(() => window.scrollTo(0, 0))
+  } else if (kind === 'icon') {
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(300)
+  } else if (kind === 'desktop') {
+    await page.click('.preview-tabs button[data-tab="hardware"]').catch(() => {})
+    await page.waitForTimeout(500)
+    await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
+    await page.waitForTimeout(500)
+  } else if (kind === 'mobile') {
+    await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
+    await page.waitForTimeout(500)
+    await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
+    await page.waitForTimeout(400)
+  }
+}
 
 async function main() {
   await mkdir(MEDIA, { recursive: true })
@@ -33,17 +69,8 @@ async function main() {
       viewport: { width: shot.w, height: shot.h },
       deviceScaleFactor: 1,
     })
-    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 30000 })
-    await page.waitForSelector('.hero h1', { timeout: 10000 })
-    await page.waitForSelector('.preview-tab-pill', { timeout: 10000 })
-    await page.waitForTimeout(1100)
-    // Exercise tab switch once on desktop for richer state (pill + fade)
-    if (shot.w >= 1000) {
-      await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
-      await page.waitForTimeout(520)
-      await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
-      await page.waitForTimeout(520)
-    }
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 45000 })
+    await prep(page, shot.prep)
     const outMedia = path.join(MEDIA, shot.file)
     const outLocal = path.join(LOCAL, shot.file)
     const outArt = path.join(ARTIFACTS, shot.file)
