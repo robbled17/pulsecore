@@ -1,12 +1,13 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.5.1",
+  "version": "1.6.0",
   "scripts": {
     "dev": "vite",
     "dev:mock": "vite --open /demo.html",
     "build": "vite build",
     "preview": "vite preview",
+    "smoke": "node scripts/smoke-ui.mjs",
     "capture:ui": "node scripts/capture-ui.mjs",
     "capture:final": "node scripts/capture-final.mjs"
   },

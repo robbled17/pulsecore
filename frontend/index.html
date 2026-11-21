@@ -55,7 +55,7 @@
         <img class="brand-logo" src="./src/assets/logo.svg" alt="PulseCore" />
         <div class="brand-text">
           <div class="brand-name">PulseCore</div>
-          <div class="brand-ver">v1.5.1</div>
+          <div class="brand-ver">v1.6.0</div>
         </div>
       </div>
       <nav class="nav">
@@ -481,6 +481,13 @@
             </label>
             <input type="range" id="mh-opacity" min="35" max="95" value="78" step="1" />
           </div>
+          <div class="hotkey-row">
+            <label for="mh-hotkey" class="slider-label">
+              <span data-i18n="mhHotkey">Горячая клавиша Mini-HUD</span>
+            </label>
+            <input type="text" id="mh-hotkey" class="hotkey-input" value="Ctrl+Shift+M" spellcheck="false" autocomplete="off" />
+            <p class="hotkey-hint" data-i18n="mhHotkeyHint">Показать или скрыть Mini-HUD (по умолчанию Ctrl+Shift+M)</p>
+          </div>
         </div>
         <div class="panel">
           <div class="panel-title" data-i18n="langTitle">Язык / Language</div>
@@ -611,7 +618,7 @@
       <div class="modal-body about-body">
         <div class="about-brand">
           <div class="about-app" id="about-app-name">PulseCore</div>
-          <div class="about-ver" id="about-app-ver">v1.5.1</div>
+          <div class="about-ver" id="about-app-ver">v1.6.0</div>
         </div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: <span data-i18n="aboutFOSS">Свободное ПО с открытым исходным кодом</span></div>
@@ -620,11 +627,28 @@
           <span data-i18n="aboutGitHub">GitHub</span>:
           <a class="about-link" id="about-github" href="https://github.com/robbled17/pulsecore" rel="noopener noreferrer">github.com/robbled17/pulsecore</a>
         </div>
-        <button type="button" class="btn" id="btn-copy-pc" data-i18n="aboutCopyPC">Скопировать конфигурацию ПК</button>
+        <div class="about-actions">
+          <button type="button" class="btn" id="btn-check-sensors" data-i18n="checkSensors">Проверить датчики</button>
+          <button type="button" class="btn" id="btn-copy-pc" data-i18n="aboutCopyPC">Скопировать конфигурацию ПК</button>
+        </div>
         <details class="about-license">
           <summary><span data-i18n="aboutLicense">Лицензия MIT</span></summary>
           <pre class="license-box" id="license-box"></pre>
         </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="diag-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="diag-title">
+    <div class="modal-card diag-card">
+      <div class="modal-head">
+        <h2 id="diag-title" data-i18n="diagTitle">Проверка датчиков</h2>
+        <button type="button" class="win-btn" id="diag-close">✕</button>
+      </div>
+      <div class="modal-body diag-body">
+        <div id="diag-status-line" class="diag-status-line" aria-live="polite"></div>
+        <div id="diag-list" class="diag-list"></div>
+        <button type="button" class="btn" id="btn-copy-diag" data-i18n="diagCopyReport">Скопировать отчет</button>
       </div>
     </div>
   </div>

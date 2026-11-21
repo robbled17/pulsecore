@@ -99,3 +99,9 @@ export function ToggleGameOverlay(arg1:boolean):Promise<void>;
 export function ToggleMiniHUD(arg1:boolean):Promise<void>;
 
 export function TriggerThermalCheck(arg1:number):Promise<void>;
+
+export function RunSelfDiagnostics():Promise<Record<string, any>>;
+
+export function SetMiniHUDHotkey(arg1:string):Promise<Record<string, any>>;
+
+export function GetMiniHUDHotkey():Promise<Record<string, any>>;
