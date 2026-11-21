@@ -29,10 +29,10 @@
   <div id="minihud" class="minihud hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
     <div class="minihud-capsule" style="--wails-draggable: drag;">
       <div class="minihud-metrics">
-        <span class="mh-item" data-mh="cpu"><span class="mh-ico">CPU</span><b id="mh-cpu" class="metric">—</b></span>
-        <span class="mh-item" data-mh="gpu"><span class="mh-ico gpu">GPU</span><b id="mh-gpu" class="metric">—</b></span>
-        <span class="mh-item" data-mh="ram"><span class="mh-ico ram">RAM</span><b id="mh-ram" class="metric">—</b></span>
-        <span class="mh-item" data-mh="temps"><span class="mh-ico temp">TEMP</span><b id="mh-temp" class="metric">—</b></span>
+        <span class="mh-item" data-mh="cpu"><span class="mh-ico">CPU</span><b id="mh-cpu" class="metric">-</b></span>
+        <span class="mh-item" data-mh="gpu"><span class="mh-ico gpu">GPU</span><b id="mh-gpu" class="metric">-</b></span>
+        <span class="mh-item" data-mh="ram"><span class="mh-ico ram">RAM</span><b id="mh-ram" class="metric">-</b></span>
+        <span class="mh-item" data-mh="temps"><span class="mh-ico temp">TEMP</span><b id="mh-temp" class="metric">-</b></span>
       </div>
       <button type="button" id="mh-expand" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Expand">↗</button>
     </div>
@@ -41,9 +41,9 @@
   <div id="gameoverlay" class="gameoverlay hidden" style="--wails-draggable: drag; --wails-drop-target: drop;">
     <div class="gameoverlay-capsule">
       <div class="gameoverlay-metrics">
-        <span class="mh-item"><span class="mh-ico fps">FPS</span><b id="go-fps" class="metric">—</b></span>
-        <span class="mh-item"><span class="mh-ico">1%</span><b id="go-low" class="metric">—</b></span>
-        <span class="mh-item"><span class="mh-ico">ms</span><b id="go-ft" class="metric">—</b></span>
+        <span class="mh-item"><span class="mh-ico fps">FPS</span><b id="go-fps" class="metric">-</b></span>
+        <span class="mh-item"><span class="mh-ico">1%</span><b id="go-low" class="metric">-</b></span>
+        <span class="mh-item"><span class="mh-ico">ms</span><b id="go-ft" class="metric">-</b></span>
       </div>
       <button type="button" id="go-close" class="btn ghost compact mh-expand" style="--wails-draggable: no-drag;" title="Close">✕</button>
     </div>
@@ -67,7 +67,7 @@
         <button type="button" class="nav-item dev-mode-nav hidden" data-tab="dev" data-i18n="tabDevMode">Dev Mode</button>
       </nav>
       <div class="sidebar-foot">
-        <div class="temp-chip metric" id="temp-chip">— °C</div>
+        <div class="temp-chip metric" id="temp-chip">- °C</div>
         <div class="muted" id="cpu-name">CPU</div>
         <button type="button" class="btn-about" id="btn-about" data-i18n="aboutBtn">О программе</button>
       </div>
@@ -92,14 +92,14 @@
             <span class="status-ico ram" aria-hidden="true">▣</span>
             <div class="status-text">
               <span class="status-label" data-i18n="freeRamLabel">Свободно RAM</span>
-              <span class="status-value metric" id="st-ram">—</span>
+              <span class="status-value metric" id="st-ram">-</span>
             </div>
           </div>
           <div class="status-cell">
             <span class="status-ico proc" aria-hidden="true">☰</span>
             <div class="status-text">
               <span class="status-label" data-i18n="bgProcLabel">Фоновые процессы</span>
-              <span class="status-value metric" id="st-procs">—</span>
+              <span class="status-value metric" id="st-procs">-</span>
             </div>
           </div>
         </div>
@@ -113,36 +113,36 @@
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
             <div class="metric-head">
               <div class="metric-label">CPU</div>
-              <div class="metric-value metric" id="ov-cpu">—</div>
+              <div class="metric-value metric" id="ov-cpu">-</div>
             </div>
-            <div class="metric-sub" id="ov-cpu-sub">—</div>
+            <div class="metric-sub" id="ov-cpu-sub">-</div>
             <canvas class="sparkline" id="spark-cpu" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-cpu-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="gpu">
             <div class="metric-head">
               <div class="metric-label">GPU</div>
-              <div class="metric-value metric" id="ov-gpu">—</div>
+              <div class="metric-value metric" id="ov-gpu">-</div>
             </div>
-            <div class="metric-sub" id="ov-gpu-sub">—</div>
+            <div class="metric-sub" id="ov-gpu-sub">-</div>
             <canvas class="sparkline" id="spark-gpu" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-gpu-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="ram">
             <div class="metric-head">
               <div class="metric-label">RAM</div>
-              <div class="metric-value metric" id="ov-ram">—</div>
+              <div class="metric-value metric" id="ov-ram">-</div>
             </div>
-            <div class="metric-sub" id="ov-ram-sub">—</div>
+            <div class="metric-sub" id="ov-ram-sub">-</div>
             <canvas class="sparkline" id="spark-ram" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-ram-bar"></i></div>
           </button>
           <button type="button" class="metric-card chart-tab" data-metric="battery">
             <div class="metric-head">
               <div class="metric-label" data-i18n="battery">Питание</div>
-              <div class="metric-value metric" id="ov-bat">—</div>
+              <div class="metric-value metric" id="ov-bat">-</div>
             </div>
-            <div class="metric-sub" id="ov-bat-sub">—</div>
+            <div class="metric-sub" id="ov-bat-sub">-</div>
             <canvas class="sparkline" id="spark-battery" width="160" height="36" aria-hidden="true"></canvas>
             <div class="bar"><i id="ov-bat-bar"></i></div>
           </button>
@@ -150,7 +150,7 @@
 
         <div class="panel chart-panel">
           <div class="panel-title" id="chart-title">Динамика CPU</div>
-          <div class="chart-current metric" id="chart-current">—</div>
+          <div class="chart-current metric" id="chart-current">-</div>
           <canvas id="trend-canvas" width="900" height="180"></canvas>
         </div>
 
@@ -226,14 +226,14 @@
         <details class="panel hw-block expand-panel" data-hw="cpu" open>
           <summary class="panel-title expand-summary" data-i18n="hwCPU">Процессор (CPU)</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">—</div></div>
-            <div><span class="muted" data-i18n="lblCores">Ядра / потоки</span><div class="hw-val metric" id="hw-cpu-cores">—</div></div>
-            <div><span class="muted" data-i18n="lblBaseFreq">Базовая частота</span><div class="hw-val metric" id="hw-cpu-base">—</div></div>
-            <div><span class="muted" data-i18n="lblCurrFreq">Текущая частота</span><div class="hw-val metric" id="hw-cpu-freq">—</div></div>
-            <div><span class="muted" data-i18n="lblLoad">Нагрузка</span><div class="hw-val metric" id="hw-cpu-load">—</div></div>
-            <div><span class="muted" data-i18n="lblTemp">Температура</span><div class="hw-val metric" id="hw-cpu-temp">—</div></div>
-            <div><span class="muted" data-i18n="lblCache">Кэш</span><div class="hw-val metric" id="hw-cpu-cache">—</div></div>
-            <div><span class="muted" data-i18n="lblArch">Архитектура</span><div class="hw-val" id="hw-cpu-arch">—</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">-</div></div>
+            <div><span class="muted" data-i18n="lblCores">Ядра / потоки</span><div class="hw-val metric" id="hw-cpu-cores">-</div></div>
+            <div><span class="muted" data-i18n="lblBaseFreq">Базовая частота</span><div class="hw-val metric" id="hw-cpu-base">-</div></div>
+            <div><span class="muted" data-i18n="lblCurrFreq">Текущая частота</span><div class="hw-val metric" id="hw-cpu-freq">-</div></div>
+            <div><span class="muted" data-i18n="lblLoad">Нагрузка</span><div class="hw-val metric" id="hw-cpu-load">-</div></div>
+            <div><span class="muted" data-i18n="lblTemp">Температура</span><div class="hw-val metric" id="hw-cpu-temp">-</div></div>
+            <div><span class="muted" data-i18n="lblCache">Кэш</span><div class="hw-val metric" id="hw-cpu-cache">-</div></div>
+            <div><span class="muted" data-i18n="lblArch">Архитектура</span><div class="hw-val" id="hw-cpu-arch">-</div></div>
           </div>
           <div id="core-grid-wrap" class="core-grid-wrap hidden">
             <div class="muted core-grid-label" data-i18n="lblPerCore">Нагрузка по ядрам (Dev)</div>
@@ -244,38 +244,38 @@
         <details class="panel hw-block expand-panel" data-hw="gpu" open>
           <summary class="panel-title expand-summary" data-i18n="hwGPU">Видеокарта (GPU)</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-gpu-name">—</div></div>
-            <div><span class="muted" data-i18n="lblDriver">Драйвер</span><div class="hw-val" id="hw-gpu-driver">—</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-gpu-name">-</div></div>
+            <div><span class="muted" data-i18n="lblDriver">Драйвер</span><div class="hw-val" id="hw-gpu-driver">-</div></div>
             <div>
               <span class="muted"><span data-i18n="lblDedVRAM">Выделенная VRAM</span> <span class="tip" tabindex="0" data-i18n-tip="tipDedVRAM">ⓘ</span></span>
-              <div class="hw-val metric" id="hw-gpu-ded">—</div>
+              <div class="hw-val metric" id="hw-gpu-ded">-</div>
             </div>
             <div>
               <span class="muted"><span data-i18n="lblSharedVRAM">Общая VRAM</span> <span class="tip" tabindex="0" data-i18n-tip="tipSharedVRAM">ⓘ</span></span>
-              <div class="hw-val metric" id="hw-gpu-shared">—</div>
+              <div class="hw-val metric" id="hw-gpu-shared">-</div>
             </div>
           </div>
         </details>
 
         <details class="panel hw-block expand-panel" data-hw="ram" open>
           <summary class="panel-title expand-summary" data-i18n="hwRAM">Оперативная память (RAM)</summary>
-          <div id="hw-ram-channel" class="channel-banner">—</div>
+          <div id="hw-ram-channel" class="channel-banner">-</div>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblCapacity">Объём</span><div class="hw-val metric" id="hw-ram-total">—</div></div>
-            <div><span class="muted" data-i18n="lblTypeFreq">Тип / частота</span><div class="hw-val metric" id="hw-ram-type">—</div></div>
-            <div><span class="muted" data-i18n="lblSlots">Слоты</span><div class="hw-val metric" id="hw-ram-slots">—</div></div>
-            <div><span class="muted" data-i18n="lblUsedFree">Занято / свободно</span><div class="hw-val metric" id="hw-ram-use">—</div></div>
+            <div><span class="muted" data-i18n="lblCapacity">Объём</span><div class="hw-val metric" id="hw-ram-total">-</div></div>
+            <div><span class="muted" data-i18n="lblTypeFreq">Тип / частота</span><div class="hw-val metric" id="hw-ram-type">-</div></div>
+            <div><span class="muted" data-i18n="lblSlots">Слоты</span><div class="hw-val metric" id="hw-ram-slots">-</div></div>
+            <div><span class="muted" data-i18n="lblUsedFree">Занято / свободно</span><div class="hw-val metric" id="hw-ram-use">-</div></div>
           </div>
         </details>
 
         <details class="panel hw-block expand-panel" data-hw="power" open>
           <summary class="panel-title expand-summary" data-i18n="hwPower">Питание</summary>
           <div class="hw-grid">
-            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-pwr-name">—</div></div>
-            <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="hw-pwr-status">—</div></div>
-            <div><span class="muted" data-i18n="lblCharge">Заряд</span><div class="hw-val metric" id="hw-pwr-pct">—</div></div>
-            <div><span class="muted" data-i18n="lblWear">Износ</span><div class="hw-val metric" id="hw-pwr-wear">—</div></div>
-            <div><span class="muted" data-i18n="lblCapacityWh">Ёмкость</span><div class="hw-val metric" id="hw-pwr-cap">—</div></div>
+            <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-pwr-name">-</div></div>
+            <div><span class="muted" data-i18n="lblStatus">Статус</span><div class="hw-val" id="hw-pwr-status">-</div></div>
+            <div><span class="muted" data-i18n="lblCharge">Заряд</span><div class="hw-val metric" id="hw-pwr-pct">-</div></div>
+            <div><span class="muted" data-i18n="lblWear">Износ</span><div class="hw-val metric" id="hw-pwr-wear">-</div></div>
+            <div><span class="muted" data-i18n="lblCapacityWh">Ёмкость</span><div class="hw-val metric" id="hw-pwr-cap">-</div></div>
           </div>
         </details>
 

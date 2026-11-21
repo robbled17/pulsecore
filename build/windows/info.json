@@ -6,7 +6,7 @@
 		"0000": {
 			"ProductVersion": "{{.Info.ProductVersion}}",
 			"CompanyName": "{{.Info.CompanyName}}",
-			"FileDescription": "PulseCore — lightweight Windows hardware intelligence",
+			"FileDescription": "PulseCore: lightweight Windows hardware intelligence",
 			"LegalCopyright": "{{.Info.Copyright}}",
 			"ProductName": "{{.Info.ProductName}}",
 			"OriginalFilename": "PulseCore.exe",

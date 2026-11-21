@@ -110,7 +110,7 @@ var gameCatalog []GameInfo
 var steamCache = map[string]GameInfo{}
 var steamCacheMu sync.RWMutex
 
-// Per-game requirement tables — BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
+// Per-game requirement tables: BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
 var gameRequirements = map[string]gameReqSet{
 	"cyberpunk": {
 		Low:   gameReq{55, 55, 38, 3},
@@ -639,7 +639,7 @@ func classifyTitle(name string, yearHint int) (cat string, year int, badge, genr
 	case containsAny(q, mobaHints):
 		cat, weight, genre, badge = "moba", 0.58, "MOBA", "eSports"
 	default:
-		// Unknown modern titles — mid AAA, not automatic "heavy unplayable".
+		// Unknown modern titles: mid AAA, not automatic "heavy unplayable".
 		cat, weight, genre, badge = "aaa", 0.95, "Action", "AAA"
 		if year >= 2020 {
 			badge = "AAA Next-Gen"

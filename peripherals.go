@@ -149,7 +149,7 @@ func classifyCleanPeripheral(pnpClass, name, deviceID, service string) (kind str
 			strings.Contains(blob, "touchpad") || strings.Contains(blob, "trackpad") || strings.Contains(blob, "сенсорная панель") {
 			return "mouse", true
 		}
-		// Skip anonymous HID vendor devices — usually noise.
+		// Skip anonymous HID vendor devices: usually noise.
 		if strings.Contains(blob, "hid-compliant") || strings.Contains(blob, "hid-совместим") || strings.Contains(blob, "vendor-defined") {
 			return "", false
 		}

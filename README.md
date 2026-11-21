@@ -8,17 +8,17 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](https://go.dev)
 [![Release](https://img.shields.io/github/v/release/robbled17/pulsecore?include_prereleases)](https://github.com/robbled17/pulsecore/releases)
 
-PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metrics, lag spotting, Eco Mode for background vampires, power profiles, S.M.A.R.T., Mini-HUD, and GamePulse FPS predictions — without heavy SDKs.
+PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metrics, lag spotting, Eco Mode for background vampires, power profiles, S.M.A.R.T., Mini-HUD, and GamePulse FPS predictions, without heavy SDKs.
 
 ## Capabilities
 
-- **Overview** — live metrics, sparklines, actionable alerts (thermal / RAM / disk / lag)
-- **Lag Spotter** — per-core spikes, stutter log, network diagnostics, sleep blockers
-- **Eco Mode** — soft-limit hungry background processes (safe denylist; undo supported)
-- **Hardware** — CPU thread grid, discrete GPU preference, RAM channels, battery wear
-- **GamePulse** — catalog search + FPS predictor across Low/Med/High/Ultra
-- **Mini-HUD** — always-on-top capsule with CPU/GPU/RAM/temps toggles
-- **Power profiles** — Silent / Balanced / Turbo via Windows `powercfg`
+- **Overview**: live metrics, sparklines, actionable alerts (thermal / RAM / disk / lag)
+- **Lag Spotter**: per-core spikes, stutter log, network diagnostics, sleep blockers
+- **Eco Mode**: soft-limit hungry background processes (safe denylist; undo supported)
+- **Hardware**: CPU thread grid, discrete GPU preference, RAM channels, battery wear
+- **GamePulse**: catalog search + FPS predictor across Low/Med/High/Ultra
+- **Mini-HUD**: always-on-top capsule with CPU/GPU/RAM/temps toggles
+- **Power profiles**: Silent / Balanced / Turbo via Windows `powercfg`
 
 ## Screenshots
 
@@ -70,7 +70,7 @@ Dev mode:
 wails dev
 ```
 
-Frontend-only mock UI (screenshots / demos — **not** shipped in production embed):
+Frontend-only mock UI (screenshots / demos; **not** shipped in production embed):
 
 ```bash
 cd frontend && npm run dev:mock

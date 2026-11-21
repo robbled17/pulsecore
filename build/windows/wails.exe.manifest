@@ -4,7 +4,7 @@
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
         <security>
             <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-                <!-- Never request elevation — unsigned GitHub Releases stay asInvoker. -->
+                <!-- Never request elevation: unsigned GitHub Releases stay asInvoker. -->
                 <requestedExecutionLevel level="asInvoker" uiAccess="false" />
             </requestedPrivileges>
         </security>
