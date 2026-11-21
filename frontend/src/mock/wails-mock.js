@@ -637,9 +637,9 @@ const App = {
     appName: name || 'Demo',
     message: 'Найдено остатков: 3',
     items: [
-      { id: 'fs:1', kind: 'folder', path: '%LOCALAPPDATA%\\DemoEditor', label: 'Local · DemoEditor', safe: true, selected: true },
-      { id: 'fs:2', kind: 'folder', path: '%APPDATA%\\DemoEditor', label: 'Roaming · DemoEditor', safe: true, selected: true },
-      { id: 'reg:1', kind: 'registry', path: 'HKCU\\Software\\DemoEditor', label: 'HKCU\\Software\\DemoEditor', safe: true, selected: true },
+      { id: 'fs:1', kind: 'folder', path: '%LOCALAPPDATA%\\DemoEditor', label: 'Local · DemoEditor', safe: true, selected: false },
+      { id: 'fs:2', kind: 'folder', path: '%APPDATA%\\DemoEditor', label: 'Roaming · DemoEditor', safe: true, selected: false },
+      { id: 'reg:1', kind: 'registry', path: 'HKCU\\Software\\DemoEditor', label: 'HKCU\\Software\\DemoEditor', safe: true, selected: false },
       { id: 'reg:2', kind: 'registry', path: 'HKLM\\Software\\Microsoft', label: 'HKLM\\Software\\Microsoft', safe: false, selected: false },
     ],
   }),
@@ -649,7 +649,16 @@ const App = {
   ListInstallTraces: async () => ([
     { appId: 'trace1', appName: 'setup.exe', createdAt: '2026-03-21T10:00:00Z', finishedAt: '2026-03-21T10:05:00Z', newKeys: 2, newDirs: 1, file: 'trace1.json' },
   ]),
-  CleanupFromTrace: async () => ({ ok: true, removed: [], failed: [], message: 'Удалено: 1, ошибок: 0' }),
+  CleanupFromTrace: async () => ({ ok: true, removed: [], failed: [], message: 'Удалено: 1, пропущено/ошибок: 0 (реестр только вручную)' }),
+  CleanSafeDiskCaches: async () => ({
+    ok: true,
+    deletedFiles: 12,
+    deletedBytes: 48 * 1024 * 1024,
+    skipped: 3,
+    errors: 0,
+    targets: ['%TEMP%', 'D3DSCache', 'Chrome/Default/Cache'],
+    message: 'Удалено файлов: 12 (48.0 МБ), пропущено: 3, ошибок: 0',
+  }),
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,

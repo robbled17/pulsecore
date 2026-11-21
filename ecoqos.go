@@ -61,6 +61,9 @@ var ecoPPLProtected = map[string]struct{}{
 }
 
 func isEcoProtected(name string) bool {
+	if IsProtectedSystemTarget(name) {
+		return true
+	}
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
 	if base == "" {
 		return true
@@ -70,6 +73,9 @@ func isEcoProtected(name string) bool {
 }
 
 func isPPLProtected(name string) bool {
+	if IsProtectedSystemTarget(name) {
+		return true
+	}
 	base := strings.ToLower(filepath.Base(strings.TrimSpace(name)))
 	_, ok := ecoPPLProtected[base]
 	return ok
@@ -161,11 +167,11 @@ func (a *App) ToggleEcoMode(pid int, enable bool) error {
 	// Allow undo for PIDs we previously eco'd even if name lookup fails transiently.
 	// Never eco-enable critical / unnamed processes.
 	if enable {
-		if name == "" || isEcoProtected(name) || isPPLProtected(name) {
+		if name == "" || IsProtectedSystemTarget(name) || isEcoProtected(name) || isPPLProtected(name) {
 			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
 		}
 	} else if !tracked {
-		if isEcoProtected(name) || isPPLProtected(name) {
+		if IsProtectedSystemTarget(name) || isEcoProtected(name) || isPPLProtected(name) {
 			return fmt.Errorf("Служба сейчас неактивна или защищена ядром Windows")
 		}
 	}
@@ -278,7 +284,7 @@ func (a *App) EcoModeByProcessName(name string, enable bool) error {
 	// Skip other kernel-protected binaries silently for UI calmness.
 	filtered := make([]string, 0, len(candidates))
 	for _, c := range candidates {
-		if isPPLProtected(c) || isEcoProtected(c) {
+		if IsProtectedSystemTarget(c) || isPPLProtected(c) || isEcoProtected(c) {
 			continue
 		}
 		filtered = append(filtered, c)

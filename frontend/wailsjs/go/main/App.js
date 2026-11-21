@@ -106,6 +106,10 @@ export function CleanupFromTrace(arg1) {
   return window['go']['main']['App']['CleanupFromTrace'](arg1);
 }
 
+export function CleanSafeDiskCaches() {
+  return window['go']['main']['App']['CleanSafeDiskCaches']();
+}
+
 export function HideToTray() {
   return window['go']['main']['App']['HideToTray']();
 }

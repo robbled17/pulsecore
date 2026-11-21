@@ -10,16 +10,18 @@ func TestEcoDenylistCriticalProcesses(t *testing.T) {
 	protected := []string{
 		"system", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe",
 		"lsass.exe", "services.exe", "svchost.exe", "dwm.exe",
+		"explorer.exe", "StartMenuExperienceHost.exe", "ShellExperienceHost.exe",
+		"SearchHost.exe", "ctfmon.exe", "RuntimeBroker.exe", "sihost.exe", "taskmgr.exe",
 		"pulsecore.exe", "zeropulse.exe", "PulseCore.EXE",
 	}
 	for _, n := range protected {
-		if !isEcoProtected(n) {
+		if !isEcoProtected(n) || !IsProtectedSystemTarget(n) {
 			t.Fatalf("expected protected: %s", n)
 		}
 	}
-	av := []string{"msmpeng.exe", "mssense.exe", "smartscreen.exe", "MpCmdRun.exe"}
+	av := []string{"msmpeng.exe", "mssense.exe", "smartscreen.exe", "MpCmdRun.exe", "NisSrv.exe", "SecurityHealthService.exe"}
 	for _, n := range av {
-		if !isPPLProtected(n) {
+		if !isPPLProtected(n) && !IsProtectedSystemTarget(n) {
 			t.Fatalf("expected AV/PPL protected: %s", n)
 		}
 	}
