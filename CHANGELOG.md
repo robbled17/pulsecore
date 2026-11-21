@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+- About: Check sensors self-diagnostics modal (CPU/GPU/RAM/drives+SMART/registry+cleaner/run mode) with copy report
+- Single instance: Windows named mutex `Global\PulseCoreSingleInstance` restores existing window on second launch
+- Settings: global Mini-HUD hotkey (default Ctrl+Shift+M), persisted, fail-soft registration
+- Frontend smoke test (Playwright + mock harness) wired into PR Windows CI
+
+### Fixed
+- Diagnostics never invent sensor numbers; unavailable / fallback / admin statuses only
+- Non-Windows / fixture path returns graceful unavailable statuses without panic
+
+### Needs hardware
+- Live dual-launch while tray-minimized or Mini-HUD floating
+- Live Mini-HUD hotkey inside exclusive fullscreen games
+
 ## 1.5.1
 
 ### Fixed
