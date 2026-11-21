@@ -271,6 +271,7 @@
       padding: 14px;
     }
     .preview-tabs {
+      position: relative;
       display: flex;
       flex-wrap: nowrap;
       gap: 6px;
@@ -286,8 +287,26 @@
       max-width: 100%;
     }
     .preview-tabs::-webkit-scrollbar { display: none; }
+    .preview-tab-pill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      border-radius: 999px;
+      background: rgba(110, 168, 255, 0.16);
+      border: 1px solid rgba(110, 168, 255, 0.35);
+      box-shadow: 0 0 20px rgba(110, 168, 255, 0.12);
+      pointer-events: none;
+      transition:
+        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform, width, height;
+    }
     .preview-tabs button {
       appearance: none;
+      position: relative;
+      z-index: 1;
       border: 1px solid transparent;
       background: transparent;
       color: var(--muted);
@@ -302,14 +321,14 @@
       scroll-snap-align: start;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
-      transition: none;
+      transition: color 0.2s ease;
     }
-    .preview-tabs button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    .preview-tabs button:hover { color: var(--text); }
     .preview-tabs button.active {
       color: #eaf2ff;
-      background: rgba(110, 168, 255, 0.16);
-      border-color: rgba(110, 168, 255, 0.35);
-      box-shadow: 0 0 20px rgba(110, 168, 255, 0.12);
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
     }
     .preview-frame {
       position: relative;
@@ -320,21 +339,34 @@
       isolation: isolate;
       margin: 0;
       padding: 0;
+      aspect-ratio: 1076 / 800;
+      width: 100%;
     }
     .preview-frame img {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      height: auto;
-      max-width: 100%;
-      object-fit: contain;
+      height: 100%;
+      max-width: none;
+      object-fit: cover;
       object-position: top left;
-      display: none;
+      display: block;
       margin: 0;
       padding: 0;
       border: 0;
-      vertical-align: top;
+      opacity: 0;
+      transform: translateY(6px);
+      transition:
+        opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+      z-index: 0;
     }
     .preview-frame img.active {
-      display: block;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      z-index: 1;
     }
 
     .bento {
@@ -350,12 +382,31 @@
       backdrop-filter: var(--blur);
       -webkit-backdrop-filter: var(--blur);
       padding: 20px 18px 18px;
-      transition: transform .2s ease, border-color .2s, box-shadow .2s;
+      transition: transform .2s ease, border-color .2s, box-shadow .2s, opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .card:hover {
       transform: translateY(-2px);
       border-color: rgba(110, 168, 255, 0.35);
       box-shadow: 0 18px 48px rgba(0,0,0,0.4), 0 0 28px rgba(110, 168, 255, 0.1);
+    }
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      transition:
+        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      transition-delay: var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+    .reveal.is-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .card.reveal.is-in {
+      transition: transform .2s ease, border-color .2s, box-shadow .2s;
+    }
+    .card.reveal.is-in:hover {
+      transform: translateY(-2px);
     }
     .card.span-2 { grid-column: span 2; }
     .card-icon {
@@ -399,6 +450,10 @@
       background: rgba(255,255,255,0.03);
       padding: 22px 18px;
       position: relative;
+      transition:
+        opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      transition-delay: var(--reveal-delay, 0ms);
     }
     .step::before {
       counter-increment: step;
@@ -479,10 +534,46 @@
       .card:hover {
         transform: none;
       }
+      .card.reveal.is-in:hover {
+        transform: translateY(0);
+      }
       .btn:hover { transform: none; }
-      .preview-tabs button,
       .btn {
         transition: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .ambient-spot {
+        transition: none !important;
+        transform: none !important;
+      }
+      .preview-tab-pill {
+        transition: none !important;
+      }
+      .preview-frame img {
+        transition: none !important;
+        transform: none !important;
+      }
+      .preview-frame img:not(.active) {
+        opacity: 0;
+      }
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .card,
+      .step,
+      .btn {
+        transition: none !important;
+      }
+      .hero-logo,
+      .hero h1,
+      .hero p,
+      .cta-row {
+        animation: none !important;
       }
     }
 
@@ -604,58 +695,59 @@
     </header>
 
     <section class="section" id="preview">
-      <div class="section-head">
+      <div class="section-head reveal">
         <h2>Живой интерфейс</h2>
         <p>Так выглядит программа. Переключайте вкладки</p>
       </div>
-      <div class="preview-shell">
+      <div class="preview-shell reveal" style="--reveal-delay: 80ms">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
+          <span class="preview-tab-pill" aria-hidden="true"></span>
           <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview">Обзор</button>
           <button type="button" role="tab" aria-selected="false" data-tab="lags">Лаги</button>
           <button type="button" role="tab" aria-selected="false" data-tab="gamepulse">GamePulse</button>
           <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
         </div>
         <div class="preview-frame">
-          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" width="1280" height="800" decoding="async" />
-          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" width="1280" height="800" decoding="async" />
-          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" width="1280" height="800" decoding="async" />
-          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" width="1280" height="800" decoding="async" />
+          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" width="1076" height="800" decoding="async" />
+          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" width="1076" height="800" decoding="async" />
+          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" width="1076" height="800" decoding="async" />
+          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" width="1076" height="800" decoding="async" />
         </div>
       </div>
     </section>
 
     <section class="section" id="features">
-      <div class="section-head">
+      <div class="section-head reveal">
         <h2>Всё для контроля и плавной работы ПК</h2>
         <p>Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы</p>
       </div>
       <div class="bento">
-        <article class="card span-2">
+        <article class="card span-2 reveal" style="--reveal-delay: 0ms">
           <div class="card-icon">⚡</div>
           <h3>Микролаги + Eco</h3>
           <p>Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия</p>
         </article>
-        <article class="card teal">
+        <article class="card teal reveal" style="--reveal-delay: 70ms">
           <div class="card-icon">🎯</div>
           <h3>FPS</h3>
           <p>Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках</p>
         </article>
-        <article class="card">
+        <article class="card reveal" style="--reveal-delay: 140ms">
           <div class="card-icon">⧉</div>
           <h3>Mini-HUD</h3>
           <p>Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами</p>
         </article>
-        <article class="card teal">
+        <article class="card teal reveal" style="--reveal-delay: 210ms">
           <div class="card-icon">🛡</div>
           <h3>Без админа</h3>
           <p>Запускается сразу после скачивания без сложных настроек и лишних разрешений системы</p>
         </article>
-        <article class="card">
+        <article class="card reveal" style="--reveal-delay: 280ms">
           <div class="card-icon">🔒</div>
           <h3>Приватность</h3>
           <p>Программа работает локально на вашем компьютере и никуда не отправляет личные данные</p>
         </article>
-        <article class="card teal">
+        <article class="card teal reveal" style="--reveal-delay: 350ms">
           <div class="card-icon">💨</div>
           <h3>Ресурсы</h3>
           <p>Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
@@ -664,20 +756,20 @@
     </section>
 
     <section class="section" id="start">
-      <div class="section-head">
+      <div class="section-head reveal">
         <h2>Быстрый старт</h2>
         <p>Три простых шага на Windows 10 или 11</p>
       </div>
       <div class="steps">
-        <div class="step">
+        <div class="step reveal" style="--reveal-delay: 0ms">
           <h3>Скачайте программу</h3>
           <p>Откройте страницу Releases и скачайте архив для Windows.</p>
         </div>
-        <div class="step">
+        <div class="step reveal" style="--reveal-delay: 80ms">
           <h3>Распакуйте архив</h3>
           <p>Распакуйте архив и найдите внутри файл PulseCore.exe.</p>
         </div>
-        <div class="step">
+        <div class="step reveal" style="--reveal-delay: 160ms">
           <h3>Запустите</h3>
           <p>Дважды щёлкните по PulseCore.exe. Готово.</p>
         </div>
@@ -729,6 +821,9 @@
       const tabs = [...document.querySelectorAll(".preview-tabs button")];
       const frames = [...document.querySelectorAll(".preview-frame img")];
       const frame = document.querySelector(".preview-frame");
+      const tablist = document.querySelector(".preview-tabs");
+      const pill = document.querySelector(".preview-tab-pill");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
       // Eager decode / warm cache (no loading=lazy)
       frames.forEach((img) => {
@@ -737,18 +832,48 @@
         if (img.decode) img.decode().catch(() => {});
       });
 
+      const movePill = (btn, instant) => {
+        if (!pill || !tablist || !btn) return;
+        const left = btn.offsetLeft;
+        const top = btn.offsetTop;
+        if (instant) pill.style.transition = "none";
+        pill.style.width = btn.offsetWidth + "px";
+        pill.style.height = btn.offsetHeight + "px";
+        pill.style.transform = "translate(" + left + "px, " + top + "px)";
+        if (instant) {
+          void pill.offsetWidth;
+          pill.style.transition = "";
+        }
+      };
+
       const activate = (id) => {
+        let activeBtn = null;
         tabs.forEach((b) => {
           const on = b.dataset.tab === id;
           b.classList.toggle("active", on);
           b.setAttribute("aria-selected", on ? "true" : "false");
-          if (on) b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
+          if (on) {
+            activeBtn = b;
+            b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
+          }
         });
         frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
+        if (activeBtn) {
+          requestAnimationFrame(() => movePill(activeBtn, reduceMotion.matches));
+        }
       };
       tabs.forEach((btn) => {
         btn.addEventListener("click", () => activate(btn.dataset.tab));
       });
+      const syncPill = () => {
+        const active = tabs.find((b) => b.classList.contains("active")) || tabs[0];
+        movePill(active, true);
+      };
+      syncPill();
+      window.addEventListener("resize", syncPill, { passive: true });
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(syncPill).catch(() => {});
+      }
 
       if (frame) {
         let x0 = 0;
@@ -775,6 +900,27 @@
         }, { passive: true });
         frame.addEventListener("pointercancel", () => { tracking = false; }, { passive: true });
       }
+
+      const reveals = [...document.querySelectorAll(".reveal")];
+      const showAllReveals = () => {
+        reveals.forEach((el) => el.classList.add("is-in"));
+      };
+      if (reduceMotion.matches || !("IntersectionObserver" in window)) {
+        showAllReveals();
+      } else {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          });
+        }, { threshold: 0.14, rootMargin: "0px 0px -6% 0px" });
+        reveals.forEach((el) => io.observe(el));
+      }
+      reduceMotion.addEventListener("change", (e) => {
+        if (e.matches) showAllReveals();
+        syncPill();
+      });
     })();
   </script>
 </body>
