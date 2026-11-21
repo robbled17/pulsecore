@@ -4,11 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PulseCore: лёгкий системный монитор для Windows</title>
-  <meta name="description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows. Eco Mode, Mini-HUD, zero telemetry." />
+  <meta name="description" content="Лёгкая программа для Windows: контроль ПК, меньше фризов, без лишней нагрузки на систему." />
   <meta property="og:title" content="PulseCore" />
-  <meta property="og:description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows" />
+  <meta property="og:description" content="Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы" />
   <meta property="og:image" content="screenshots/overview.png" />
   <link rel="icon" href="assets/appicon.png" />
+  <link rel="preload" as="image" href="screenshots/overview.png" />
+  <link rel="preload" as="image" href="screenshots/lags.png" />
+  <link rel="preload" as="image" href="screenshots/gamepulse.png" />
+  <link rel="preload" as="image" href="screenshots/hardware-16threads.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -17,6 +21,7 @@
       --bg: #05070f;
       --ink: #080d18;
       --card: rgba(18, 24, 42, 0.58);
+      --card-solid: #111625;
       --glass: rgba(255, 255, 255, 0.055);
       --line: rgba(160, 190, 255, 0.14);
       --line-soft: rgba(180, 210, 255, 0.28);
@@ -30,6 +35,7 @@
       --blur: blur(22px) saturate(165%);
       --mouse-x: 0;
       --mouse-y: 0;
+      --cta-grad: linear-gradient(135deg, rgba(110,168,255,0.95), rgba(61,231,200,0.75));
       --shadow: 0 18px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(140, 180, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
     }
 
@@ -52,6 +58,7 @@
       letter-spacing: -0.015em;
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
     }
 
     a { color: inherit; text-decoration: none; }
@@ -188,22 +195,42 @@
       font-size: 14px;
       font-weight: 650;
       border: 1px solid transparent;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
       transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s;
     }
     .btn:hover { transform: translateY(-1px); }
-    .btn-primary {
-      background: linear-gradient(135deg, rgba(110,168,255,0.95), rgba(61,231,200,0.75));
+    .btn-primary,
+    .btn-primary:link,
+    .btn-primary:visited,
+    .btn-primary:hover,
+    .btn-primary:active,
+    .btn-primary:focus,
+    .btn-primary:focus-visible {
+      background: var(--cta-grad);
+      background-color: #6ea8ff;
       color: #051018;
+      -webkit-tap-highlight-color: transparent;
       box-shadow: 0 10px 32px rgba(110, 168, 255, 0.28), 0 0 0 1px rgba(255,255,255,0.12) inset;
     }
-    .btn-primary:hover {
+    .btn-primary:hover,
+    .btn-primary:focus,
+    .btn-primary:focus-visible {
       box-shadow: 0 14px 40px rgba(110, 168, 255, 0.38), 0 0 0 1px rgba(255,255,255,0.16) inset;
+    }
+    .btn-primary:active {
+      background: var(--cta-grad);
+      background-color: #6ea8ff;
+      color: #051018;
+      transform: translateY(0);
+      box-shadow: 0 6px 20px rgba(110, 168, 255, 0.22), 0 0 0 1px rgba(255,255,255,0.1) inset;
     }
     .btn-ghost {
       background: rgba(255,255,255,0.04);
       border-color: var(--line-soft);
       color: var(--text);
       backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
     }
     .btn-ghost:hover {
       border-color: rgba(110, 168, 255, 0.45);
@@ -226,17 +253,20 @@
     .section-head p {
       color: var(--muted);
       font-size: 14.5px;
-      max-width: 480px;
+      max-width: 520px;
       margin: 0 auto;
       line-height: 1.5;
     }
 
     .preview-shell {
+      max-width: 1040px;
+      margin: 0 auto;
       border-radius: 22px;
       border: 1px solid var(--line);
       background: linear-gradient(165deg, rgba(32, 42, 72, 0.55), rgba(16, 22, 38, 0.52));
       box-shadow: var(--shadow);
       backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
       overflow: hidden;
       padding: 14px;
     }
@@ -270,7 +300,9 @@
       flex: 0 0 auto;
       white-space: nowrap;
       scroll-snap-align: start;
-      transition: color .2s, background .2s, border-color .2s, box-shadow .2s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: none;
     }
     .preview-tabs button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
     .preview-tabs button.active {
@@ -284,32 +316,25 @@
       border-radius: 14px;
       overflow: hidden;
       border: 1px solid rgba(160, 190, 255, 0.12);
-      background: #05070f; /* opaque: no stacked shot bleed */
+      background: #05070f;
       isolation: isolate;
-      aspect-ratio: 16 / 10;
+      margin: 0;
+      padding: 0;
     }
     .preview-frame img {
-      position: absolute;
-      inset: 0;
       width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: top center;
+      height: auto;
+      max-width: 100%;
+      object-fit: contain;
+      object-position: top left;
       display: none;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      z-index: 0;
-      transform: scale(1.02);
-      transition: opacity .35s ease, transform .4s ease;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      vertical-align: top;
     }
     .preview-frame img.active {
       display: block;
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
-      z-index: 1;
-      transform: scale(1);
     }
 
     .bento {
@@ -323,6 +348,7 @@
       background: linear-gradient(165deg, rgba(28, 38, 68, 0.55), rgba(14, 18, 32, 0.5));
       box-shadow: var(--shadow);
       backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
       padding: 20px 18px 18px;
       transition: transform .2s ease, border-color .2s, box-shadow .2s;
     }
@@ -428,13 +454,43 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Touch / phone: no blur, no parallax, solid cards */
+    @media (hover: none), (max-width: 768px) {
+      .ambient-spot {
+        transform: none !important;
+        transition: none !important;
+        will-change: auto;
+        filter: blur(100px);
+        opacity: 0.28;
+      }
+      .card,
+      .preview-shell,
+      .btn-ghost {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .card,
+      .preview-shell {
+        background: var(--card-solid);
+      }
+      .btn-ghost {
+        background: #151b2c;
+      }
+      .card:hover {
+        transform: none;
+      }
+      .btn:hover { transform: none; }
+      .preview-tabs button,
+      .btn {
+        transition: none;
+      }
+    }
+
     /* Tablet / laptop: 768-1440 */
     @media (min-width: 768px) and (max-width: 1440px) {
       .wrap { width: min(1120px, calc(100% - 48px)); }
       .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card.span-2 { grid-column: span 2; }
-      .preview-frame { aspect-ratio: 16 / 10; }
-      .preview-frame img { object-fit: contain; background: #05070f; }
       .preview-tabs { justify-content: center; flex-wrap: wrap; overflow-x: visible; }
     }
 
@@ -458,14 +514,13 @@
       .bento { grid-template-columns: 1fr; }
       .card.span-2 { grid-column: span 1; }
       .preview-shell { padding: 8px; border-radius: 16px; }
-      .preview-frame { aspect-ratio: 4 / 3; }
       .preview-tabs {
         justify-content: flex-start;
         flex-wrap: nowrap;
-        margin-left: -2px;
-        margin-right: -2px;
-        padding-left: 4px;
-        padding-right: 4px;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 2px;
+        padding-right: 2px;
       }
       .preview-tabs button {
         font-size: 12px;
@@ -483,7 +538,6 @@
     @media (max-width: 480px) {
       .wrap { width: calc(100% - 20px); }
       .hero h1 { font-size: clamp(26px, 10vw, 34px); }
-      .preview-frame { aspect-ratio: 5 / 4; }
     }
 
     /* Wide / 2K / 4K: 1920-3440 */
@@ -502,7 +556,6 @@
         left: 30%; bottom: -14%;
       }
       .hero h1 { font-size: clamp(52px, 3.2vw, 72px); }
-      .preview-frame { aspect-ratio: 16 / 9; }
       .bento { gap: 16px; }
     }
 
@@ -539,7 +592,7 @@
     <header class="hero" id="top">
       <img class="hero-logo" src="assets/appicon.png" alt="PulseCore" width="72" height="72" />
       <h1>PulseCore</h1>
-      <p>Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows</p>
+      <p>Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="https://github.com/robbled17/pulsecore/releases/latest">
           Скачать для Windows (.exe)
@@ -553,7 +606,7 @@
     <section class="section" id="preview">
       <div class="section-head">
         <h2>Живой интерфейс</h2>
-        <p>Тот же aurora-glass UI, что в приложении. Переключайте вкладки</p>
+        <p>Так выглядит программа. Переключайте вкладки</p>
       </div>
       <div class="preview-shell">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
@@ -563,49 +616,49 @@
           <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
         </div>
         <div class="preview-frame">
-          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" />
-          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" />
-          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" />
-          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" />
+          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" width="1280" height="800" decoding="async" />
+          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" width="1280" height="800" decoding="async" />
+          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" width="1280" height="800" decoding="async" />
+          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" width="1280" height="800" decoding="async" />
         </div>
       </div>
     </section>
 
     <section class="section" id="features">
       <div class="section-head">
-        <h2>Всё нужное, без тяжёлых SDK</h2>
-        <p>Стек Go + Wails: точность датчиков и спокойный UI</p>
+        <h2>Всё для контроля и плавной работы ПК</h2>
+        <p>Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы</p>
       </div>
       <div class="bento">
         <article class="card span-2">
           <div class="card-icon">⚡</div>
-          <h3>Микролаги + Eco Mode</h3>
-          <p>Ловит пики ядер и паузы ≥300 мс, показывает виновника. Eco Mode мягко усмиряет фон без закрытия процессов, с безопасным denylist и откатом.</p>
+          <h3>Микролаги</h3>
+          <p>Находит короткие подвисания и показывает, какая программа их вызывает. Eco Mode снижает нагрузку от фона, не закрывая нужные окна.</p>
         </article>
         <article class="card teal">
           <div class="card-icon">🎯</div>
-          <h3>Предиктор FPS</h3>
-          <p>GamePulse оценивает Low/Med/High/Ultra по CPU, GPU и каналам RAM.</p>
+          <h3>FPS в играх</h3>
+          <p>Подсказывает, насколько уверенно потянет ПК игру на Low, Medium, High или Ultra.</p>
         </article>
         <article class="card">
           <div class="card-icon">⧉</div>
           <h3>Mini-HUD</h3>
-          <p>Компактный оверлей поверх окон: CPU, GPU, RAM и температуры.</p>
+          <p>Маленькое окошко поверх других окон: загрузка процессора, видеокарты, памяти и температуры.</p>
         </article>
         <article class="card teal">
           <div class="card-icon">🛡</div>
-          <h3>Без прав админа</h3>
-          <p>asInvoker-манифест. Вкладки работают без elevation; админ-действия с понятным отказом.</p>
+          <h3>Без прав администратора</h3>
+          <p>Открывается и работает без запроса прав админа. Обычные функции доступны сразу.</p>
         </article>
         <article class="card">
           <div class="card-icon">🔒</div>
-          <h3>Zero telemetry</h3>
-          <p>Нет скрытого HTTP. Сеть только по кнопке; Steam CDN только при поиске игр.</p>
+          <h3>Приватность</h3>
+          <p>Никакой скрытой отправки данных. Сеть используется только когда вы сами нажимаете кнопку.</p>
         </article>
         <article class="card teal">
           <div class="card-icon">💨</div>
-          <h3>Мало RAM / CPU</h3>
-          <p>Лёгкий desk-app без Electron-жира. Опрос датчиков настраивается: 0.5 / 1 / 2 с.</p>
+          <h3>Лёгкая нагрузка</h3>
+          <p>Занимает мало памяти и процессора, чтобы монитор не мешал работе и играм.</p>
         </article>
       </div>
     </section>
@@ -613,20 +666,20 @@
     <section class="section" id="start">
       <div class="section-head">
         <h2>Быстрый старт</h2>
-        <p>Три шага до первого запуска на Windows 10/11</p>
+        <p>Три простых шага на Windows 10 или 11</p>
       </div>
       <div class="steps">
         <div class="step">
-          <h3>Скачайте релиз</h3>
-          <p>Откройте Releases и возьмите <code>PulseCore-*-windows-amd64.zip</code>.</p>
+          <h3>Скачайте</h3>
+          <p>Откройте Releases и скачайте архив для Windows.</p>
         </div>
         <div class="step">
           <h3>Распакуйте</h3>
-          <p>Проверьте SHA256 при желании и извлеките <code>PulseCore.exe</code>.</p>
+          <p>Извлеките файл PulseCore.exe на компьютер.</p>
         </div>
         <div class="step">
           <h3>Запустите</h3>
-          <p>Нужен WebView2 (уже есть на современных Windows). Готово.</p>
+          <p>Дважды щёлкните по PulseCore.exe. Готово.</p>
         </div>
       </div>
     </section>
@@ -645,15 +698,22 @@
   <script>
     (function () {
       const root = document.documentElement;
+      const coarseOrNarrow = window.matchMedia("(hover: none), (max-width: 768px)");
       let raf = 0;
       let mx = 0;
       let my = 0;
       const apply = () => {
         raf = 0;
+        if (coarseOrNarrow.matches) {
+          root.style.setProperty("--mouse-x", "0");
+          root.style.setProperty("--mouse-y", "0");
+          return;
+        }
         root.style.setProperty("--mouse-x", mx.toFixed(4));
         root.style.setProperty("--mouse-y", my.toFixed(4));
       };
       window.addEventListener("pointermove", (e) => {
+        if (coarseOrNarrow.matches) return;
         const w = window.innerWidth || 1;
         const h = window.innerHeight || 1;
         mx = (e.clientX / w) * 2 - 1;
@@ -664,23 +724,32 @@
         mx = 0; my = 0;
         if (!raf) raf = requestAnimationFrame(apply);
       }, { passive: true });
+      coarseOrNarrow.addEventListener("change", apply);
 
       const tabs = [...document.querySelectorAll(".preview-tabs button")];
       const frames = [...document.querySelectorAll(".preview-frame img")];
       const frame = document.querySelector(".preview-frame");
+
+      // Eager decode / warm cache (no loading=lazy)
+      frames.forEach((img) => {
+        img.loading = "eager";
+        img.decoding = "async";
+        if (img.decode) img.decode().catch(() => {});
+      });
+
       const activate = (id) => {
         tabs.forEach((b) => {
           const on = b.dataset.tab === id;
           b.classList.toggle("active", on);
           b.setAttribute("aria-selected", on ? "true" : "false");
-          if (on) b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+          if (on) b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
         });
         frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
       };
       tabs.forEach((btn) => {
         btn.addEventListener("click", () => activate(btn.dataset.tab));
       });
-      // Swipe preview on touch / trackpad-ish pointer drag
+
       if (frame) {
         let x0 = 0;
         let y0 = 0;
