@@ -17,8 +17,10 @@ const shots = [
   { file: 'landing-live-demo-1440x900.png', w: 1440, h: 900, prep: 'desktop' },
   { file: 'landing-live-demo-390x844.png', w: 390, h: 844, prep: 'mobile' },
   { file: 'landing-gamepulse-covers-1440x900.png', w: 1440, h: 900, prep: 'gamepulse' },
+  { file: 'landing-ssd-accordion-1440x900.png', w: 1440, h: 900, prep: 'ssd' },
   { file: 'landing-lang-switcher-1440x900.png', w: 1440, h: 900, prep: 'lang' },
   { file: 'landing-icon-hero-1440x900.png', w: 1440, h: 900, prep: 'icon' },
+  { file: 'landing-ssd-accordion-390x844.png', w: 390, h: 844, prep: 'ssd-mobile' },
 ]
 
 async function prep(page, kind) {
@@ -32,9 +34,22 @@ async function prep(page, kind) {
       document.getElementById('preview')?.scrollIntoView({ block: 'start' })
     })
     await page.waitForTimeout(400)
+  } else if (kind === 'ssd' || kind === 'ssd-mobile') {
+    await page.click('.preview-tabs button[data-tab="hardware"]').catch(() => {})
+    await page.waitForTimeout(500)
+    await page.evaluate(() => {
+      const acc = document.getElementById('demo-hw-ssd')
+      if (acc) {
+        acc.open = true
+        acc.scrollIntoView({ block: 'center', inline: 'nearest' })
+      }
+    })
+    await page.waitForTimeout(600)
   } else if (kind === 'lang') {
     await page.selectOption('#lang-switch', 'en').catch(() => {})
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(300)
+    await page.selectOption('#lang-switch', 'ja').catch(() => {})
+    await page.waitForTimeout(300)
     await page.selectOption('#lang-switch', 'de').catch(() => {})
     await page.waitForTimeout(350)
     await page.evaluate(() => window.scrollTo(0, 0))
@@ -42,14 +57,18 @@ async function prep(page, kind) {
     await page.evaluate(() => window.scrollTo(0, 0))
     await page.waitForTimeout(300)
   } else if (kind === 'desktop') {
-    await page.click('.preview-tabs button[data-tab="hardware"]').catch(() => {})
-    await page.waitForTimeout(500)
     await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
     await page.waitForTimeout(500)
+    await page.evaluate(() => {
+      document.getElementById('preview')?.scrollIntoView({ block: 'start' })
+    })
+    await page.waitForTimeout(400)
   } else if (kind === 'mobile') {
     await page.click('.preview-tabs button[data-tab="gamepulse"]').catch(() => {})
     await page.waitForTimeout(500)
-    await page.click('.preview-tabs button[data-tab="overview"]').catch(() => {})
+    await page.evaluate(() => {
+      document.getElementById('preview')?.scrollIntoView({ block: 'start' })
+    })
     await page.waitForTimeout(400)
   }
 }
@@ -68,6 +87,9 @@ async function main() {
     const page = await browser.newPage({
       viewport: { width: shot.w, height: shot.h },
       deviceScaleFactor: 1,
+    })
+    await page.addInitScript(() => {
+      try { localStorage.setItem('zp_lang', 'ru') } catch (_) {}
     })
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 45000 })
     await prep(page, shot.prep)
