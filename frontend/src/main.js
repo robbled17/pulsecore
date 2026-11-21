@@ -182,6 +182,7 @@ async function changeLanguage(next) {
   refresh()
   refreshWeekly()
   refreshPeripherals()
+  refreshUpgradeAdvisor()
 }
 
 function setActiveTab(name) {
@@ -1782,12 +1783,20 @@ function renderUpgradeRecs(advice) {
   }
   host.innerHTML = recs.map((r) => {
     const pitfalls = (r.pitfalls || []).map((p) => `<li>${escapeHtml(p)}</li>`).join('')
+    const model = r.model ? `<div class="upgrade-model">${escapeHtml(r.model)}</div>` : ''
+    const gain = r.estimatedGain
+      ? `<span class="upgrade-gain">${escapeHtml(r.estimatedGain)}</span>`
+      : ''
     return `
       <article class="upgrade-rec">
         <div class="upgrade-rec-head">
           <h3>${escapeHtml(r.title || '')}</h3>
-          <span class="upgrade-part">${escapeHtml(r.part || '')}</span>
+          <div class="upgrade-rec-meta">
+            ${gain}
+            <span class="upgrade-part">${escapeHtml(r.part || '')}</span>
+          </div>
         </div>
+        ${model}
         <p>${escapeHtml(r.body || '')}</p>
         <div class="pitfalls">
           <div class="pitfalls-title">${t('pitfallsTitle')}</div>

@@ -55,10 +55,10 @@ const PROFILES = {
   B: {
     id: 'B',
     label: 'Mid',
-    cpuName: 'AMD Ryzen 5 5600',
+    cpuName: 'AMD Ryzen 7 5700X',
     gpuName: 'NVIDIA GeForce RTX 3060',
-    physicalCores: 6,
-    logicalCores: 12,
+    physicalCores: 8,
+    logicalCores: 16,
     frequencyMHz: 3900,
     ramTotalMB: 16384,
     dedicatedMB: 8192,
@@ -581,36 +581,137 @@ const App = {
     const passport = await App.GetPCPassport()
     const g = String(goal || 'max_fps')
     const laptop = passport.isLaptop
-    const recommendations = laptop ? [
+    const socket = passport.socket || 'AM4'
+    const ramType = passport.ramType || 'DDR4'
+    const pitGPU = [
+      'Перед покупкой GPU измерьте место в корпусе и проверьте мощность и разъёмы блока питания.',
+      'Нужен запас по ваттам и родные разъёмы (8-pin / 12VHPWR).',
+      'После установки поставьте свежий драйвер NVIDIA или AMD.',
+    ]
+    const pitCPU = [
+      'Обновите BIOS перед установкой более нового процессора.',
+      'Проверьте VRM на плате.',
+      `Сокет сейчас: ${socket}. Новый процессор должен быть для этого сокета.`,
+    ]
+    const pitRAM = [
+      `Тип памяти: ${ramType}. Другое поколение не подойдёт.`,
+      'Совпадайте частоту и тайминги модулей.',
+      'В BIOS включите XMP/EXPO.',
+    ]
+    const desktopByGoal = {
+      max_fps: [
+        {
+          id: 'desktop-gpu', title: 'Видеокарта', part: 'gpu', priority: 1,
+          model: 'RTX 4070 Super', estimatedGain: '+60% FPS',
+          body: `Сейчас ${passport.gpuName}. Переход на RTX 4070 Super даёт примерно +60% FPS в типичных играх на 1080p/1440p.`,
+          pitfalls: pitGPU,
+        },
+        {
+          id: 'desktop-cpu', title: 'Процессор под сокет', part: 'cpu', priority: 2,
+          model: 'Ryzen 7 5700X3D / 5800X3D', estimatedGain: '+10-20% 1% lows',
+          body: `Сокет ${socket} ещё живой: 5700X3D встанет без смены платы. Сейчас у вас ${passport.cpuName}.`,
+          pitfalls: pitCPU,
+        },
+        {
+          id: 'desktop-ram', title: 'Оперативная память', part: 'ram', priority: 3,
+          model: `2x16 GB ${ramType} dual-channel`, estimatedGain: 'меньше статтеров',
+          body: `Свободно слотов: ${passport.ramSlotsFree}. Наберите 32 ГБ ${ramType} одной частоты и таймингов.`,
+          pitfalls: pitRAM,
+        },
+      ],
+      quiet_cool: [
+        {
+          id: 'desktop-cooling', title: 'Тихое охлаждение', part: 'cooling', priority: 1,
+          model: 'Башенный кулер 120/140 мм', estimatedGain: 'тише на 5-15°C',
+          body: 'Башенный кулер, нормальный поток воздуха и undervolt GPU/CPU часто тише смены железа.',
+          pitfalls: ['Смените термопасту и проверьте посадку кулера.', 'Undervolt снижайте маленькими шагами.', 'Воздух должен выходить из корпуса.'],
+        },
+        {
+          id: 'desktop-gpu', title: 'Тихая видеокарта', part: 'gpu', priority: 2,
+          model: 'RTX 4070 Super (3-fan)', estimatedGain: 'тише под нагрузкой',
+          body: 'RTX 4070 Super с трёхвентиляторным охлаждением и undervolt работает тише коротких дутышей.',
+          pitfalls: pitGPU,
+        },
+        {
+          id: 'desktop-cpu', title: 'CPU с умеренным TDP', part: 'cpu', priority: 3,
+          model: `Keep ${passport.cpuName} + cooler`, estimatedGain: 'ниже температура',
+          body: `На сокете ${socket} оставьте текущий чип и поставьте хороший башенный кулер.`,
+          pitfalls: pitCPU,
+        },
+      ],
+      work: [
+        {
+          id: 'desktop-ram', title: 'Оперативная память', part: 'ram', priority: 1,
+          model: `2x16 GB ${ramType}`, estimatedGain: '32-64 GB',
+          body: `Для работы целитесь в 32 или 64 ГБ ${ramType}. Все модули одной частоты и таймингов.`,
+          pitfalls: pitRAM,
+        },
+        {
+          id: 'desktop-cpu', title: 'Больше ядер на сокете', part: 'cpu', priority: 2,
+          model: 'Ryzen 9 5950X / 5900X', estimatedGain: '+multi-core',
+          body: `Для работы на сокете ${socket} логичен Ryzen 9: больше ядер для рендера и виртуалок.`,
+          pitfalls: pitCPU,
+        },
+        {
+          id: 'desktop-nvme', title: 'NVMe SSD', part: 'storage', priority: 3,
+          model: 'NVMe 1-2 TB', estimatedGain: 'быстрее загрузка',
+          body: 'Поставьте систему и проекты на NVMe. Свободный M.2: быстрый апгрейд без замены всего ПК.',
+          pitfalls: ['Для NVMe нужен свободный M.2 и иногда радиатор.', 'Клонируйте систему или поставьте Windows заново.', 'SATA SSD медленнее NVMe.'],
+        },
+      ],
+      budget: [
+        {
+          id: 'desktop-ram', title: 'Оперативная память', part: 'ram', priority: 1,
+          model: `2x16 GB ${ramType}`, estimatedGain: 'лучший $/эффект',
+          body: `Свободно слотов: ${passport.ramSlotsFree}. Dual-channel ${ramType} одной частоты и таймингов.`,
+          pitfalls: pitRAM,
+        },
+        {
+          id: 'desktop-gpu', title: 'Бюджетная видеокарта', part: 'gpu', priority: 2,
+          model: 'RTX 4060 Ti 16GB (used OK)', estimatedGain: '+30-45% FPS',
+          body: `Сейчас ${passport.gpuName}. RTX 4060 Ti (в том числе б/у) даёт заметный прирост без смены платформы.`,
+          pitfalls: pitGPU,
+        },
+        {
+          id: 'desktop-nvme', title: 'NVMe SSD', part: 'storage', priority: 3,
+          model: 'NVMe 1 TB', estimatedGain: 'быстрее загрузка',
+          body: 'Бюджетный NVMe ускоряет Windows и игры без дорогой смены GPU.',
+          pitfalls: ['Проверьте свободный M.2.', 'Клонируйте систему при необходимости.', 'Берите диск с DRAM или хорошим SLC-кэшем.'],
+        },
+      ],
+    }
+    const laptopRecs = [
       {
-        id: 'laptop-soldered', title: 'Честно про впаянное железо', part: 'other', priority: 1,
-        body: 'В большинстве ноутбуков CPU и GPU впаяны. Реальный апгрейд: RAM, SSD и охлаждение.',
-        pitfalls: ['Не покупайте мобильный процессор отдельно.', 'Замена платы часто дороже нового ноутбука.', 'Проверьте сервисное руководство.'],
+        id: 'laptop-ram', title: 'RAM: dual-channel', part: 'ram', priority: 1,
+        model: `1x 16 GB ${ramType} (match)`, estimatedGain: '+15-25% FPS (iGPU)',
+        body: `Вторая планка ${ramType} той же частоты включает dual-channel. На ноутбуке CPU/GPU обычно впаяны.`,
+        pitfalls: pitRAM,
       },
       {
-        id: 'laptop-ram', title: 'RAM: dual-channel', part: 'ram', priority: 2,
-        body: 'Вторая планка той же частоты включает dual-channel.',
-        pitfalls: [`Тип памяти: ${passport.ramType}.`, 'Берите одинаковые модули.', 'В BIOS включите XMP/EXPO.'],
-      },
-    ] : [
-      {
-        id: 'desktop-gpu', title: 'Сбалансированная видеокарта', part: 'gpu', priority: 1,
-        body: g === 'quiet_cool' ? 'Карта с тихим охлаждением и умеренным TDP.' : 'Главный прирост FPS даёт видеокарта под ваше разрешение.',
-        pitfalls: ['Измерьте длину корпуса.', 'Проверьте разъёмы БП.', 'Обновите драйвер после установки.'],
+        id: 'laptop-m2', title: 'Второй NVMe', part: 'storage', priority: 2,
+        model: 'NVMe 1 TB (2nd M.2)', estimatedGain: 'быстрее загрузка',
+        body: 'Второй M.2 или замена SSD ускоряет загрузку игр и проектов. Проверьте сервисное руководство.',
+        pitfalls: ['Проверьте второй слот M.2 в руководстве.', 'Иногда нужен радиатор.', 'Клонируйте систему при замене загрузочного диска.'],
       },
       {
-        id: 'desktop-cpu', title: 'Процессор под текущий сокет', part: 'cpu', priority: 2,
-        body: `Для сокета ${passport.socket} берите совместимый процессор.`,
-        pitfalls: ['Обновите BIOS.', 'Проверьте VRM.', `Сокет: ${passport.socket}.`],
+        id: 'laptop-cooling', title: 'Охлаждение и undervolt', part: 'cooling', priority: 3,
+        model: 'Паста + чистка + undervolt', estimatedGain: 'стабильнее FPS',
+        body: 'Чистка, новая паста и undervolt. Реальный апгрейд ноутбука без замены платы. Впаянный CPU/GPU менять нельзя.',
+        pitfalls: ['Не закрывайте вентиляцию.', 'Undervolt маленькими шагами.', 'Не покупайте мобильный CPU/GPU отдельно.'],
       },
     ]
+    const recommendations = laptop
+      ? laptopRecs
+      : (desktopByGoal[g] || desktopByGoal.max_fps)
     return {
       goal: g,
       chassis: passport.chassis,
       isLaptop: laptop,
       passport,
       recommendations,
-      summary: laptop ? 'Ноутбук: упор на RAM, SSD и охлаждение.' : 'ПК: видеокарта и процессор под текущий сокет.',
+      summary: laptop
+        ? 'Ноутбук: только RAM, второй NVMe и охлаждение. CPU/GPU обычно впаяны.'
+        : `ПК: конкретные модели под сокет ${socket} и текущую видеокарту.`,
     }
   },
   ListInstalledApps: async () => ([
