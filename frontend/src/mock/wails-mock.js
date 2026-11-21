@@ -3,6 +3,7 @@
  * Loaded only by demo.html / screenshot harness; production Wails path unchanged.
  * Supports hardware matrix profiles A/B/C for GamePulse + sensor fallback demos.
  */
+import embeddedGames from './embedded_games.json'
 
 const listeners = new Map()
 
@@ -186,14 +187,75 @@ function steamArt(id) {
   }
 }
 
-const GAMES = [
-  { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', weight: 0.7, ...steamArt(730) },
-  { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', weight: 0.85, ...steamArt(271590) },
-  { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', weight: 0.8, ...steamArt(292030) },
-  { id: 'elden', name: 'ELDEN RING', genre: 'Action RPG', category: 'modern', year: 2022, engine: 'Proprietary', weight: 1.05, ...steamArt(1245620) },
-  { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', weight: 0.55, ...steamArt(570) },
-  { id: 'cyberpunk', name: 'Cyberpunk 2077', genre: 'RPG', category: 'modern', year: 2020, engine: 'REDengine', weight: 1.25, ...steamArt(1091500) },
-]
+const GAMES = (Array.isArray(embeddedGames) && embeddedGames.length
+  ? embeddedGames
+  : [
+    { id: 'cs2', name: 'Counter-Strike 2', genre: 'FPS', category: 'modern', year: 2023, engine: 'Source 2', weight: 0.7, ...steamArt(730) },
+    { id: 'gta5', name: 'Grand Theft Auto V', genre: 'Action', category: 'modern', year: 2015, engine: 'RAGE', weight: 0.85, ...steamArt(271590) },
+    { id: 'witcher3', name: 'The Witcher 3', genre: 'RPG', category: 'classic', year: 2015, engine: 'REDengine', weight: 0.8, ...steamArt(292030) },
+    { id: 'elden', name: 'ELDEN RING', genre: 'Action RPG', category: 'modern', year: 2022, engine: 'Proprietary', weight: 1.05, ...steamArt(1245620) },
+    { id: 'dota2', name: 'Dota 2', genre: 'MOBA', category: 'classic', year: 2013, engine: 'Source 2', weight: 0.55, ...steamArt(570) },
+    { id: 'cyberpunk', name: 'Cyberpunk 2077', genre: 'RPG', category: 'modern', year: 2020, engine: 'REDengine', weight: 1.25, ...steamArt(1091500) },
+  ]
+).map((g) => {
+  const sid = Number(g.steamAppId) || 0
+  const art = sid > 0 ? steamArt(sid) : {}
+  return {
+    ...g,
+    posterUrl: g.posterUrl || art.posterUrl || '',
+    headerUrl: g.headerUrl || art.headerUrl || '',
+    steamAppId: sid || g.steamAppId || 0,
+  }
+})
+
+const SEARCH_ALIASES = {
+  'как достать соседа': ['neighbours from hell', 'neighbors from hell'],
+  'соседей': ['neighbours from hell'],
+  'герои 3': ['heroes of might and magic iii', 'homm3'],
+  'герои iii': ['heroes of might and magic iii'],
+  'герои 5': ['heroes of might and magic v'],
+  'ведьмак 3': ['witcher 3'],
+  'ведьмак': ['witcher'],
+  'кдло': ['counter-strike', 'cs2'],
+  'кс': ['counter-strike'],
+  'кс го': ['counter-strike'],
+  'дота': ['dota 2'],
+  'танки': ['world of tanks'],
+  'танки блиц': ['world of tanks blitz'],
+  'майкрафт': ['minecraft'],
+  'гта': ['grand theft auto'],
+  'гта 5': ['gta v', 'grand theft auto v'],
+  'гта сан': ['san andreas'],
+  'халф лайф': ['half-life'],
+  'халф-лайф': ['half-life'],
+  'флиаут': ['flatout'],
+  'флэтаут': ['flatout'],
+  'нфс': ['need for speed'],
+  'nfs underground': ['need for speed underground'],
+}
+
+function expandSearchAliases(q) {
+  const raw = String(q || '').trim().toLowerCase()
+  if (!raw) return []
+  if (SEARCH_ALIASES[raw]) return SEARCH_ALIASES[raw]
+  for (const [k, v] of Object.entries(SEARCH_ALIASES)) {
+    if (raw.includes(k)) return v
+  }
+  return []
+}
+
+function filterGames(query) {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return GAMES.slice()
+  const aliases = expandSearchAliases(q)
+  return GAMES.filter((g) => {
+    const name = String(g.name || '').toLowerCase()
+    const id = String(g.id || '').toLowerCase()
+    const genre = String(g.genre || '').toLowerCase()
+    if (name.includes(q) || id.includes(q) || genre.includes(q)) return true
+    return aliases.some((al) => name.includes(al) || id.includes(al))
+  })
+}
 
 /** Simplified GamePulse req tables (mirrors gamelab.go spirit). */
 const GAME_REQ = {
@@ -594,13 +656,9 @@ const App = {
     { group: 'audio', name: 'HyperX Cloud II', kind: 'Headset', class: 'Audio', icon: '🎧' },
     { group: 'display', name: 'LG UltraGear 27GL850', kind: 'Monitor', class: 'Display', icon: '🖥' },
   ]),
-  ListGames: async () => GAMES,
-  SearchGames: async (q) => {
-    const s = String(q || '').toLowerCase()
-    if (!s) return GAMES
-    return GAMES.filter((g) => g.name.toLowerCase().includes(s))
-  },
-  SearchGamesOnline: async (q) => App.SearchGames(q),
+  ListGames: async () => GAMES.slice(),
+  SearchGames: async (q) => filterGames(q),
+  SearchGamesOnline: async (q) => filterGames(q),
   PredictGameFPS: async (id) => predictFPS(id),
   GetPCPassport: async () => {
     const p = profile()
