@@ -272,6 +272,10 @@
       overflow: hidden;
       padding: 14px;
     }
+    .preview-shell > .preview-tabs {
+      overflow-x: auto;
+      max-width: 100%;
+    }
     .preview-tabs {
       position: relative;
       display: flex;
@@ -285,8 +289,9 @@
       overscroll-behavior-x: contain;
       scroll-snap-type: x proximity;
       scrollbar-width: none;
-      padding: 2px 2px 6px;
+      padding: 2px 12px 6px 2px;
       max-width: 100%;
+      box-sizing: border-box;
     }
     .preview-tabs::-webkit-scrollbar { display: none; }
     .preview-tab-pill {
@@ -625,9 +630,30 @@
       white-space: nowrap;
     }
     .demo-hw-card .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .demo-upgrade-goals {
-      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+    .demo-upgrade-device {
+      display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 10px;
     }
+    .demo-device {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .demo-device.active {
+      color: var(--text);
+      border-color: rgba(94, 234, 212, 0.45);
+      background: rgba(45, 212, 191, 0.14);
+    }
+    .demo-upgrade-goals {
+      display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 12px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      max-width: 100%;
+    }
+    .demo-upgrade-goals::-webkit-scrollbar { display: none; }
     .demo-goal {
       border: 1px solid var(--line);
       background: rgba(255,255,255,0.04);
@@ -637,6 +663,8 @@
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
     .demo-goal.active {
       color: var(--text);
@@ -644,15 +672,36 @@
       background: rgba(110,168,255,0.16);
     }
     .demo-upgrade-passport { margin-bottom: 12px; }
+    .demo-upgrade-recs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
     .demo-upgrade-rec {
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 14px;
       background: rgba(255,255,255,0.03);
     }
-    .demo-upgrade-rec .title { font-weight: 700; margin-bottom: 6px; }
+    .demo-upgrade-rec .rec-top {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px;
+    }
+    .demo-upgrade-rec .title { font-weight: 700; }
+    .demo-upgrade-rec .gain {
+      flex-shrink: 0;
+      font-size: 12px; font-weight: 700; color: #86efac;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      border-radius: 8px; padding: 2px 8px; white-space: nowrap;
+    }
+    .demo-upgrade-rec .model { font-size: 15px; font-weight: 750; margin-bottom: 6px; letter-spacing: -0.02em; }
     .demo-upgrade-rec .body { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 8px; }
-    .demo-upgrade-rec .pit { color: #fbbf24; font-size: 12.5px; line-height: 1.4; }
+    .demo-upgrade-rec .pit {
+      color: #fbbf24; font-size: 12.5px; line-height: 1.4;
+    }
+    .demo-upgrade-rec .pit ul {
+      margin: 4px 0 0; padding-left: 18px; color: rgba(251, 191, 36, 0.92);
+    }
     .demo-uninstall-app {
       border: 1px solid var(--line);
       border-radius: 14px;
@@ -1134,7 +1183,7 @@
       .wrap { width: min(1120px, calc(100% - 48px)); }
       .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card.span-2 { grid-column: span 2; }
-      .preview-tabs { justify-content: center; flex-wrap: wrap; overflow-x: visible; }
+      .preview-tabs { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; }
     }
 
     @media (max-width: 900px) {
@@ -1165,11 +1214,12 @@
         margin-left: 0;
         margin-right: 0;
         padding-left: 2px;
-        padding-right: 2px;
+        padding-right: 16px;
+        overflow-x: auto;
       }
       .preview-tabs button {
-        font-size: 12px;
-        padding: 7px 12px;
+        font-size: 11.5px;
+        padding: 7px 10px;
       }
       .cta-row {
         flex-direction: column;
@@ -1393,6 +1443,10 @@
                   <p data-i18n="demoUpgradeSub">Паспорт ПК и рекомендации под цель</p>
                 </div>
               </div>
+              <div class="demo-upgrade-device" id="demo-upgrade-device" role="group" aria-label="Device">
+                <button type="button" class="demo-device active" data-device="pc" data-i18n="devicePC">ПК</button>
+                <button type="button" class="demo-device" data-device="laptop" data-i18n="deviceLaptop">Ноутбук</button>
+              </div>
               <div class="demo-upgrade-goals" id="demo-upgrade-goals">
                 <button type="button" class="demo-goal active" data-goal="fps" data-i18n="goalMaxFps">Максимум FPS</button>
                 <button type="button" class="demo-goal" data-goal="quiet" data-i18n="goalQuiet">Тише и холоднее</button>
@@ -1402,15 +1456,11 @@
               <div class="demo-upgrade-passport">
                 <div class="demo-hw-card">
                   <div class="lab" data-i18n="passportTitle">Текущий ПК</div>
-                  <div class="big">Ryzen 7 5700X · RTX 3060</div>
-                  <div class="sub">AM4 · B550 · 16 GB DDR4 · 2/4 слота</div>
+                  <div class="big" id="demo-upgrade-pass-big">Ryzen 7 5700X · RTX 3060</div>
+                  <div class="sub" id="demo-upgrade-pass-sub">AM4 · B550 · 16 GB DDR4 · 2/4 слота</div>
                 </div>
               </div>
-              <div class="demo-upgrade-rec" id="demo-upgrade-rec">
-                <div class="title" data-i18n="demoUpgradeRecTitle">Сбалансированная видеокарта</div>
-                <div class="body" data-i18n="demoUpgradeRecBody">Главный прирост FPS даёт видеокарта под ваше разрешение.</div>
-                <div class="pit" data-i18n="demoUpgradePit">Подводные камни: длина корпуса, разъёмы БП, обновление BIOS.</div>
-              </div>
+              <div class="demo-upgrade-recs" id="demo-upgrade-recs"></div>
             </div>
 
             <div class="demo-pane" id="panel-uninstall" data-panel="uninstall" role="tabpanel">
@@ -1595,9 +1645,7 @@
           tabUninstall: "Удаление",
           demoUpgradeTitle: "Советник апгрейда",
           demoUpgradeSub: "Паспорт ПК и рекомендации под цель",
-          demoUpgradeRecTitle: "Сбалансированная видеокарта",
-          demoUpgradeRecBody: "Главный прирост FPS даёт видеокарта под ваше разрешение.",
-          demoUpgradePit: "Подводные камни: длина корпуса, разъёмы БП, обновление BIOS.",
+          demoUpgradePitfalls: "Подводные камни",
           demoUninstallTitle: "Умное удаление",
           demoUninstallSub: "Процессы, остатки и трассировка",
           demoUninstallWarn: "Найден процесс Chatty.exe. Можно завершить и удалить.",
@@ -1605,7 +1653,12 @@
           goalQuiet: "Тише и холоднее",
           goalWork: "Работа",
           goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
           passportTitle: "Текущий ПК",
+          passportLaptop: "Текущий ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слота",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слота · 1× NVMe",
           uninstallKillRemove: "Завершить и удалить",
           featUpgradeTitle: "Советник апгрейда",
           featUpgradeBody: "Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями",
@@ -1688,9 +1741,7 @@
           tabUninstall: "Uninstall",
           demoUpgradeTitle: "Upgrade Advisor",
           demoUpgradeSub: "PC passport and goal-based tips",
-          demoUpgradeRecTitle: "Balanced graphics card",
-          demoUpgradeRecBody: "The biggest FPS jump comes from a GPU matched to your resolution.",
-          demoUpgradePit: "Pitfalls: case length, PSU connectors, BIOS update.",
+          demoUpgradePitfalls: "Pitfalls",
           demoUninstallTitle: "Smart Uninstaller",
           demoUninstallSub: "Processes, leftovers and tracing",
           demoUninstallWarn: "Chatty.exe is running. You can kill it and uninstall.",
@@ -1698,7 +1749,12 @@
           goalQuiet: "Quiet and cool",
           goalWork: "Work",
           goalBudget: "Budget",
+          devicePC: "PC",
+          deviceLaptop: "Laptop",
           passportTitle: "Current PC",
+          passportLaptop: "Current laptop",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 slots",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 slots · 1× NVMe",
           uninstallKillRemove: "Kill and uninstall",
           featUpgradeTitle: "Upgrade Advisor",
           featUpgradeBody: "PC passport: socket, RAM slots, NVMe. Local tips for FPS, quiet, work or budget, with plain pitfalls",
@@ -1781,9 +1837,7 @@
           tabUninstall: "Жою",
           demoUpgradeTitle: "Апгрейд кеңесшісі",
           demoUpgradeSub: "ПК паспорты және мақсатқа сай кеңестер",
-          demoUpgradeRecTitle: "Теңгерімді видеокарта",
-          demoUpgradeRecBody: "FPS өсімінің басты бөлігі рұқсатыңызға сай GPU-дан келеді.",
-          demoUpgradePit: "Тұзақтар: корпус ұзындығы, БП қосқыштары, BIOS жаңарту.",
+          demoUpgradePitfalls: "Тұзақтар",
           demoUninstallTitle: "Ақылды жою",
           demoUninstallSub: "Процестер, қалдықтар және із",
           demoUninstallWarn: "Chatty.exe іске қосулы. Тоқтатып жоюға болады.",
@@ -1791,7 +1845,12 @@
           goalQuiet: "Тыныш әрі салқын",
           goalWork: "Жұмыс",
           goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
           passportTitle: "Қазіргі ПК",
+          passportLaptop: "Қазіргі ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
           uninstallKillRemove: "Тоқтатып жою",
           featUpgradeTitle: "Апгрейд кеңесшісі",
           featUpgradeBody: "ПК паспорты: сокет, RAM слоттары, NVMe. FPS, тыныштық, жұмыс не бюджетке сай жергілікті кеңестер",
@@ -1874,9 +1933,7 @@
           tabUninstall: "Бетерү",
           demoUpgradeTitle: "Апгрейд киңәшчесе",
           demoUpgradeSub: "ПК паспорты һәм максат буенча киңәшләр",
-          demoUpgradeRecTitle: "Тигез видеокарта",
-          demoUpgradeRecBody: "FPS үсешенең төп өлеше резолюциягә туры килгән GPU-дан килә.",
-          demoUpgradePit: "Куркынычлар: корпус озынлыгы, БП тоташтыргычлары, BIOS яңарту.",
+          demoUpgradePitfalls: "Куркынычлар",
           demoUninstallTitle: "Акыллы бетерү",
           demoUninstallSub: "Процесслар, калдыклар һәм эз",
           demoUninstallWarn: "Chatty.exe эшли. Туктатып бетерергә була.",
@@ -1884,7 +1941,12 @@
           goalQuiet: "Тынрак һәм салкынрак",
           goalWork: "Эш",
           goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
           passportTitle: "Хәзерге ПК",
+          passportLaptop: "Хәзерге ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
           uninstallKillRemove: "Туктатып бетерү",
           featUpgradeTitle: "Апгрейд киңәшчесе",
           featUpgradeBody: "ПК паспорты: сокет, RAM слотлары, NVMe. FPS, тынлык, эш яки бюджет өчен җирле киңәшләр",
@@ -1967,17 +2029,20 @@
           tabUninstall: "Deinstallieren",
           demoUpgradeTitle: "Upgrade-Berater",
           demoUpgradeSub: "PC-Pass und Tipps nach Ziel",
-          demoUpgradeRecTitle: "Ausgewogene Grafikkarte",
-          demoUpgradeRecBody: "Den größten FPS-Sprung bringt eine GPU passend zur Auflösung.",
-          demoUpgradePit: "Fallstricke: Gehäuselänge, Netzteilstecker, BIOS-Update.",
+          demoUpgradePitfalls: "Fallstricke",
           demoUninstallTitle: "Intelligente Deinstallation",
           demoUninstallSub: "Prozesse, Reste und Tracing",
           demoUninstallWarn: "Chatty.exe läuft. Sie können beenden und entfernen.",
           goalMaxFps: "Max FPS",
-          goalQuiet: "Leise und kühl",
+          goalQuiet: "Leise und kuehl",
           goalWork: "Arbeit",
           goalBudget: "Budget",
+          devicePC: "PC",
+          deviceLaptop: "Notebook",
           passportTitle: "Aktueller PC",
+          passportLaptop: "Aktuelles Notebook",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 Slots",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 Slots · 1× NVMe",
           uninstallKillRemove: "Beenden und entfernen",
           featUpgradeTitle: "Upgrade-Berater",
           featUpgradeBody: "PC-Pass: Sockel, RAM-Slots, NVMe. Lokale Tipps für FPS, Ruhe, Arbeit oder Budget mit klaren Fallstricken",
@@ -2060,9 +2125,7 @@
           tabUninstall: "削除",
           demoUpgradeTitle: "アップグレード助言",
           demoUpgradeSub: "PCパスポートと目的別の提案",
-          demoUpgradeRecTitle: "バランスの良いGPU",
-          demoUpgradeRecBody: "解像度に合ったGPUがFPS向上の主役です。",
-          demoUpgradePit: "注意点: ケース長、電源コネクタ、BIOS更新。",
+          demoUpgradePitfalls: "注意点",
           demoUninstallTitle: "スマートアンインストール",
           demoUninstallSub: "プロセス、残留、追跡",
           demoUninstallWarn: "Chatty.exe が実行中。終了して削除できます。",
@@ -2070,7 +2133,12 @@
           goalQuiet: "静かで涼しい",
           goalWork: "作業",
           goalBudget: "予算",
+          devicePC: "デスクトップ",
+          deviceLaptop: "ノートPC",
           passportTitle: "現在のPC",
+          passportLaptop: "現在のノートPC",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 スロット",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 スロット · 1× NVMe",
           uninstallKillRemove: "終了して削除",
           featUpgradeTitle: "アップグレード助言",
           featUpgradeBody: "PCパスポート: ソケット、RAMスロット、NVMe。FPS・静音・作業・予算向けのローカル提案と注意点",
@@ -2153,9 +2221,7 @@
           tabUninstall: "卸载",
           demoUpgradeTitle: "升级顾问",
           demoUpgradeSub: "电脑护照与按目标的建议",
-          demoUpgradeRecTitle: "均衡显卡",
-          demoUpgradeRecBody: "按分辨率搭配显卡，帧率提升最大。",
-          demoUpgradePit: "坑点: 机箱长度、电源接口、更新 BIOS。",
+          demoUpgradePitfalls: "坑点",
           demoUninstallTitle: "智能卸载",
           demoUninstallSub: "进程、残留与追踪",
           demoUninstallWarn: "Chatty.exe 正在运行。可以结束并卸载。",
@@ -2163,7 +2229,12 @@
           goalQuiet: "更安静更凉",
           goalWork: "办公",
           goalBudget: "省钱",
+          devicePC: "台式机",
+          deviceLaptop: "笔记本",
           passportTitle: "当前电脑",
+          passportLaptop: "当前笔记本",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 插槽",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 插槽 · 1× NVMe",
           uninstallKillRemove: "结束并卸载",
           featUpgradeTitle: "升级顾问",
           featUpgradeBody: "电脑护照: 插槽、内存槽、NVMe。按帧率、安静、办公或省钱给出本地建议与坑点",
@@ -2214,6 +2285,7 @@
         renderProcs();
         const ecoAlert = document.getElementById("demo-eco-alert");
         if (ecoAlert) ecoAlert.textContent = t("ecoMode");
+        if (typeof window.__pcRenderUpgrade === "function") window.__pcRenderUpgrade();
         requestAnimationFrame(() => {
           const active = document.querySelector(".preview-tabs button.active");
           if (active && typeof window.__pcMovePill === "function") window.__pcMovePill(active, true);
@@ -2293,7 +2365,7 @@
           b.setAttribute("aria-selected", on ? "true" : "false");
           if (on) {
             activeBtn = b;
-            b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
+            b.scrollIntoView({ inline: "center", block: "nearest", behavior: "auto" });
           }
         });
         panes.forEach((p) => {
@@ -2794,26 +2866,270 @@
         });
       }
 
-      const upgradeCopy = {
-        fps: { titleKey: "demoUpgradeRecTitle", bodyKey: "demoUpgradeRecBody", pitKey: "demoUpgradePit" },
-        quiet: { titleKey: "featUpgradeTitle", bodyKey: "goalQuiet", pitKey: "demoUpgradePit" },
-        work: { titleKey: "goalWork", bodyKey: "featUpgradeBody", pitKey: "demoUpgradePit" },
-        budget: { titleKey: "goalBudget", bodyKey: "featUpgradeBody", pitKey: "demoUpgradePit" }
+      const upgradeState = { device: "pc", goal: "fps" };
+      const upgradeDemoData = {
+        pc: {
+          big: "Ryzen 7 5700X · RTX 3060",
+          goals: {
+            fps: [
+              {
+                title: "Видеокарта",
+                model: "RTX 4070 Super",
+                gain: "+60% FPS",
+                body: "Сейчас RTX 3060. Переход на 4070 Super даёт около +60% FPS в 1080p/1440p. Главный прирост для этого ПК.",
+                pits: [
+                  "Перед покупкой GPU измерьте место в корпусе и проверьте мощность и разъёмы блока питания.",
+                  "Нужен запас по ваттам и родные разъёмы (8-pin / 12VHPWR).",
+                  "После установки поставьте свежий драйвер NVIDIA или AMD."
+                ]
+              },
+              {
+                title: "Процессор под сокет AM4",
+                model: "Ryzen 7 5700X3D / 5800X3D",
+                gain: "+10-20% 1% lows",
+                body: "Сокет AM4 ещё живой: X3D встанет без смены платы. Сейчас Ryzen 7 5700X. Снимает CPU limit в играх.",
+                pits: [
+                  "Обновите BIOS перед установкой более нового процессора.",
+                  "Проверьте VRM на плате.",
+                  "Сокет сейчас: AM4. Новый процессор должен быть для этого сокета."
+                ]
+              },
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4 dual-channel",
+                gain: "меньше статтеров",
+                body: "Свободно 2 слота. Наберите 32 ГБ DDR4 одной частоты и таймингов для стабильного FPS.",
+                pits: [
+                  "Тип памяти: DDR4. Другое поколение не подойдёт.",
+                  "Совпадайте частоту и тайминги модулей.",
+                  "В BIOS включите XMP/EXPO."
+                ]
+              }
+            ],
+            quiet: [
+              {
+                title: "Тихое охлаждение",
+                model: "Башенный кулер 120/140 мм",
+                gain: "тише на 5-15°C",
+                body: "Башенный кулер, поток воздуха и undervolt GPU/CPU часто тише смены железа.",
+                pits: ["Смените термопасту и проверьте посадку.", "Undervolt маленькими шагами.", "Воздух должен выходить из корпуса."]
+              },
+              {
+                title: "Тихая видеокарта",
+                model: "RTX 4070 Super (3-fan)",
+                gain: "тише под нагрузкой",
+                body: "Трёхвентиляторная 4070 Super с undervolt тише коротких дутышей и даёт запас FPS.",
+                pits: [
+                  "Перед покупкой GPU измерьте место в корпусе и проверьте блок питания.",
+                  "Нужны родные разъёмы питания.",
+                  "Поставьте свежий драйвер после установки."
+                ]
+              },
+              {
+                title: "CPU с умеренным TDP",
+                model: "Оставить 5700X + кулер",
+                gain: "ниже температура",
+                body: "На AM4 оставьте 5700X и поставьте хороший башенный кулер вместо шумного боксового.",
+                pits: ["Обновите BIOS при смене CPU.", "Проверьте VRM.", "Сокет AM4."]
+              }
+            ],
+            work: [
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4",
+                gain: "32-64 GB",
+                body: "Для работы целитесь в 32 или 64 ГБ DDR4. Все модули одной частоты и таймингов.",
+                pits: ["Тип: DDR4.", "Совпадайте частоту и тайминги.", "Включите XMP/EXPO."]
+              },
+              {
+                title: "Больше ядер на AM4",
+                model: "Ryzen 9 5950X / 5900X",
+                gain: "+multi-core",
+                body: "Сокет AM4: Ryzen 9 без смены платы. Больше ядер для рендера, компиляции и виртуалок.",
+                pits: ["Обновите BIOS перед новым CPU.", "Проверьте VRM.", "Только сокет AM4."]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1-2 TB",
+                gain: "быстрее проекты",
+                body: "Поставьте систему и проекты на NVMe. Свободный M.2: быстрый апгрейд без замены ПК.",
+                pits: ["Нужен свободный M.2.", "Клонируйте ОС при необходимости.", "SATA SSD медленнее NVMe."]
+              }
+            ],
+            budget: [
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4",
+                gain: "лучший $/эффект",
+                body: "Свободные слоты: dual-channel DDR4 одной частоты. Дешёвый и заметный шаг.",
+                pits: ["Только DDR4.", "Частота и тайминги совпадают.", "Включите XMP."]
+              },
+              {
+                title: "Бюджетная видеокарта",
+                model: "RTX 4060 Ti 16GB (б/у OK)",
+                gain: "+30-45% FPS",
+                body: "Сейчас RTX 3060. 4060 Ti (в том числе б/у) даёт прирост без смены платформы.",
+                pits: [
+                  "Перед покупкой измерьте корпус и проверьте блок питания.",
+                  "Родные разъёмы питания.",
+                  "Свежий драйвер после установки."
+                ]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1 TB",
+                gain: "быстрее загрузка",
+                body: "Бюджетный NVMe ускоряет Windows и игры без дорогой смены GPU.",
+                pits: ["Проверьте свободный M.2.", "Клонируйте систему при замене.", "Берите диск с нормальным кэшем."]
+              }
+            ]
+          }
+        },
+        laptop: {
+          big: "Ryzen 7 6800H · RTX 3060 Laptop",
+          goals: {
+            fps: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "+15-25% FPS (iGPU)",
+                body: "Вторая планка той же частоты включает dual-channel. CPU и GPU в ноутбуке обычно впаяны.",
+                pits: ["Только тот же тип памяти.", "Совпадайте частоту и тайминги.", "Проверьте сервисное руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "быстрее загрузка",
+                body: "Второй M.2 ускоряет игры и проекты. Это реальный апгрейд ноутбука без замены платы.",
+                pits: ["Проверьте второй слот в руководстве.", "Иногда нужен радиатор.", "Клонируйте ОС при замене загрузочного."]
+              },
+              {
+                title: "Охлаждение и undervolt",
+                model: "Паста + чистка + undervolt",
+                gain: "стабильнее FPS",
+                body: "Охлаждение держит частоты дольше. На ноутбуке это часто даёт больше стабильного FPS, чем попытка разогнать всё.",
+                pits: ["Не закрывайте вентиляцию.", "Undervolt маленькими шагами.", "Не покупайте мобильный CPU/GPU отдельно."]
+              }
+            ],
+            quiet: [
+              {
+                title: "Охлаждение и undervolt",
+                model: "Паста + чистка + undervolt",
+                gain: "заметно тише",
+                body: "Главный путь к тишине: чистка, паста, undervolt и тихий профиль питания. Новый GPU сюда не поставить.",
+                pits: ["Не закрывайте вентиляцию.", "Undervolt маленькими шагами.", "CPU/GPU впаяны."]
+              },
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "меньше нагрева от iGPU",
+                body: "Dual-channel снижает нагрузку на память и помогает держать частоты без лишнего шума кулера.",
+                pits: ["Тот же тип памяти.", "Частота и тайминги совпадают.", "Смотрите руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB",
+                gain: "тише при копировании",
+                body: "Быстрый NVMe меньше крутит вентиляторы при больших копиях, чем медленный диск.",
+                pits: ["Свободный M.2.", "Радиатор по необходимости.", "Клонирование ОС."]
+              }
+            ],
+            work: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "быстрее отклик",
+                body: "Вторая планка для dual-channel. Браузер, IDE и вкладки любят объём и двухканал.",
+                pits: ["Тот же тип.", "Частота и тайминги.", "Сервисное руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "быстрее проекты",
+                body: "Рабочим задачам нужен быстрый NVMe: проекты, Docker, IDE.",
+                pits: ["Проверьте второй слот.", "Радиатор.", "Клонирование при замене."]
+              },
+              {
+                title: "Охлаждение",
+                model: "Паста + чистка",
+                gain: "стабильные частоты",
+                body: "Чистка и паста держат частоты на длинных задачах. Впаянный CPU менять нельзя.",
+                pits: ["Вентиляция свободна.", "Качественная паста.", "Не покупайте мобильный CPU отдельно."]
+              }
+            ],
+            budget: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 8-16 GB DDR4 (match)",
+                gain: "лучший $/эффект",
+                body: "Самый выгодный шаг на ноутбуке: вторая планка под dual-channel. Дешевле любой платы.",
+                pits: ["Тот же тип.", "Частота и тайминги.", "Руководство по слотам."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 512 GB-1 TB",
+                gain: "быстрее загрузка",
+                body: "Бюджетный NVMe во второй слот. CPU/GPU впаяны, диск реально меняется.",
+                pits: ["Свободный M.2.", "Клонирование при замене.", "Не берите USB-только как «апгрейд»."]
+              },
+              {
+                title: "Охлаждение",
+                model: "Чистка + паста",
+                gain: "тише / стабильнее",
+                body: "Обслуживание охлаждения бесплатнее новой машины и возвращает частоты.",
+                pits: ["Не закрывайте вентиляцию.", "Аккуратно с разборкой.", "CPU/GPU не меняются отдельно."]
+              }
+            ]
+          }
+        }
       };
-      document.querySelectorAll(".demo-goal").forEach((btn) => {
+
+      function renderUpgradeDemo() {
+        const device = upgradeState.device;
+        const goal = upgradeState.goal;
+        const pack = upgradeDemoData[device] || upgradeDemoData.pc;
+        const list = (pack.goals && pack.goals[goal]) || pack.goals.fps;
+        const big = el("demo-upgrade-pass-big");
+        const sub = el("demo-upgrade-pass-sub");
+        const lab = document.querySelector(".demo-upgrade-passport .lab");
+        if (big) big.textContent = pack.big;
+        if (sub) sub.textContent = t(device === "laptop" ? "passLaptopSub" : "passPCSub");
+        if (lab) lab.textContent = t(device === "laptop" ? "passportLaptop" : "passportTitle");
+        const host = el("demo-upgrade-recs");
+        if (!host) return;
+        const pitLabel = t("demoUpgradePitfalls");
+        host.innerHTML = list.map((r) => `
+          <article class="demo-upgrade-rec">
+            <div class="rec-top">
+              <div class="title">${r.title}</div>
+              <span class="gain">${r.gain}</span>
+            </div>
+            <div class="model">${r.model}</div>
+            <div class="body">${r.body}</div>
+            <div class="pit">
+              <div>${pitLabel}</div>
+              <ul>${r.pits.map((p) => `<li>${p}</li>`).join("")}</ul>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      document.querySelectorAll(".demo-device").forEach((btn) => {
         btn.addEventListener("click", () => {
-          document.querySelectorAll(".demo-goal").forEach((b) => b.classList.toggle("active", b === btn));
-          const pack = upgradeCopy[btn.dataset.goal] || upgradeCopy.fps;
-          const rec = el("demo-upgrade-rec");
-          if (!rec) return;
-          const title = rec.querySelector(".title");
-          const body = rec.querySelector(".body");
-          const pit = rec.querySelector(".pit");
-          if (title) title.textContent = t(pack.titleKey);
-          if (body) body.textContent = t(pack.bodyKey);
-          if (pit) pit.textContent = t(pack.pitKey);
+          upgradeState.device = btn.dataset.device || "pc";
+          document.querySelectorAll(".demo-device").forEach((b) => b.classList.toggle("active", b === btn));
+          renderUpgradeDemo();
         });
       });
+      document.querySelectorAll(".demo-goal").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          upgradeState.goal = btn.dataset.goal || "fps";
+          document.querySelectorAll(".demo-goal").forEach((b) => b.classList.toggle("active", b === btn));
+          renderUpgradeDemo();
+        });
+      });
+      window.__pcRenderUpgrade = renderUpgradeDemo;
+      renderUpgradeDemo();
       const killBtn = el("demo-kill-remove");
       if (killBtn) {
         killBtn.addEventListener("click", () => {

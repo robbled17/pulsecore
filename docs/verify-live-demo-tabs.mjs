@@ -44,7 +44,7 @@ const TABS = [
   {
     id: 'upgrade',
     file: 'live-demo-tab-upgrade-1440x900.png',
-    expectVisible: ['#demo-upgrade-goals', '#demo-upgrade-rec'],
+    expectVisible: ['#demo-upgrade-goals', '#demo-upgrade-device', '#demo-upgrade-recs', '.demo-upgrade-rec'],
     expectHidden: ['#demo-metrics', '#demo-procs', '#demo-games', '#demo-hw-ssd'],
   },
   {

@@ -64,12 +64,14 @@ type UpgradeAdvice struct {
 
 // UpgradeRecommendation is one upgrade path with mandatory pitfalls.
 type UpgradeRecommendation struct {
-	ID       string   `json:"id"`
-	Title    string   `json:"title"`
-	Part     string   `json:"part"` // cpu | gpu | ram | storage | cooling | other
-	Body     string   `json:"body"`
-	Priority int      `json:"priority"` // 1 = highest
-	Pitfalls []string `json:"pitfalls"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Part          string   `json:"part"` // cpu | gpu | ram | storage | cooling | other
+	Model         string   `json:"model"`
+	EstimatedGain string   `json:"estimatedGain"`
+	Body          string   `json:"body"`
+	Priority      int      `json:"priority"` // 1 = highest
+	Pitfalls      []string `json:"pitfalls"`
 }
 
 // GetPCPassport builds a chassis-aware hardware passport via WMI/SMBIOS.
@@ -183,8 +185,9 @@ func (a *App) GetUpgradeAdvice(goal string) UpgradeAdvice {
 	}
 
 	pass := a.GetPCPassport()
-	recs := buildUpgradeRecommendations(pass, goal)
-	summary := upgradeSummary(pass, goal)
+	lang := a.GetLanguage()
+	recs := buildUpgradeRecommendations(pass, goal, lang)
+	summary := upgradeSummary(pass, goal, lang)
 	return UpgradeAdvice{
 		Goal:            goal,
 		Chassis:         pass.Chassis,
@@ -648,226 +651,4 @@ func normalizeDiskMediaType(media, model string) string {
 	}
 }
 
-func upgradeSummary(pass PCPassport, goal string) string {
-	kind := "ПК"
-	if pass.IsLaptop {
-		kind = "ноутбук"
-	}
-	switch goal {
-	case UpgradeGoalMaxFPS:
-		return fmt.Sprintf("Цель: максимум FPS. Тип устройства: %s. Смотрите видеокарту, процессор под текущий сокет и память в двухканале.", kind)
-	case UpgradeGoalQuiet:
-		return fmt.Sprintf("Цель: тише и холоднее. Тип устройства: %s. Упор на охлаждение, undervolt и отказ от шумных топовых решений.", kind)
-	case UpgradeGoalWork:
-		return fmt.Sprintf("Цель: работа и учёба. Тип устройства: %s. Важны ядра, объём RAM и быстрый NVMe.", kind)
-	default:
-		return fmt.Sprintf("Цель: апгрейд с умом за небольшие деньги. Тип устройства: %s. Сначала слоты RAM и накопитель.", kind)
-	}
-}
-
-func buildUpgradeRecommendations(pass PCPassport, goal string) []UpgradeRecommendation {
-	if pass.IsLaptop {
-		return laptopRecommendations(pass, goal)
-	}
-	return desktopRecommendations(pass, goal)
-}
-
-func commonPitfalls(pass PCPassport, part string) []string {
-	base := []string{}
-	switch part {
-	case "cpu":
-		base = []string{
-			"Обновите BIOS материнской платы до установки нового процессора. Старая прошивка может не узнать чип.",
-			"Проверьте питание VRM на плате. Слабая система питания греется на мощных CPU и снижает частоту.",
-			fmt.Sprintf("Сокет сейчас: %s. Новый процессор должен быть именно для этого сокета, иначе не встанет.", pass.Socket),
-		}
-	case "gpu":
-		base = []string{
-			"Измерьте длину корпуса и карты. Длинная видеокарта может не влезть или упереться в диски.",
-			"Блок питания: запас по ваттам и нужные разъёмы (8-pin / 12VHPWR). Старый кабель переходником не спасает слабый БП.",
-			"После установки поставьте свежий драйвер с сайта NVIDIA или AMD и удалите старый через DDU при смене бренда.",
-		}
-	case "ram":
-		base = []string{
-			fmt.Sprintf("Тип памяти: %s. Планки другого поколения (DDR4/DDR5) физически не подойдут.", pass.RAMType),
-			"Берите комплект из двух одинаковых модулей. Разный объём или частота часто даёт сбои.",
-			"В BIOS включите XMP/EXPO, иначе планки могут работать на меньшей частоте.",
-		}
-	case "storage":
-		base = []string{
-			"Для NVMe нужен свободный слот M.2 и иногда отдельный радиатор. Без него диск может троттлить.",
-			"Клонируйте систему или поставьте Windows заново. Просто вставить диск недостаточно для переноса ОС.",
-			"SATA SSD дешевле, но медленнее NVMe. Для игр разница меньше, чем для больших проектов.",
-		}
-	case "cooling":
-		base = []string{
-			"Смените термопасту и проверьте посадку кулера. Воздух должен выходить из корпуса, а не крутиться внутри.",
-			"Undervolt в BIOS или через фирменную утилиту снижает нагрев. Делайте маленькими шагами и тестируйте стабильность.",
-			"На ноутбуке следите, чтобы вентиляционные отверстия не были закрыты на мягкой поверхности.",
-		}
-	default:
-		base = []string{
-			"Перед апгрейдом сделайте резервную копию важных файлов.",
-			"Отключайте питание от розетки и снимайте статику перед работой внутри корпуса.",
-		}
-	}
-	return base
-}
-
-func laptopRecommendations(pass PCPassport, goal string) []UpgradeRecommendation {
-	recs := make([]UpgradeRecommendation, 0, 6)
-
-	recs = append(recs, UpgradeRecommendation{
-		ID:       "laptop-soldered",
-		Title:    "Честно про впаянное железо",
-		Part:     "other",
-		Priority: 1,
-		Body:     "В большинстве ноутбуков CPU и GPU впаяны в плату. Их нельзя заменить отдельно. Реальный апгрейд: RAM (если есть слот), SSD и обслуживание охлаждения.",
-		Pitfalls: []string{
-			"Не покупайте «мобильный» процессор или видеокарту отдельно. Они не встанут в ваш ноутбук.",
-			"Сервисная замена всей материнской платы почти всегда дороже нового устройства.",
-			"Проверьте сервисное руководство по модели: какие слоты реально доступны пользователю.",
-		},
-	})
-
-	if pass.RAMSlotsFree > 0 || pass.IsSingleChannel {
-		body := "Добавьте второй модуль той же частоты и типа, чтобы включить dual-channel. Это часто даёт больше FPS в играх на встроенной графике и отзывчивость в браузере."
-		if goal == UpgradeGoalBudget {
-			body = "Самый выгодный шаг: вторая планка RAM под dual-channel. Дешевле новой видеокарты и сразу заметно."
-		}
-		recs = append(recs, UpgradeRecommendation{
-			ID:       "laptop-ram-dual",
-			Title:    "RAM: dual-channel",
-			Part:     "ram",
-			Priority: 2,
-			Body:     body,
-			Pitfalls: commonPitfalls(pass, "ram"),
-		})
-	}
-
-	if pass.HasFreeM2 || len(pass.Storage) > 0 {
-		body := "Поставьте или добавьте NVMe SSD во второй M.2, если слот свободен. Игры и Windows будут открываться быстрее."
-		if goal == UpgradeGoalWork {
-			body = "Рабочим задачам нужен быстрый NVMe: проекты, Docker, IDE и браузер с кучей вкладок любят быстрый диск."
-		}
-		recs = append(recs, UpgradeRecommendation{
-			ID:       "laptop-m2",
-			Title:    "Второй M.2 / замена SSD",
-			Part:     "storage",
-			Priority: 3,
-			Body:     body,
-			Pitfalls: commonPitfalls(pass, "storage"),
-		})
-	}
-
-	coolBody := "Почистите пыль, смените термопасту и при необходимости сделайте undervolt. Тише и холоднее без покупки нового железа."
-	if goal == UpgradeGoalQuiet {
-		coolBody = "Главный путь к тишине на ноутбуке: чистка, новая паста, undervolt и тихий профиль питания. Новый GPU сюда не поставить."
-	}
-	if goal == UpgradeGoalMaxFPS {
-		coolBody = "Охлаждение и undervolt держат частоты дольше. На ноутбуке это часто даёт больше стабильного FPS, чем попытка «разогнать всё»."
-	}
-	recs = append(recs, UpgradeRecommendation{
-		ID:       "laptop-cooling",
-		Title:    "Охлаждение и undervolt",
-		Part:     "cooling",
-		Priority: 4,
-		Body:     coolBody,
-		Pitfalls: commonPitfalls(pass, "cooling"),
-	})
-
-	return recs
-}
-
-func desktopRecommendations(pass PCPassport, goal string) []UpgradeRecommendation {
-	recs := make([]UpgradeRecommendation, 0, 8)
-	socket := pass.Socket
-	if socket == "" || socket == "Unknown" {
-		socket = guessSocketFromCPU(pass.CPUName)
-	}
-
-	cpuBody := fmt.Sprintf("Для сокета %s берите актуальный процессор того же поколения платы. Не меняйте платформу целиком, если сокет ещё живой.", socket)
-	switch goal {
-	case UpgradeGoalMaxFPS:
-		cpuBody = fmt.Sprintf("Максимум FPS: возьмите лучший игровой CPU на сокете %s (высокое однопоточное ускорение). Видеокарта всё равно важнее, но слабый процессор её ограничивает.", socket)
-	case UpgradeGoalWork:
-		cpuBody = fmt.Sprintf("Для работы берите больше ядер на сокете %s. Рендер, компиляция и виртуалки любят много потоков.", socket)
-	case UpgradeGoalQuiet:
-		cpuBody = fmt.Sprintf("Тихий ПК: процессор среднего TDP на сокете %s плюс хороший башенный кулер. Топовые чипы с высоким потреблением будут шуметь.", socket)
-	case UpgradeGoalBudget:
-		cpuBody = fmt.Sprintf("Бюджет: б/у или mid-range CPU строго под сокет %s. Смена материнской платы съест весь бюджет.", socket)
-	}
-	recs = append(recs, UpgradeRecommendation{
-		ID:       "desktop-cpu",
-		Title:    "Процессор под текущий сокет",
-		Part:     "cpu",
-		Priority: 2,
-		Body:     cpuBody,
-		Pitfalls: commonPitfalls(pass, "cpu"),
-	})
-
-	gpuBody := "Сбалансированная видеокарта под разрешение монитора. Для 1080p хватит mid-range, для 1440p нужен запас по VRAM."
-	switch goal {
-	case UpgradeGoalMaxFPS:
-		gpuBody = "Главный прирост FPS даёт видеокарта. Берите модель с запасом VRAM под ваше разрешение и трассировку лучей, если она нужна."
-	case UpgradeGoalQuiet:
-		gpuBody = "Берите карту с хорошим трёхвентиляторным охлаждением и умеренным TDP. Короткий двухслотовый «дутыш» часто орёт на 100%."
-	case UpgradeGoalWork:
-		gpuBody = "Для монтажа и 3D смотрите объём VRAM. Для офиса и браузера достаточно текущей карты, если это не встроенная графика."
-	case UpgradeGoalBudget:
-		gpuBody = "Бюджетная дискретная карта заметно обгоняет встроенную графику. Не гонитесь за топовым номером, берите свежий mid-range."
-	}
-	if pass.GPUIntegrated {
-		gpuBody = "Сейчас встроенная графика. Дискретная карта даст главный скачок в играх. Подберите модель под блок питания и длину корпуса."
-	}
-	recs = append(recs, UpgradeRecommendation{
-		ID:       "desktop-gpu",
-		Title:    "Сбалансированная видеокарта",
-		Part:     "gpu",
-		Priority: 1,
-		Body:     gpuBody,
-		Pitfalls: commonPitfalls(pass, "gpu"),
-	})
-
-	if pass.RAMSlotsFree > 0 || pass.IsSingleChannel || pass.RAMTotalGB < 16 {
-		ramBody := fmt.Sprintf("Свободно слотов: %d. Добавьте планки %s до 32 ГБ в двухканале для игр и браузера.", pass.RAMSlotsFree, pass.RAMType)
-		if goal == UpgradeGoalWork {
-			ramBody = fmt.Sprintf("Для работы целитесь в 32 или 64 ГБ %s. Все модули одной частоты.", pass.RAMType)
-		}
-		if goal == UpgradeGoalBudget && pass.IsSingleChannel {
-			ramBody = "Самый дешёвый буст: вторая планка той же памяти для dual-channel."
-		}
-		recs = append(recs, UpgradeRecommendation{
-			ID:       "desktop-ram",
-			Title:    "Оперативная память",
-			Part:     "ram",
-			Priority: 3,
-			Body:     ramBody,
-			Pitfalls: commonPitfalls(pass, "ram"),
-		})
-	}
-
-	if pass.HasFreeM2 {
-		recs = append(recs, UpgradeRecommendation{
-			ID:       "desktop-nvme",
-			Title:    "NVMe SSD",
-			Part:     "storage",
-			Priority: 4,
-			Body:     "Поставьте игры и систему на NVMe. Если слот M.2 свободен, это быстрый апгрейд без замены всего ПК.",
-			Pitfalls: commonPitfalls(pass, "storage"),
-		})
-	}
-
-	if goal == UpgradeGoalQuiet {
-		recs = append(recs, UpgradeRecommendation{
-			ID:       "desktop-cooling",
-			Title:    "Тихое охлаждение",
-			Part:     "cooling",
-			Priority: 2,
-			Body:     "Башенный кулер, нормальный поток воздуха в корпусе и undervolt GPU/CPU. Часто тише, чем замена железа.",
-			Pitfalls: commonPitfalls(pass, "cooling"),
-		})
-	}
-
-	return recs
-}
+// Recommendation builders live in upgrade_advice.go.
