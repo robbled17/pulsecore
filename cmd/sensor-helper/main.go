@@ -24,7 +24,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const helperVersion = "1.6.2"
+const helperVersion = "1.6.3"
 
 type sensorPayload struct {
 	Version      string  `json:"version"`

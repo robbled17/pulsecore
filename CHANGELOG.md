@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.3
+
+### Fixed
+- Windows release build: remove duplicate `isProcessElevated` (`admin.go` vs `diagnostics_win.go`) that failed `go vet` and left tag v1.6.2 with no release assets
+- Site download (`releases/latest/download/pulsecore.exe`) now serves this build
+
+### Note
+- Tag v1.6.2 was pushed but the Windows release workflow failed before assets were uploaded; do not use that tag for downloads
+
 ## 1.6.2
 
 ### Added
