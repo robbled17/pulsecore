@@ -29,6 +29,7 @@ import {
   FinishTracedInstall,
   ListInstallTraces,
   CleanupFromTrace,
+  CleanSafeDiskCaches,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -2189,9 +2190,14 @@ function wireUI() {
       } else if (act === 'disk-smart') {
         runDiskHealth(selectedDrive || 'C', false)
       } else if (act === 'disk-cleanup') {
+        try {
+          const r = await CleanSafeDiskCaches()
+          showToast(r?.message || t('insightCleanupHint'), !!r?.ok)
+        } catch (err) {
+          showToast(String(err), false)
+        }
         setActiveTab('overview')
         $('ov-disks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        showToast(t('insightCleanupHint'), true)
       }
     } catch (err) {
       showToast(String(err), false)

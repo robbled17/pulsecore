@@ -54,6 +54,8 @@ export function ListInstallTraces():Promise<Array<Record<string, any>>>;
 
 export function CleanupFromTrace(arg1:string):Promise<Record<string, any>>;
 
+export function CleanSafeDiskCaches():Promise<Record<string, any>>;
+
 export function HideToTray():Promise<void>;
 
 export function IsFullscreen():Promise<boolean>;
