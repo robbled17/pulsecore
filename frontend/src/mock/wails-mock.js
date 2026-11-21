@@ -424,7 +424,7 @@ function buildMetrics() {
       statusText: 'Зарядка',
       powerDrawWatts: 28.4,
       wearPercent: 8.2,
-      wearLabel: 'Износ 8%',
+      wearLabel: '8%',
       capacitymWh: 55200,
       designCapacitymWh: 60100,
       deviceName: 'Primary',
@@ -473,23 +473,12 @@ function buildMetrics() {
         statusText: 'Зарядка',
         percent: 76,
         wearPercent: 8.2,
-        wearLabel: 'Износ 8%',
+        wearLabel: '8%',
         capacitymWh: 55200,
         designCapacitymWh: 60100,
       },
     },
     lagEvents: p.id === 'A' || p.id === 'B' ? [
-      {
-        timestamp: '14:02:11',
-        coreID: 3,
-        coreLoad: 99,
-        overallLoad: 61,
-        culpritProcess: 'MsMpEng.exe',
-        culpritFriendly: 'Защитник Windows',
-        culpritPID: 4120,
-        explanation: 'lag_core_spike|3|99',
-        icon: '',
-      },
       {
         timestamp: '13:58:44',
         coreID: 7,
@@ -503,16 +492,15 @@ function buildMetrics() {
       },
     ] : [],
     stutterEvents: p.id === 'A' ? [
-      { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike · SearchIndexer.exe', culprit: 'SearchIndexer.exe' },
+      { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike on C:', culprit: '' },
       { timestamp: '13:55:18', jitterMs: 480, cause: 'Low free RAM', culprit: 'chrome.exe' },
     ] : p.id === 'B' ? [
-      { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike · SearchIndexer.exe', culprit: 'SearchIndexer.exe' },
+      { timestamp: '14:01:02', jitterMs: 340, cause: 'Disk IO spike on C:', culprit: '' },
     ] : [],
     vampires: [
-      { pid: 4120, pids: [4120], count: 1, name: 'MsMpEng.exe', friendlyName: 'Защитник Windows', cpuPercent: 6.4, diskMBps: 1.2, score: 10, ecoMode: false, frozen: false },
       { pid: 2204, pids: [2204, 2208, 2212], count: 3, name: 'chrome.exe', friendlyName: 'Chrome', cpuPercent: p.id === 'A' ? 18.4 : 9.1, diskMBps: 0.4, score: 14, ecoMode: false, frozen: false },
       { pid: 1180, pids: [1180], count: 1, name: 'OneDrive.exe', friendlyName: 'OneDrive', cpuPercent: 3.2, diskMBps: 2.8, score: 7, ecoMode: true, frozen: true },
-      ...(p.id === 'A' ? [{ pid: 3300, pids: [3300], count: 1, name: 'SearchIndexer.exe', friendlyName: 'Индексатор Windows', cpuPercent: 11.2, diskMBps: 18.0, score: 22, ecoMode: false, frozen: false }] : []),
+      ...(p.id === 'A' ? [{ pid: 4410, pids: [4410], count: 1, name: 'Discord.exe', friendlyName: 'Discord', cpuPercent: 8.1, diskMBps: 0.6, score: 12, ecoMode: false, frozen: false }] : []),
     ],
   }
 }
@@ -572,7 +560,7 @@ const App = {
     note: 'mock',
     topApps: [
       { name: 'MsMpEng.exe', friendlyName: 'procDefender', detail: 'procDefenderDetail', activeHours: 14.2, trafficMB: 12, energymWh: 4200 },
-      { name: 'SearchIndexer.exe', friendlyName: 'procIndexer', detail: 'procIndexerDetail', activeHours: 6.1, trafficMB: 0, energymWh: 1800 },
+      { name: 'Discord.exe', friendlyName: 'Discord', detail: 'procBrowserDetail', activeHours: 6.1, trafficMB: 0, energymWh: 1800 },
       { name: 'chrome.exe', friendlyName: 'procBrowser', detail: 'procBrowserDetail', activeHours: 22.0, trafficMB: 8400, energymWh: 9100 },
     ],
   }),
@@ -616,23 +604,27 @@ const App = {
   PredictGameFPS: async (id) => predictFPS(id),
   GetPCPassport: async () => {
     const p = profile()
+    const isLaptop = p.chassis === 'laptop' || /laptop|mobile|max-q/i.test(String(p.gpuName || '')) || /[0-9]{4,5}(hx|hs|h|u)\b/i.test(String(p.cpuName || ''))
+    const slotsUsed = p.slotsUsed || 0
+    const slotsTotal = p.slotsTotal || 0
+    const slotsFree = Math.max(0, slotsTotal - slotsUsed)
     return {
-      chassis: p.id === 'A' ? 'laptop' : 'desktop',
-      chassisRaw: p.id === 'A' ? '9' : '3',
-      isLaptop: p.id === 'A',
-      motherboard: p.id === 'A' ? 'Laptop Board' : 'B550M Pro',
-      manufacturer: p.id === 'A' ? 'OEM' : 'ASUS',
-      chipset: p.id === 'A' ? 'Unknown' : 'B550',
-      socket: p.id === 'A' ? 'BGA' : (p.cpuName.includes('7950') ? 'AM5' : 'AM4'),
+      chassis: isLaptop ? 'laptop' : (p.chassis || 'desktop'),
+      chassisRaw: isLaptop ? '9' : '3',
+      isLaptop,
+      motherboard: isLaptop ? 'Laptop Board' : 'B550M Pro',
+      manufacturer: isLaptop ? 'OEM' : 'ASUS',
+      chipset: isLaptop ? 'Unknown' : 'B550',
+      socket: isLaptop ? 'BGA' : (p.cpuName.includes('7950') ? 'AM5' : 'AM4'),
       cpuName: p.cpuName,
       physicalCores: p.physicalCores,
       logicalCores: p.logicalCores,
       ramType: p.ramType,
       ramSpeedMHz: p.ramSpeed,
       ramTotalGB: p.ramGB,
-      ramSlotsUsed: p.slotsUsed,
-      ramSlotsTotal: p.slotsTotal,
-      ramSlotsFree: Math.max(0, p.slotsTotal - p.slotsUsed),
+      ramSlotsUsed: slotsUsed,
+      ramSlotsTotal: slotsTotal,
+      ramSlotsFree: slotsFree,
       isSingleChannel: p.isSingleChannel,
       gpuName: p.gpuName,
       vramGB: p.vramGB,
@@ -641,7 +633,7 @@ const App = {
         { model: 'Samsung 980 PRO 1TB', interfaceType: 'NVMe', mediaType: 'SSD', sizeGB: 1000 },
       ],
       hasFreeM2: true,
-      notes: p.id === 'A'
+      notes: isLaptop
         ? ['Ноутбук: процессор и видеокарта обычно впаяны. Менять их нельзя без замены всей платы.']
         : [],
     }
@@ -750,12 +742,12 @@ const App = {
       ],
     }
     const laptopRecs = [
-      {
+      ...(passport.ramSlotsFree > 0 ? [{
         id: 'laptop-ram', title: 'RAM: dual-channel', part: 'ram', priority: 1,
         model: `1x 16 GB ${ramType} (match)`, estimatedGain: '+15-25% FPS (iGPU)',
-        body: `Вторая планка ${ramType} той же частоты включает dual-channel. На ноутбуке CPU/GPU обычно впаяны.`,
+        body: `Вторая планка ${ramType} той же частоты включает dual-channel. На ноутбуке CPU/GPU обычно впаяны. Свободно слотов: ${passport.ramSlotsFree}.`,
         pitfalls: pitRAM,
-      },
+      }] : []),
       {
         id: 'laptop-m2', title: 'Второй NVMe', part: 'storage', priority: 2,
         model: 'NVMe 1 TB (2nd M.2)', estimatedGain: 'быстрее загрузка',

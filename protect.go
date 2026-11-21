@@ -22,8 +22,15 @@ var protectedSystemProcesses = map[string]struct{}{
 	"securityhealthservice.exe": {}, "securityhealthsystray.exe": {},
 	"securityhealthhost.exe": {}, "mssense.exe": {}, "mpcmdrun.exe": {},
 	"sgrmbroker.exe": {}, "smartscreen.exe": {}, "wdavscannerservice.exe": {},
+	"searchindexer.exe": {}, "searchprotocolhost.exe": {},
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
 	"msedgewebview2.exe": {},
+}
+
+// isNoiseBackgroundProcess is true for AV / critical OS processes that must
+// never appear as Lag culprits or Eco Mode targets (aligns with IsProtectedSystemTarget).
+func isNoiseBackgroundProcess(nameOrPath string) bool {
+	return IsProtectedSystemTarget(nameOrPath)
 }
 
 // Path fragments that mark Windows / Defender / AV / shell critical targets.

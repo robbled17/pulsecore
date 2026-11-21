@@ -209,7 +209,8 @@ func enrichBatteryWMI(base BatteryMetrics) BatteryMetrics {
 				out.WearPercent = 0
 			}
 		}
-		out.WearLabel = fmt.Sprintf("Износ: %.0f%% (%s)", out.WearPercent, wearLabel(out.WearPercent))
+		// Value only - UI already shows the "Износ" / Wear label beside the field.
+		out.WearLabel = fmt.Sprintf("%.0f%%", out.WearPercent)
 		if out.DeviceName == "" {
 			out.DeviceName = "Аккумулятор ноутбука"
 		}

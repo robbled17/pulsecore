@@ -30,6 +30,7 @@ import {
   ListInstallTraces,
   CleanupFromTrace,
   CleanSafeDiskCaches,
+  PreviewSafeDiskCaches,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -38,7 +39,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.4.0
+const MIT_LICENSE = `PulseCore v1.4.1
 
 MIT License
 
@@ -74,7 +75,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.4.0'
+const APP_VERSION = 'v1.4.1'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -516,7 +517,7 @@ function renderStatusStrip(m) {
   const temp = validTemp(m.temperatureC, m.tempAvailable)
   const cpu = safeNum(m.cpuPercent, 0)
   const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
-  const vamps = m.vampires || []
+  const vamps = filterNoiseVampires(m.vampires || [])
   const bgCount = vamps.reduce((sum, v) => sum + (v.count || (v.pids ? v.pids.length : 1) || 1), 0)
 
   let state = 'ok'
@@ -564,9 +565,9 @@ function collectInsights(m) {
   const disks = m.disks || []
   const sysDisk = disks.find((d) => /^C/i.test(String(d.mount || ''))) || disks[0]
   const diskPct = safeNum(sysDisk?.percent, 0)
-  const lags = m.lagEvents || []
-  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
-  const vamps = (m.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+  const lags = filterNoiseLags(m.lagEvents || [])
+  const stutters = filterNoiseLags((m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300))
+  const vamps = filterNoiseVampires(m.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
 
   if (Number.isFinite(temp) && temp >= throttleC) {
     items.push({
@@ -610,13 +611,14 @@ function collectInsights(m) {
   if (lags.length) {
     const e = lags[0]
     const name = e.culpritFriendly || e.culpritProcess || t('unknownProc')
+    const canEco = e.culpritPID && e.culpritProcess && !isNoiseBackgroundProcess(e.culpritProcess)
     items.push({
       id: 'lag',
       level: 'warn',
       title: `${t('insightLagShort')} • ${name}`,
       body: '',
       actions: [
-        ...(e.culpritPID ? [{ id: 'eco-pid', label: t('ecoLower'), pid: e.culpritPID, name: e.culpritProcess }] : []),
+        ...(canEco ? [{ id: 'eco-pid', label: t('ecoLower'), pid: e.culpritPID, name: e.culpritProcess }] : []),
         { id: 'tab-lag', label: t('insightActOpenLags') },
       ].slice(0, 2),
     })
@@ -802,32 +804,36 @@ function lagExplanation(e) {
 }
 
 function renderLag(m) {
-  const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
+  const stutters = filterNoiseLags((m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300))
   const stutterBox = $('stutter-log')
   if (stutterBox) {
     if (!stutters.length) {
       stutterBox.innerHTML = `<div class="status-banner ok">${t('noStutters')}</div>`
     } else {
-      stutterBox.innerHTML = stutters.map((e) => `
+      stutterBox.innerHTML = stutters.map((e) => {
+        const canEco = e.culprit && !isNoiseBackgroundProcess(e.culprit)
+        return `
         <div class="row">
           <div>
             <div class="name metric">${e.timestamp || dash()} · ${fmt(e.jitterMs, 0)} ms</div>
             <div class="meta stutter-cause">${e.cause || dash()}</div>
           </div>
           <div class="row-actions">
-            ${e.culprit ? `<button type="button" class="btn compact danger" data-eco-name="${e.culprit}">${t('ecoCulprit')}</button>` : ''}
+            ${canEco ? `<button type="button" class="btn compact danger" data-eco-name="${e.culprit}">${t('ecoCulprit')}</button>` : ''}
           </div>
-        </div>
-      `).join('')
+        </div>`
+      }).join('')
     }
   }
 
-  const lags = m.lagEvents || []
+  const lags = filterNoiseLags(m.lagEvents || [])
   const lagBox = $('lag-log')
   if (!lags.length) {
     lagBox.innerHTML = `<div class="empty">${t('noLags')}</div>`
   } else {
-    lagBox.innerHTML = lags.map((e) => `
+    lagBox.innerHTML = lags.map((e) => {
+      const canEco = e.culpritPID && e.culpritProcess && !isNoiseBackgroundProcess(e.culpritProcess)
+      return `
       <div class="incident-card">
         <div>
           <div class="incident-title">${e.culpritFriendly || e.culpritProcess || t('unknownProc')}</div>
@@ -835,13 +841,13 @@ function renderLag(m) {
           <div class="meta">${e.timestamp || dash()} · ${e.culpritProcess || dash()} · PID ${e.culpritPID || dash()}</div>
         </div>
         <div class="row-actions">
-          ${e.culpritPID ? `<button type="button" class="btn compact danger" data-act="freeze" data-pid="${e.culpritPID}">${t('ecoLower')}</button>` : ''}
+          ${canEco ? `<button type="button" class="btn compact danger" data-act="freeze" data-pid="${e.culpritPID}">${t('ecoLower')}</button>` : ''}
         </div>
-      </div>
-    `).join('')
+      </div>`
+    }).join('')
   }
 
-  const vamps = m.vampires || []
+  const vamps = filterNoiseVampires(m.vampires || [])
   const vampBox = $('vampire-list')
   if (!vamps.length) {
     vampBox.innerHTML = `<div class="empty">${t('noVampires')}</div>`
@@ -1023,7 +1029,11 @@ function renderHardware(m) {
     $('hw-pwr-name').textContent = pwr.deviceName || t('batteryPack')
     $('hw-pwr-status').textContent = pwr.statusText || na()
     $('hw-pwr-pct').textContent = fmtPct(pwr.percent, 0)
-    $('hw-pwr-wear').textContent = pwr.wearLabel || fmtPct(pwr.wearPercent, 0)
+    // Field label is already "Износ" / Wear - show percent only (never "Износ 8%").
+    const wearPct = Number(pwr.wearPercent)
+    $('hw-pwr-wear').textContent = Number.isFinite(wearPct)
+      ? fmtPct(wearPct, 0)
+      : String(pwr.wearLabel || '').replace(/^(износ|wear|тозу|тузу|verschlei[sß]|劣化|磨损)\s*:?\s*/i, '') || na()
     $('hw-pwr-cap').textContent = pwr.capacitymWh
       ? `${fmt(pwr.capacitymWh, 0)} / ${fmt(pwr.designCapacitymWh, 0)} mWh`
       : na()
@@ -1039,6 +1049,27 @@ function renderHardware(m) {
 function isDefenderName(name) {
   const n = String(name || '').toLowerCase()
   return /msmpeng|defender|защитник|антивирус|antivirus/.test(n)
+}
+
+/** AV / critical OS - never show in Lags vampires or suggest Eco Mode. */
+function isNoiseBackgroundProcess(name) {
+  const n = String(name || '').toLowerCase().replace(/^.*[\\/]/, '')
+  if (!n) return true
+  return /^(system|registry|idle|system idle process|secure system|memory compression)$/.test(n) ||
+    /^(msmpeng|nissrv|nisrv|securityhealthservice|securityhealthsystray|securityhealthhost|mssense|mpcmdrun|sgrmbroker|smartscreen|wdavscannerservice)\.exe$/.test(n) ||
+    /^(searchindexer|searchprotocolhost|searchhost|searchapp|svchost|csrss|lsass|smss|wininit|winlogon|services|dwm|explorer|fontdrvhost|sihost|taskhostw|conhost|ctfmon|runtimebroker|taskmgr)\.exe$/.test(n) ||
+    isDefenderName(n)
+}
+
+function filterNoiseVampires(list) {
+  return (list || []).filter((v) => !isNoiseBackgroundProcess(v?.name) && !isNoiseBackgroundProcess(v?.friendlyName))
+}
+
+function filterNoiseLags(list) {
+  return (list || []).filter((e) => {
+    const name = e?.culpritProcess || e?.culprit || ''
+    return !name || !isNoiseBackgroundProcess(name)
+  })
 }
 
 function localizeWeeklyApp(a) {
@@ -1083,6 +1114,7 @@ async function refreshWeekly() {
     }
     box.innerHTML = apps.map((a, i) => {
       const loc = localizeWeeklyApp(a)
+      const canEco = !isNoiseBackgroundProcess(a.name) && !isDefenderName(a.name) && !isDefenderName(a.friendlyName)
       return `
       <div class="row">
         <div>
@@ -1090,7 +1122,7 @@ async function refreshWeekly() {
           <div class="meta">${loc.detail}</div>
         </div>
         <div class="row-actions">
-          <button type="button" class="btn compact danger" data-weekly-eco="${a.name}">${t('ecoAppetite')}</button>
+          ${canEco ? `<button type="button" class="btn compact danger" data-weekly-eco="${a.name}">${t('ecoAppetite')}</button>` : ''}
           <button type="button" class="btn compact" data-weekly-hide="${a.name}">${t('whitelist')}</button>
         </div>
       </div>`
@@ -1870,6 +1902,59 @@ function renderInstalledApps(filter = '') {
   })
 }
 
+function formatCleanBytes(n) {
+  const b = Number(n) || 0
+  if (b >= 1024 * 1024 * 1024) return `${(b / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  if (b >= 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`
+  if (b >= 1024) return `${(b / 1024).toFixed(0)} KB`
+  return `${b} B`
+}
+
+function renderCleanPreview(r) {
+  const box = $('clean-preview')
+  const runBtn = $('btn-clean-run')
+  if (!box) return
+  if (!r) {
+    box.textContent = t('cleanPreviewEmpty')
+    if (runBtn) runBtn.disabled = true
+    return
+  }
+  const msg = t('cleanPreviewResult')
+    .replace('{files}', String(r.deletedFiles ?? 0))
+    .replace('{size}', formatCleanBytes(r.deletedBytes))
+    .replace('{skipped}', String(r.skipped ?? 0))
+  const targets = Array.isArray(r.targets) && r.targets.length ? ` · ${r.targets.join(', ')}` : ''
+  box.textContent = `${msg}${targets}`
+  if (runBtn) runBtn.disabled = !(Number(r.deletedFiles) > 0)
+}
+
+async function refreshCleanPreview() {
+  const box = $('clean-preview')
+  if (box) box.textContent = t('checking')
+  try {
+    const r = await PreviewSafeDiskCaches()
+    renderCleanPreview(r)
+  } catch (err) {
+    if (box) box.textContent = String(err)
+    const runBtn = $('btn-clean-run')
+    if (runBtn) runBtn.disabled = true
+  }
+}
+
+async function runSafeClean() {
+  const runBtn = $('btn-clean-run')
+  if (runBtn) runBtn.disabled = true
+  try {
+    const r = await CleanSafeDiskCaches()
+    showToast(r?.message || t('cleanDone'), !!r?.ok)
+    renderCleanPreview({ ...r, deletedFiles: 0, deletedBytes: 0 })
+    if (runBtn) runBtn.disabled = true
+  } catch (err) {
+    showToast(String(err), false)
+    if (runBtn) runBtn.disabled = false
+  }
+}
+
 async function refreshInstalledApps() {
   try {
     installedAppsCache = await ListInstalledApps() || []
@@ -2027,6 +2112,8 @@ function wireUI() {
   $('btn-uninstall-only')?.addEventListener('click', () => runUninstall(false))
   $('btn-residual-scan')?.addEventListener('click', () => runResidualScan())
   $('btn-residual-delete')?.addEventListener('click', () => runResidualDelete())
+  $('btn-clean-preview')?.addEventListener('click', () => refreshCleanPreview())
+  $('btn-clean-run')?.addEventListener('click', () => runSafeClean())
   $('btn-trace-start')?.addEventListener('click', async () => {
     try {
       const r = await StartTracedInstall()
@@ -2197,7 +2284,7 @@ function wireUI() {
         })
         showToast(t('modeApplied'), true)
       } else if (act === 'eco-vampires') {
-        const vamps = (lastMetrics?.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
+        const vamps = filterNoiseVampires(lastMetrics?.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
         for (const v of vamps.slice(0, 4)) {
           try {
             if (v.name) await EcoModeByProcessName(v.name, true)
@@ -2209,7 +2296,9 @@ function wireUI() {
         refresh()
       } else if (act === 'eco-pid') {
         const pid = Number(btn.dataset.pid)
-        if (pid) {
+        const vamp = filterNoiseVampires(lastMetrics?.vampires || []).find((v) => Number(v.pid) === pid)
+        const lag = filterNoiseLags(lastMetrics?.lagEvents || []).find((e) => Number(e.culpritPID) === pid)
+        if (pid && (vamp || lag)) {
           await FreezeProcess(pid)
           frozen.add(pid)
           showToast(t('insightEcoDone'), true)
@@ -2217,7 +2306,7 @@ function wireUI() {
         }
       } else if (act === 'eco-name') {
         const name = btn.dataset.ecoName
-        if (name) {
+        if (name && !isNoiseBackgroundProcess(name)) {
           await EcoModeByProcessName(name, true)
           showToast(t('insightEcoDone'), true)
           refresh()
@@ -2230,14 +2319,11 @@ function wireUI() {
       } else if (act === 'disk-smart') {
         runDiskHealth(selectedDrive || 'C', false)
       } else if (act === 'disk-cleanup') {
+        setActiveTab('uninstall')
+        $('clean-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         try {
-          const r = await CleanSafeDiskCaches()
-          showToast(r?.message || t('insightCleanupHint'), !!r?.ok)
-        } catch (err) {
-          showToast(String(err), false)
-        }
-        setActiveTab('overview')
-        $('ov-disks')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          await refreshCleanPreview()
+        } catch (_) {}
       }
     } catch (err) {
       showToast(String(err), false)
@@ -2366,12 +2452,11 @@ function wireUI() {
     const hide = ev.target.closest('[data-weekly-hide]')
     if (eco) {
       const name = eco.dataset.weeklyEco
+      if (isNoiseBackgroundProcess(name) || isDefenderName(name)) return
       try {
         await EcoModeByProcessName(name, true)
-      } catch (_) {
-        // No kernel/PPL error toasts; button still reflects intended outcome for Defender.
-      }
-      eco.textContent = isDefenderName(name) ? t('ecoLimited15') : t('ecoLimited')
+      } catch (_) {}
+      eco.textContent = t('ecoLimited')
       eco.classList.remove('danger')
       eco.classList.add('eco-on')
     }
@@ -2386,6 +2471,7 @@ function wireUI() {
     const btn = ev.target.closest('[data-eco-name]')
     if (!btn) return
     const name = btn.dataset.ecoName
+    if (isNoiseBackgroundProcess(name)) return
     try {
       await EcoModeByProcessName(name, true)
     } catch (_) {}
@@ -2398,6 +2484,7 @@ function wireUI() {
     const btn = ev.target.closest('button[data-vamp-eco], button[data-pid]')
     if (!btn) return
     const name = btn.dataset.vampEco
+    if (name && isNoiseBackgroundProcess(name)) return
     const pid = Number(btn.dataset.pid)
     try {
       if (btn.dataset.act === 'freeze') {

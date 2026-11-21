@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.1
+
+### Fixed
+- Upgrade Advisor: hard laptop split - never recommend desktop CPU/GPU; RAM only when free slots > 0; battery / mobile CPU-GPU heuristics when SMBIOS chassis is wrong
+- RAM free-slot count shared between Hardware and Upgrade via `normalizeRAMSlots`
+- Lags / Eco Mode: filter Windows Defender and critical OS (MsMpEng, NisSrv, SecurityHealthService, SearchIndexer, System, svchost, …); never suggest Eco on them
+- Quick Clean UI restored at top of Uninstall tab with dry-run size preview before delete (whitelist unchanged)
+- Battery wear field shows percent only (`8%`), not duplicated `Износ 8%`
+- GitHub Release attaches bare `pulsecore.exe` alongside the zip for direct download
+
 ## 1.4.0
 
 ### Fixed

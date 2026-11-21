@@ -106,7 +106,8 @@ func (a *App) startFlightRecorder() {
 						if readMBps+writeMBps >= 40 {
 							diskBusy = true
 							cause = fmt.Sprintf("Зависание %.0f мс вызвано активностью диска C:", float64(overshoot)/float64(time.Millisecond))
-							culprit = "SearchIndexer.exe"
+							// Do not blame SearchIndexer / AV - Eco Mode must never target them.
+							culprit = ""
 						}
 					}
 				}
@@ -118,7 +119,7 @@ func (a *App) startFlightRecorder() {
 			}
 
 			if !diskBusy && freeMB >= criticalFreeRAMMB {
-				if name, _ := findHottestProcess(); name != "" && !isEcoProtected(name) {
+				if name, _ := findHottestProcess(); name != "" && !isEcoProtected(name) && !isNoiseBackgroundProcess(name) {
 					culprit = name
 					cause = fmt.Sprintf("Зависание %.0f мс: высокая нагрузка от %s", float64(overshoot)/float64(time.Millisecond), friendlyProcessName(name))
 				}

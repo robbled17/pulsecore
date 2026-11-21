@@ -24,11 +24,19 @@ func upgradeSummary(pass PCPassport, goal, lang string) string {
 }
 
 func buildUpgradeRecommendations(pass PCPassport, goal, lang string) []UpgradeRecommendation {
+	// Hard-split: force laptop path when markers say so even if IsLaptop was missed.
+	if !pass.IsLaptop && looksLikeLaptopHardware(pass.CPUName, pass.GPUName, false) {
+		pass.IsLaptop = true
+		pass.Chassis = "laptop"
+	}
 	var recs []UpgradeRecommendation
 	if pass.IsLaptop {
 		recs = laptopRecommendations(pass, goal, lang)
 	} else {
 		recs = desktopRecommendations(pass, goal, lang)
+	}
+	if pass.IsLaptop {
+		recs = filterLaptopSafeRecs(recs)
 	}
 	sort.SliceStable(recs, func(i, j int) bool {
 		return recs[i].Priority < recs[j].Priority
@@ -47,6 +55,19 @@ func buildUpgradeRecommendations(pass PCPassport, goal, lang string) []UpgradeRe
 		}
 	}
 	return recs
+}
+
+// filterLaptopSafeRecs bans CPU/GPU replacement cards and RAM when no free slots.
+func filterLaptopSafeRecs(recs []UpgradeRecommendation) []UpgradeRecommendation {
+	out := make([]UpgradeRecommendation, 0, len(recs))
+	for _, r := range recs {
+		part := strings.ToLower(strings.TrimSpace(r.Part))
+		if part == "cpu" || part == "gpu" {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 func socketOf(pass PCPassport) string {
@@ -112,8 +133,20 @@ func laptopRecommendations(pass PCPassport, goal, lang string) []UpgradeRecommen
 		ramType = "DDR4"
 	}
 
-	// Realistic laptop upgrades only: RAM, 2nd NVMe, cooling. Never soldered CPU/GPU.
-	if pass.RAMSlotsFree > 0 || pass.IsSingleChannel || pass.RAMSlotsTotal >= 2 {
+	// Realistic laptop upgrades only: RAM (free slots only), 2nd NVMe, cooling.
+	// Never soldered CPU/GPU. Never claim free slots when Hardware shows full.
+	_, _, freeSlots := normalizeRAMSlots(pass.RAMSlotsUsed, pass.RAMSlotsTotal)
+	if pass.RAMSlotsFree >= 0 && pass.RAMSlotsTotal > 0 {
+		freeSlots = pass.RAMSlotsFree
+		if freeSlots < 0 {
+			freeSlots = 0
+		}
+		if pass.RAMSlotsUsed+freeSlots != pass.RAMSlotsTotal && pass.RAMSlotsTotal > 0 {
+			_, _, freeSlots = normalizeRAMSlots(pass.RAMSlotsUsed, pass.RAMSlotsTotal)
+		}
+	}
+	pass.RAMSlotsFree = freeSlots
+	if freeSlots > 0 {
 		gain := "+15-25% FPS (iGPU)"
 		if goal == UpgradeGoalWork {
 			gain = trUpgrade(lang, "gainSnappier")

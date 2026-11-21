@@ -71,10 +71,11 @@ func (a *App) GetMonthlyAppReport() MonthlyAppReport {
 		report.OK = true
 		report.Note = ""
 		// Detail holds stable i18n keys; UI localizes FriendlyName + Detail.
+		// Demo-only placeholders when SRUM is empty - no AV/OS noise as Eco targets.
 		report.TopApps = []AppUsageEntry{
-			{Name: "MsMpEng.exe", FriendlyName: "procDefender", Detail: "procDefenderDetail", ActiveHours: 0},
-			{Name: "SearchIndexer.exe", FriendlyName: "procIndexer", Detail: "procIndexerDetail", ActiveHours: 0},
 			{Name: "chrome.exe", FriendlyName: "procBrowser", Detail: "procBrowserDetail", ActiveHours: 0},
+			{Name: "Discord.exe", FriendlyName: "Discord", Detail: "procBrowserDetail", ActiveHours: 0},
+			{Name: "OneDrive.exe", FriendlyName: "OneDrive", Detail: "procBrowserDetail", ActiveHours: 0},
 		}
 		return report
 	}
