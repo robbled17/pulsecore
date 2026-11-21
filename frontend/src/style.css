@@ -705,6 +705,15 @@ html[data-theme="light"] .bar { background: rgba(15,23,42,0.08); }
 }
 
 .panel { padding: 18px; margin-bottom: 16px; }
+.clean-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
 .panel-title {
   font-size: 11px;
   text-transform: uppercase;
