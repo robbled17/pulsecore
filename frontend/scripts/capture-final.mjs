@@ -85,7 +85,7 @@ async function main() {
   await page.waitForSelector('#insight-list .insight-card', { timeout: 8000 }).catch(() => {})
   await saveShot(page, 'overview.png')
 
-  // Hardware clean card (no tiles)
+  // Hardware Dev OFF: hierarchical physical cores (8c/16t)
   await page.evaluate(() => {
     const mock = window.__PULSECORE_MOCK__
     if (mock?.profiles?.B) {
@@ -98,8 +98,8 @@ async function main() {
   await page.waitForTimeout(800)
   await openTab(page, 'hardware')
   await page.waitForSelector('#hw-cpu-name', { timeout: 5000 })
+  await page.waitForSelector('#core-grid .core-phys', { timeout: 5000 }).catch(() => {})
   await saveShot(page, 'hardware.png')
-  // keep alias for README
   await copyFile(path.join(MEDIA, 'hardware.png'), path.join(DOCS, 'hardware-16threads.png')).catch(() => {})
 
   // Dev mode open
@@ -110,9 +110,9 @@ async function main() {
   await page.waitForTimeout(300)
   await saveShot(page, 'dev-mode.png')
 
-  // Hardware with Dev per-core visible
+  // Hardware still shows core/thread grid with Dev on
   await openTab(page, 'hardware')
-  await page.waitForSelector('#core-grid-wrap:not(.hidden)', { timeout: 5000 }).catch(() => {})
+  await page.waitForSelector('#core-grid .core-phys', { timeout: 5000 }).catch(() => {})
   await saveShot(page, 'hardware-dev-percore.png')
 
   await openTab(page, 'settings')
