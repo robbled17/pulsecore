@@ -18,6 +18,7 @@
   <div id="titlebar" class="titlebar">
     <div class="titlebar-brand">PulseCore</div>
     <div class="titlebar-actions">
+      <button type="button" id="dev-mode-badge" class="dev-mode-badge hidden" title="Dev Mode">DEV</button>
       <button type="button" class="win-btn" id="btn-hud-title" title="Mini-HUD" aria-label="Mini-HUD">⧉</button>
       <button type="button" class="win-btn" id="btn-min" title="Minimize" aria-label="Minimize">─</button>
       <button type="button" class="win-btn" id="btn-fs" title="Maximize" aria-label="Maximize">□</button>
@@ -63,6 +64,7 @@
         <button type="button" class="nav-item" data-tab="hardware" data-i18n="tabHardware">Железо</button>
         <button type="button" class="nav-item" data-tab="gamelab" data-i18n="tabGameLab">GamePulse</button>
         <button type="button" class="nav-item" data-tab="settings" data-i18n="tabSettings">Настройки</button>
+        <button type="button" class="nav-item dev-mode-nav hidden" data-tab="dev" data-i18n="tabDevMode">Dev Mode</button>
       </nav>
       <div class="sidebar-foot">
         <div class="temp-chip metric" id="temp-chip">— °C</div>
@@ -102,7 +104,10 @@
           </div>
         </div>
 
-        <div id="insight-list" class="insight-list" aria-live="polite"></div>
+        <div id="insight-host" class="insight-host" aria-live="polite">
+          <div id="insight-list" class="insight-list"></div>
+          <button type="button" id="insight-more" class="insight-more hidden" hidden></button>
+        </div>
 
         <div class="cards">
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
@@ -223,10 +228,17 @@
           <div class="hw-grid">
             <div><span class="muted" data-i18n="lblModel">Модель</span><div class="hw-val" id="hw-cpu-name">—</div></div>
             <div><span class="muted" data-i18n="lblCores">Ядра / потоки</span><div class="hw-val metric" id="hw-cpu-cores">—</div></div>
-            <div><span class="muted" data-i18n="lblFreq">Частота</span><div class="hw-val metric" id="hw-cpu-freq">—</div></div>
+            <div><span class="muted" data-i18n="lblBaseFreq">Базовая частота</span><div class="hw-val metric" id="hw-cpu-base">—</div></div>
+            <div><span class="muted" data-i18n="lblCurrFreq">Текущая частота</span><div class="hw-val metric" id="hw-cpu-freq">—</div></div>
             <div><span class="muted" data-i18n="lblLoad">Нагрузка</span><div class="hw-val metric" id="hw-cpu-load">—</div></div>
+            <div><span class="muted" data-i18n="lblTemp">Температура</span><div class="hw-val metric" id="hw-cpu-temp">—</div></div>
+            <div><span class="muted" data-i18n="lblCache">Кэш</span><div class="hw-val metric" id="hw-cpu-cache">—</div></div>
+            <div><span class="muted" data-i18n="lblArch">Архитектура</span><div class="hw-val" id="hw-cpu-arch">—</div></div>
           </div>
-          <div id="core-grid" class="core-grid"></div>
+          <div id="core-grid-wrap" class="core-grid-wrap hidden">
+            <div class="muted core-grid-label" data-i18n="lblPerCore">Нагрузка по ядрам (Dev)</div>
+            <div id="core-grid" class="core-grid compact"></div>
+          </div>
         </details>
 
         <details class="panel hw-block expand-panel" data-hw="gpu" open>
@@ -379,6 +391,96 @@
             <option value="zh">简体中文</option>
           </select>
         </div>
+      </section>
+
+      <section id="tab-dev" class="tab">
+        <header class="section-head">
+          <h1 data-i18n="tabDevMode">Dev Mode</h1>
+          <p data-i18n="devModeSub">Пороги, источники метрик и демо-профили (сессия)</p>
+        </header>
+        <div class="dev-toolbar">
+          <button type="button" class="btn compact" id="btn-dev-reset" data-i18n="devResetDefaults">Сбросить Dev</button>
+          <button type="button" class="btn compact danger" id="btn-dev-disable" data-i18n="devModeDisableBtn">Выключить Dev Mode</button>
+        </div>
+
+        <details class="panel expand-panel" open>
+          <summary class="panel-title expand-summary">CPU</summary>
+          <div class="dev-grid">
+            <label class="dev-field"><span data-i18n="devTempSource">Источник температуры</span>
+              <select id="dev-temp-source" class="lang-select lang-select-block">
+                <option value="auto">Auto (WMI → PDH → sensors)</option>
+                <option value="wmi">WMI</option>
+                <option value="pdh">PDH</option>
+                <option value="sensors">Sensors</option>
+              </select>
+            </label>
+            <label class="dev-field"><span data-i18n="devThrottleC">Порог троттлинга °C</span>
+              <input type="number" id="dev-throttle-c" class="dev-input" min="70" max="105" step="1" />
+            </label>
+            <label class="dev-field"><span data-i18n="devPeakSens">Чувствительность пиков %</span>
+              <input type="number" id="dev-peak-sens" class="dev-input" min="70" max="100" step="1" />
+            </label>
+            <label class="dev-field"><span data-i18n="devEcoAllow">Eco allow-list</span>
+              <input type="text" id="dev-eco-allow" class="dev-input" placeholder="chrome.exe, discord.exe" />
+            </label>
+            <label class="dev-field wide"><span data-i18n="devEcoDeny">Eco deny-list</span>
+              <input type="text" id="dev-eco-deny" class="dev-input" placeholder="csrss.exe, lsass.exe, svchost.exe" />
+            </label>
+            <label class="check-row"><input type="checkbox" id="dev-show-percore" /> <span data-i18n="devShowPerCore">Показать нагрузку по ядрам</span></label>
+          </div>
+        </details>
+
+        <details class="panel expand-panel">
+          <summary class="panel-title expand-summary">GPU</summary>
+          <div class="dev-grid">
+            <label class="dev-field wide"><span data-i18n="devForceAdapter">Force adapter</span>
+              <input type="text" id="dev-force-adapter" class="dev-input" placeholder="RTX / UHD / leave empty" />
+            </label>
+            <label class="dev-field"><span data-i18n="devGpuTempWarn">GPU temp warn °C</span>
+              <input type="number" id="dev-gpu-temp" class="dev-input" min="60" max="110" step="1" />
+            </label>
+            <label class="dev-field"><span data-i18n="devVramWarn">VRAM warn %</span>
+              <input type="number" id="dev-vram-warn" class="dev-input" min="50" max="100" step="1" />
+            </label>
+          </div>
+        </details>
+
+        <details class="panel expand-panel">
+          <summary class="panel-title expand-summary">RAM / Disks</summary>
+          <div class="dev-grid">
+            <label class="dev-field"><span data-i18n="devRamWarn">RAM warn %</span>
+              <input type="number" id="dev-ram-warn" class="dev-input" min="50" max="99" step="1" />
+            </label>
+            <label class="dev-field"><span data-i18n="devDiskWarn">Disk warn %</span>
+              <input type="number" id="dev-disk-warn" class="dev-input" min="50" max="99" step="1" />
+            </label>
+            <label class="check-row"><input type="checkbox" id="dev-smart" checked /> <span data-i18n="devSmart">S.M.A.R.T. enabled</span></label>
+            <label class="check-row"><input type="checkbox" id="dev-removable" /> <span data-i18n="devRemovable">Show removable disks</span></label>
+          </div>
+        </details>
+
+        <details class="panel expand-panel">
+          <summary class="panel-title expand-summary">Network / UI</summary>
+          <div class="dev-grid">
+            <label class="dev-field"><span data-i18n="devPingGw">Ping gateway</span>
+              <input type="text" id="dev-ping-gw" class="dev-input" placeholder="auto" />
+            </label>
+            <label class="dev-field"><span data-i18n="devPingPublic">Ping public</span>
+              <input type="text" id="dev-ping-public" class="dev-input" placeholder="8.8.8.8" />
+            </label>
+            <label class="dev-field"><span data-i18n="devPollMs">Poll ms</span>
+              <input type="number" id="dev-poll-ms" class="dev-input" min="250" max="5000" step="50" />
+            </label>
+            <div class="dev-field">
+              <span data-i18n="devMockProfile">Mock A/B/C</span>
+              <div class="dev-mock-row" id="dev-mock-row">
+                <button type="button" class="btn compact mock-profile-btn" data-profile="A">A</button>
+                <button type="button" class="btn compact mock-profile-btn" data-profile="B">B</button>
+                <button type="button" class="btn compact mock-profile-btn" data-profile="C">C</button>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
     </main>
   </div>

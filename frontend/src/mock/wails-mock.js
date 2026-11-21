@@ -334,6 +334,7 @@ function buildMetrics() {
     vramTotalMB: p.dedicatedMB,
     vramSharedMB: p.sharedMB,
     temperatureC: temp,
+    tempAvailable: p.tempMode !== 'broken',
     fanRPM: brokenFan,
     powerMode: state.powerMode,
     pollIntervalMS: state.pollIntervalMS,
@@ -377,6 +378,10 @@ function buildMetrics() {
         physicalCores: p.physicalCores,
         logicalCores: p.logicalCores,
         frequencyMHz: p.frequencyMHz,
+        baseFrequencyMHz: p.frequencyMHz * 0.85,
+        currentFrequencyMHz: p.frequencyMHz * (0.9 + Math.sin(state.tick / 20) * 0.08),
+        cacheKB: p.logicalCores >= 16 ? 64 * 1024 : 32 * 1024,
+        architecture: 'x64',
         percent: Number(cpu.toFixed(1)),
         perCore: Array.from({ length: p.logicalCores }, (_, i) => {
           if (p.tempMode === 'broken' && i === 3) return null

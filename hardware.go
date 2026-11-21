@@ -44,12 +44,16 @@ type HardwareInfo struct {
 }
 
 type CPUDeepInfo struct {
-	Name          string    `json:"name"`
-	PhysicalCores int       `json:"physicalCores"`
-	LogicalCores  int       `json:"logicalCores"`
-	FrequencyMHz  float64   `json:"frequencyMHz"`
-	PerCore       []float64 `json:"perCore"`
-	Percent       float64   `json:"percent"`
+	Name               string    `json:"name"`
+	PhysicalCores      int       `json:"physicalCores"`
+	LogicalCores       int       `json:"logicalCores"`
+	FrequencyMHz       float64   `json:"frequencyMHz"`
+	BaseFrequencyMHz   float64   `json:"baseFrequencyMHz"`
+	CurrentFrequencyMHz float64  `json:"currentFrequencyMHz"`
+	CacheKB            int       `json:"cacheKB"`
+	Architecture       string    `json:"architecture"`
+	PerCore            []float64 `json:"perCore"`
+	Percent            float64   `json:"percent"`
 }
 
 type GPUDeepInfo struct {
@@ -94,6 +98,9 @@ type staticHardware struct {
 	physicalCores  int
 	logicalCores   int
 	frequencyMHz   float64
+	baseFrequency  float64
+	cacheKB        int
+	architecture   string
 	gpuName        string
 	gpuDriver      string
 	gpuVRAM        uint64
@@ -114,15 +121,79 @@ func collectStaticHardware() staticHardware {
 	if logi, err := cpu.Counts(true); err == nil {
 		out.logicalCores = logi
 	}
+	out.architecture = "x64"
 	if info, err := cpu.Info(); err == nil && len(info) > 0 {
 		out.frequencyMHz = info[0].Mhz
+		out.baseFrequency = info[0].Mhz
+		out.cacheKB = int(info[0].CacheSize)
 		if out.cpuName == "" || out.cpuName == "Unknown CPU" {
 			out.cpuName = strings.TrimSpace(info[0].ModelName)
 		}
+		if info[0].Family != "" || info[0].Model != "" {
+			out.architecture = fmt.Sprintf("Family %s · Model %s", info[0].Family, info[0].Model)
+		}
+	}
+	if arch := readCPUArchitecture(); arch != "" {
+		out.architecture = arch
 	}
 	out.gpuName, out.gpuVRAM, out.gpuDriver = readGPUInfoDetailed()
 	out.ramType, out.ramSlotsUsed, out.ramSlotsTotal, out.ramSpeedMHz = readRAMSlots()
 	return out
+}
+
+func readCPUArchitecture() string {
+	ensureOLE()
+	defer func() { _ = recover() }()
+	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
+	if err != nil {
+		return ""
+	}
+	defer locator.Release()
+	dl, err := locator.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return ""
+	}
+	defer dl.Release()
+	serviceRaw, err := oleutil.CallMethod(dl, "ConnectServer", nil, `root\cimv2`)
+	if err != nil {
+		return ""
+	}
+	service := serviceRaw.ToIDispatch()
+	defer service.Release()
+	resultRaw, err := oleutil.CallMethod(service, "ExecQuery", "SELECT Architecture, Caption, MaxClockSpeed, L2CacheSize, L3CacheSize FROM Win32_Processor")
+	if err != nil {
+		return ""
+	}
+	result := resultRaw.ToIDispatch()
+	defer result.Release()
+	countVar, err := oleutil.GetProperty(result, "Count")
+	if err != nil {
+		return ""
+	}
+	count := int(countVar.Val)
+	countVar.Clear()
+	if count < 1 {
+		return ""
+	}
+	itemRaw, err := oleutil.CallMethod(result, "ItemIndex", 0)
+	if err != nil {
+		return ""
+	}
+	item := itemRaw.ToIDispatch()
+	defer item.Release()
+	archMap := map[int]string{
+		0: "x86", 5: "ARM", 6: "ia64", 9: "x64", 12: "ARM64",
+	}
+	archCode := 9
+	if v, err := oleutil.GetProperty(item, "Architecture"); err == nil {
+		archCode = int(v.Val)
+		v.Clear()
+	}
+	label := archMap[archCode]
+	if label == "" {
+		label = "x64"
+	}
+	return label
 }
 
 func gpuDiscreteRank(name string) int {
@@ -426,14 +497,26 @@ func buildHardwareInfo(static staticHardware, cpuPct float64, perCore []float64,
 		pct = vm.UsedPercent
 	}
 
+	baseFreq := static.baseFrequency
+	if baseFreq <= 0 {
+		baseFreq = static.frequencyMHz
+	}
+	curFreq := freq
+	if curFreq <= 0 {
+		curFreq = static.frequencyMHz
+	}
 	return HardwareInfo{
 		CPU: CPUDeepInfo{
-			Name:          static.cpuName,
-			PhysicalCores: static.physicalCores,
-			LogicalCores:  static.logicalCores,
-			FrequencyMHz:  freq,
-			PerCore:       perCore,
-			Percent:       cpuPct,
+			Name:                static.cpuName,
+			PhysicalCores:       static.physicalCores,
+			LogicalCores:        static.logicalCores,
+			FrequencyMHz:        curFreq,
+			BaseFrequencyMHz:    baseFreq,
+			CurrentFrequencyMHz: curFreq,
+			CacheKB:             static.cacheKB,
+			Architecture:        static.architecture,
+			PerCore:             perCore,
+			Percent:             cpuPct,
 		},
 		GPU: func() GPUDeepInfo {
 			integrated := detectIntegratedGPU(static.gpuName, vramTotal)

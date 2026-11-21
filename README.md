@@ -24,7 +24,9 @@ PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metr
 
 ![Overview](docs/screenshots/overview.png)
 
-![Hardware · 16 threads](docs/screenshots/hardware-16threads.png)
+![Hardware](docs/screenshots/hardware.png)
+
+![Dev Mode](docs/screenshots/dev-mode.png)
 
 ![About](docs/screenshots/about.png)
 

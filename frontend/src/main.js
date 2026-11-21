@@ -22,6 +22,11 @@ import {
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
+import {
+  initDevMode,
+  getDevState,
+  isDevModeActive,
+} from './devMode.js'
 
 const MIT_LICENSE = `PulseCore v1.0
 
@@ -49,8 +54,8 @@ SOFTWARE.`
 
 const HISTORY_LEN = 60
 const BUFFER_DELAY_MS = 650
-const LERP = 0.08
-const EMA_ALPHA = 0.25
+const LERP = 0.14
+const EMA_ALPHA = 0.22
 
 const chartThemes = {
   cpu: { stroke: '#8ec0ff', glow: 'rgba(142, 192, 255, 0.95)', top: 'rgba(110, 168, 255, 0.55)', bottom: 'rgba(110, 168, 255, 0.04)' },
@@ -344,13 +349,8 @@ function drawTrendFrame() {
   let theme = chartThemes[activeMetric] || chartThemes.cpu
   if (activeMetric === 'battery') theme = batteryTheme(last)
 
-  chartScroll.target = Math.max(0, values.length - 1)
-  chartScroll.pos += (chartScroll.target - chartScroll.pos) * 0.1
-  const scrollFrac = chartScroll.target > 0 ? (chartScroll.pos / chartScroll.target) : 1
-  const pts = buildPoints(values, cssW, cssH, padL, padR, padT, padB).map((p, i) => {
-    const ideal = padL + (i / Math.max(HISTORY_LEN - 1, 1)) * plotW
-    return { x: ideal - (1 - scrollFrac) * 8, y: p.y }
-  })
+  // Keep X locked to sample index — only Y is lerped, so Bezier stays stable.
+  const pts = buildPoints(values, cssW, cssH, padL, padR, padT, padB)
 
   fillSmooth(ctx, pts, cssH, theme.top, theme.bottom)
 
@@ -443,38 +443,26 @@ function drawSparkline(canvasId, values, theme) {
   const top = theme?.top || 'rgba(110,168,255,0.35)'
   const bottom = theme?.bottom || 'rgba(110,168,255,0.02)'
 
-  // Translucent fill
-  ctx.beginPath()
-  pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y) })
-  const last = pts[pts.length - 1]
-  const first = pts[0]
-  ctx.lineTo(last.x, cssH)
-  ctx.lineTo(first.x, cssH)
-  ctx.closePath()
-  const grad = ctx.createLinearGradient(0, 0, 0, cssH)
-  grad.addColorStop(0, top)
-  grad.addColorStop(1, bottom)
-  ctx.fillStyle = grad
-  ctx.fill()
+  fillSmooth(ctx, pts, cssH, top, bottom)
 
-  // Glow stroke
-  ctx.beginPath()
-  pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y) })
-  ctx.strokeStyle = glow
-  ctx.lineWidth = 3.2
+  ctx.save()
+  ctx.lineWidth = 3
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
+  ctx.strokeStyle = glow
   ctx.shadowColor = glow
   ctx.shadowBlur = 12
-  ctx.globalAlpha = 0.55
-  ctx.stroke()
+  ctx.globalAlpha = 0.5
+  strokeSmooth(ctx, pts)
+  ctx.restore()
 
-  // Crisp neon stroke
-  ctx.globalAlpha = 1
-  ctx.shadowBlur = 8
-  ctx.strokeStyle = stroke
   ctx.lineWidth = 1.8
-  ctx.stroke()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = stroke
+  ctx.shadowColor = glow
+  ctx.shadowBlur = 8
+  strokeSmooth(ctx, pts)
   ctx.shadowBlur = 0
 }
 
@@ -526,8 +514,23 @@ function renderStatusStrip(m) {
   procEl.textContent = String(bgCount)
 }
 
+let insightsExpanded = false
+
+function insightPriority(it) {
+  if (it.id === 'thermal') return it.level === 'hot' ? 100 : 90
+  if (it.id === 'ram' && it.level === 'hot') return 85
+  if (it.id === 'disk') return 70
+  if (it.id === 'lag' || it.id === 'stutter') return 60
+  if (it.id === 'ram') return 55
+  return 40
+}
+
 function collectInsights(m) {
   const items = []
+  const dev = getDevState()
+  const throttleC = Number(dev.throttleC) || 85
+  const ramWarn = Number(dev.ramWarn) || 85
+  const diskWarn = Number(dev.diskWarn) || 90
   const temp = validTemp(m.temperatureC, m.tempAvailable)
   const ramPct = safeNum(m.ramPercent, 0)
   const disks = m.disks || []
@@ -537,45 +540,42 @@ function collectInsights(m) {
   const stutters = (m.stutterEvents || []).filter((e) => safeNum(e.jitterMs, 0) >= 300)
   const vamps = (m.vampires || []).filter((v) => !v.ecoMode && !v.frozen)
 
-  if (Number.isFinite(temp) && temp >= 85) {
+  if (Number.isFinite(temp) && temp >= throttleC) {
     items.push({
       id: 'thermal',
-      level: temp >= 90 ? 'hot' : 'warn',
-      title: t('insightThermalTitle'),
-      body: t('insightThermalBody').replace('{temp}', fmtTemp(temp, 0)),
+      level: temp >= throttleC + 5 ? 'hot' : 'warn',
+      title: `${t('insightThermalShort')} • ${fmtTemp(temp, 0)}°C`,
+      body: '',
       actions: [
         { id: 'power-silent', label: t('insightActSilent') },
         { id: 'eco-vampires', label: t('insightActEcoBg') },
-        { id: 'tab-lag', label: t('insightActOpenLags') },
-      ],
+      ].slice(0, 2),
     })
   }
 
-  if (ramPct >= 85) {
+  if (ramPct >= ramWarn) {
     items.push({
       id: 'ram',
-      level: ramPct >= 90 ? 'hot' : 'warn',
-      title: t('insightRamTitle'),
-      body: t('insightRamBody').replace('{pct}', fmt(ramPct, 0)),
+      level: ramPct >= Math.min(99, ramWarn + 5) ? 'hot' : 'warn',
+      title: `${t('insightRamShort')} • ${fmt(ramPct, 0)}%`,
+      body: '',
       actions: [
         { id: 'tab-weekly', label: t('insightActTopProcs') },
         { id: 'eco-vampires', label: t('ecoAppetite') },
-      ],
+      ].slice(0, 2),
     })
   }
 
-  if (sysDisk && diskPct >= 90) {
+  if (sysDisk && diskPct >= diskWarn) {
     items.push({
       id: 'disk',
       level: 'warn',
-      title: t('insightDiskTitle'),
-      body: t('insightDiskBody')
-        .replace('{pct}', fmt(diskPct, 0))
-        .replace('{mount}', sysDisk.mount || 'C:\\'),
+      title: `${t('insightDiskShort')} • ${fmt(diskPct, 0)}%`,
+      body: '',
       actions: [
         { id: 'disk-cleanup', label: t('insightActCleanup') },
-        { id: 'disk-smart', label: t('diskHealthBtn') },
-      ],
+        ...(dev.smartEnabled !== false ? [{ id: 'disk-smart', label: t('diskHealthBtn') }] : []),
+      ].slice(0, 2),
     })
   }
 
@@ -585,25 +585,20 @@ function collectInsights(m) {
     items.push({
       id: 'lag',
       level: 'warn',
-      title: t('insightLagTitle'),
-      body: t('insightLagBody').replace('{name}', name).replace('{core}', e.coreID ?? '—'),
+      title: `${t('insightLagShort')} • ${name}`,
+      body: '',
       actions: [
         ...(e.culpritPID ? [{ id: 'eco-pid', label: t('ecoLower'), pid: e.culpritPID, name: e.culpritProcess }] : []),
-        ...(e.culpritProcess ? [{ id: 'eco-name', label: t('ecoCulprit'), name: e.culpritProcess }] : []),
         { id: 'tab-lag', label: t('insightActOpenLags') },
-      ],
+      ].slice(0, 2),
     })
   } else if (stutters.length) {
-    const e = stutters[0]
     items.push({
       id: 'stutter',
       level: 'warn',
-      title: t('insightStutterTitle'),
-      body: e.cause || t('insightStutterBody'),
-      actions: [
-        ...(e.culprit ? [{ id: 'eco-name', label: t('ecoCulprit'), name: e.culprit }] : []),
-        { id: 'tab-lag', label: t('insightActOpenLags') },
-      ],
+      title: t('insightStutterShort'),
+      body: '',
+      actions: [{ id: 'tab-lag', label: t('insightActOpenLags') }],
     })
   }
 
@@ -611,49 +606,70 @@ function collectInsights(m) {
     items.push({
       id: 'vampires',
       level: 'warn',
-      title: t('insightVampTitle'),
-      body: t('insightVampBody').replace('{n}', String(vamps.length)),
+      title: `${t('insightVampShort')} • ${vamps.length}`,
+      body: '',
       actions: [
         { id: 'eco-vampires', label: t('insightActEcoBg') },
         { id: 'tab-lag', label: t('insightActOpenLags') },
-      ],
+      ].slice(0, 2),
     })
   }
 
-  return items
+  return items.sort((a, b) => insightPriority(b) - insightPriority(a))
 }
 
-function renderInsightHost(hostId, items) {
-  const host = $(hostId)
-  if (!host) return
-  if (!items.length) {
-    host.innerHTML = ''
-    host.classList.add('hidden')
-    return
-  }
-  host.classList.remove('hidden')
-  host.innerHTML = items.map((it) => `
+function insightCardHTML(it) {
+  return `
     <div class="insight-card ${it.level || 'warn'}" data-insight="${it.id}">
       <div class="insight-text">
         <div class="insight-title">${it.title}</div>
-        <div class="insight-body">${it.body}</div>
       </div>
       <div class="insight-actions">
-        ${(it.actions || []).map((a) => `
-          <button type="button" class="btn compact ${a.id.startsWith('eco') ? 'danger' : ''}"
+        ${(it.actions || []).slice(0, 2).map((a) => `
+          <button type="button" class="btn compact insight-btn ${a.id.startsWith('eco') ? 'danger' : ''}"
             data-insight-act="${a.id}"
             ${a.pid != null ? `data-pid="${a.pid}"` : ''}
             ${a.name ? `data-eco-name="${a.name}"` : ''}>${a.label}</button>
         `).join('')}
       </div>
     </div>
-  `).join('')
+  `
+}
+
+function renderInsightHost(hostId, items, { collapse = false } = {}) {
+  const host = $(hostId)
+  if (!host) return
+  const moreBtn = hostId === 'insight-list' ? $('insight-more') : null
+  if (!items.length) {
+    host.innerHTML = ''
+    host.classList.add('hidden')
+    if (moreBtn) {
+      moreBtn.classList.add('hidden')
+      moreBtn.hidden = true
+    }
+    return
+  }
+  host.classList.remove('hidden')
+  const visible = collapse && !insightsExpanded ? items.slice(0, 1) : items
+  host.innerHTML = visible.map(insightCardHTML).join('')
+  if (moreBtn) {
+    const hiddenN = items.length - 1
+    if (collapse && hiddenN > 0) {
+      moreBtn.hidden = false
+      moreBtn.classList.remove('hidden')
+      moreBtn.textContent = insightsExpanded
+        ? t('insightShowLess')
+        : t('insightMore').replace('{n}', String(hiddenN))
+    } else {
+      moreBtn.classList.add('hidden')
+      moreBtn.hidden = true
+    }
+  }
 }
 
 function renderInsights(m) {
   const items = collectInsights(m)
-  renderInsightHost('insight-list', items)
-  // Lags tab: emphasize lag/stutter/thermal actions
+  renderInsightHost('insight-list', items, { collapse: true })
   const lagFocus = items.filter((i) => ['lag', 'stutter', 'thermal', 'vampires'].includes(i.id))
   renderInsightHost('lag-insight-list', lagFocus.length ? lagFocus : items.slice(0, 2))
 }
@@ -838,19 +854,38 @@ function renderHardware(m) {
   $('hw-cpu-cores').textContent = (phys || logic)
     ? `${phys || na()} / ${logic || na()}`
     : na()
-  $('hw-cpu-freq').textContent = cpu.frequencyMHz
-    ? `${fmt(cpu.frequencyMHz / 1000, 2)} GHz`
-    : na()
+  const baseMHz = cpu.baseFrequencyMHz || cpu.frequencyMHz
+  const curMHz = cpu.currentFrequencyMHz || cpu.frequencyMHz
+  if ($('hw-cpu-base')) {
+    $('hw-cpu-base').textContent = baseMHz ? `${fmt(baseMHz / 1000, 2)} GHz` : na()
+  }
+  $('hw-cpu-freq').textContent = curMHz ? `${fmt(curMHz / 1000, 2)} GHz` : na()
   $('hw-cpu-load').textContent = fmtPct(cpu.percent ?? m.cpuPercent)
+  if ($('hw-cpu-temp')) {
+    const temp = m.tempAvailable === false ? na() : fmtTemp(m.temperatureC, 0)
+    $('hw-cpu-temp').textContent = temp === na() ? na() : `${temp} °C`
+  }
+  if ($('hw-cpu-cache')) {
+    const kb = Number(cpu.cacheKB) || 0
+    $('hw-cpu-cache').textContent = kb > 0
+      ? (kb >= 1024 ? `${fmt(kb / 1024, 1)} MB` : `${kb} KB`)
+      : na()
+  }
+  if ($('hw-cpu-arch')) {
+    $('hw-cpu-arch').textContent = cpu.architecture || 'x64'
+  }
 
   const cores = cpu.perCore || m.cpuPerCore || []
   const grid = $('core-grid')
-  if (grid) {
+  const wrap = $('core-grid-wrap')
+  const showCores = isDevModeActive() && getDevState().showPerCore
+  if (wrap) wrap.classList.toggle('hidden', !showCores)
+  if (grid && showCores) {
     const n = cores.length
     let cols = 0
     if (n === 16 || n === 32) cols = 8
     else if (n === 12 || n === 24) cols = 6
-    else if (n === 8 || n === 4) cols = n === 4 ? 4 : 4
+    else if (n === 8 || n === 4) cols = 4
     else if (n === 6) cols = 6
     if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
     else grid.style.gridTemplateColumns = ''
@@ -869,7 +904,15 @@ function renderHardware(m) {
       : `<div class="empty">${na()}</div>`
   }
 
-  $('hw-gpu-name').textContent = gpu.name || m.gpuName || na()
+  let gpuName = gpu.name || m.gpuName || na()
+  const forceAdapter = getDevState().forceAdapter
+  if (forceAdapter && typeof gpuName === 'string' && gpuName !== na()) {
+    // Display-only preference hint when force string matches.
+    if (!gpuName.toLowerCase().includes(String(forceAdapter).toLowerCase())) {
+      gpuName = `${gpuName} · force:${forceAdapter}`
+    }
+  }
+  $('hw-gpu-name').textContent = gpuName
   $('hw-gpu-driver').textContent = gpu.driverVersion || na()
   const ded = gpu.dedicatedMB ?? m.vramTotalMB
   const shared = gpu.sharedMB ?? m.vramSharedMB
@@ -1597,6 +1640,10 @@ function renderDiskHealthBody(r) {
 }
 
 async function runDiskHealth(drive, force = false) {
+  if (getDevState().smartEnabled === false) {
+    showToast(t('devSmartOff'), false)
+    return
+  }
   if (drive) selectedDrive = driveLetter(drive)
   const key = (selectedDrive || 'C').toUpperCase()
   renderDiskTabs(latestDisks, 'modal-disk-tabs')
@@ -1815,6 +1862,10 @@ function wireUI() {
   }
   $('insight-list')?.addEventListener('click', onInsightAct)
   $('lag-insight-list')?.addEventListener('click', onInsightAct)
+  $('insight-more')?.addEventListener('click', () => {
+    insightsExpanded = !insightsExpanded
+    if (lastMetrics) renderInsights(lastMetrics)
+  })
 
   ;['cpu', 'gpu', 'ram', 'temps'].forEach((key) => {
     $(`mh-opt-${key}`)?.addEventListener('change', (ev) => {
@@ -2050,6 +2101,23 @@ function boot() {
   applyI18n()
   wireUI()
   wireAmbientParallax()
+  initDevMode({
+    showToast,
+    setActiveTab,
+    t,
+    applyPoll: async (ms) => {
+      await SetPollInterval(Number(ms) || 1000)
+      document.querySelectorAll('.btn.poll').forEach((b) => {
+        b.classList.toggle('active', Number(b.dataset.poll) === Number(ms))
+      })
+    },
+    onChange: () => {
+      if (lastMetrics) {
+        renderHardware(lastMetrics)
+        renderInsights(lastMetrics)
+      }
+    },
+  })
   SetLanguage(lang).catch(() => {})
   refresh()
   refreshWeekly()
