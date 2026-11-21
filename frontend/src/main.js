@@ -25,7 +25,6 @@ import { i18n } from './i18n.js'
 import {
   initDevMode,
   getDevState,
-  isDevModeActive,
 } from './devMode.js'
 
 const MIT_LICENSE = `PulseCore v1.0
@@ -841,6 +840,36 @@ function renderLag(m) {
   }
 }
 
+/** Group logical per-thread loads into physical cores (SMT = 2 threads). */
+function groupPhysicalCores(perCore, physicalCores, logicalCores) {
+  const threads = Array.isArray(perCore) ? perCore : []
+  const logic = Number(logicalCores) || threads.length || 0
+  const phys = Number(physicalCores) || 0
+  if (!logic && !threads.length) return []
+  const coreCount = phys > 0 ? phys : (threads.length || logic)
+  const tpc = Math.max(1, Math.round((logic || threads.length) / Math.max(1, coreCount)))
+  const groups = []
+  for (let c = 0; c < coreCount; c++) {
+    const kids = []
+    for (let tIdx = 0; tIdx < tpc; tIdx++) {
+      const idx = c * tpc + tIdx
+      if (idx >= Math.max(logic, threads.length) && kids.length) break
+      const raw = idx < threads.length ? threads[idx] : null
+      const num = Number(raw)
+      kids.push({
+        id: tIdx,
+        load: Number.isFinite(num) ? num : null,
+        logicalIndex: idx,
+      })
+    }
+    if (!kids.length) continue
+    const nums = kids.map((k) => k.load).filter((v) => Number.isFinite(v))
+    const avg = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
+    groups.push({ id: c, load: avg, threads: kids })
+  }
+  return groups
+}
+
 function renderHardware(m) {
   const hw = m.hardware || {}
   const cpu = hw.cpu || {}
@@ -875,30 +904,42 @@ function renderHardware(m) {
     $('hw-cpu-arch').textContent = cpu.architecture || 'x64'
   }
 
-  const cores = cpu.perCore || m.cpuPerCore || []
+  const threads = cpu.perCore || m.cpuPerCore || []
   const grid = $('core-grid')
   const wrap = $('core-grid-wrap')
-  const showCores = isDevModeActive() && getDevState().showPerCore
-  if (wrap) wrap.classList.toggle('hidden', !showCores)
-  if (grid && showCores) {
-    const n = cores.length
-    let cols = 0
-    if (n === 16 || n === 32) cols = 8
-    else if (n === 12 || n === 24) cols = 6
-    else if (n === 8 || n === 4) cols = 4
-    else if (n === 6) cols = 6
-    if (cols) grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`
-    else grid.style.gridTemplateColumns = ''
+  if (wrap) wrap.classList.remove('hidden')
+  if (grid) {
+    const physN = Number(phys) || 0
+    const logicN = Number(logic) || threads.length || 0
+    const groups = groupPhysicalCores(threads, physN, logicN)
+    const n = groups.length
+    const cols = n >= 12 ? 4 : n >= 6 ? 4 : n >= 4 ? 4 : Math.max(1, n)
+    grid.style.gridTemplateColumns = n ? `repeat(${cols}, minmax(0, 1fr))` : ''
     grid.dataset.cores = String(n || 0)
-    grid.innerHTML = cores.length
-      ? cores.map((c, i) => {
-        const load = Number.isFinite(Number(c)) ? safeNum(c, 0) : 0
-        const val = Number.isFinite(Number(c)) ? fmtPct(c, 0) : na()
+    grid.dataset.smt = groups.some((g) => g.threads.length > 1) ? '1' : '0'
+    const coreWord = t('lblCore')
+    grid.innerHTML = groups.length
+      ? groups.map((g) => {
+        const load = Number.isFinite(g.load) ? Math.min(100, Math.max(0, g.load)) : 0
+        const val = Number.isFinite(g.load) ? fmtPct(g.load, 0) : na()
+        const threadRows = g.threads.map((th) => {
+          const tLoad = Number.isFinite(Number(th.load)) ? Math.min(100, Math.max(0, Number(th.load))) : 0
+          const tVal = Number.isFinite(Number(th.load)) ? fmtPct(th.load, 0) : na()
+          return `
+          <div class="core-thread" title="T${th.id}">
+            <span class="tid">${t('lblThread')}${th.id}</span>
+            <div class="mini-bar"><i style="width:${tLoad}%"></i></div>
+            <span class="tval">${tVal}</span>
+          </div>`
+        }).join('')
         return `
-      <div class="core-cell">
-        <div class="id">C${i}</div>
-        <div class="val">${val}</div>
-        <div class="mini-bar"><i style="width:${Math.min(100, load)}%"></i></div>
+      <div class="core-phys" data-core="${g.id}">
+        <div class="core-phys-head">
+          <span class="id">${coreWord} ${g.id}</span>
+          <span class="val">${val}</span>
+        </div>
+        <div class="core-phys-bar"><i style="width:${load}%"></i></div>
+        <div class="core-threads">${threadRows}</div>
       </div>`
       }).join('')
       : `<div class="empty">${na()}</div>`

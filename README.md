@@ -15,7 +15,7 @@ PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metr
 - **Overview**: live metrics, sparklines, actionable alerts (thermal / RAM / disk / lag)
 - **Lag Spotter**: per-core spikes, stutter log, network diagnostics, sleep blockers
 - **Eco Mode**: soft-limit hungry background processes (safe denylist; undo supported)
-- **Hardware**: CPU thread grid, discrete GPU preference, RAM channels, battery wear
+- **Hardware**: physical CPU cores with SMT thread bars, discrete GPU preference, RAM channels, battery wear
 - **GamePulse**: catalog search + FPS predictor across Low/Med/High/Ultra
 - **Mini-HUD**: always-on-top capsule with CPU/GPU/RAM/temps toggles
 - **Power profiles**: Silent / Balanced / Turbo via Windows `powercfg`

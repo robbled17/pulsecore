@@ -14,8 +14,8 @@ const ARTIFACTS = '/opt/cursor/artifacts'
 const LOCAL = path.join(__dirname, 'screenshots')
 
 const shots = [
-  { file: 'landing-polish-v2-1440x900.png', w: 1440, h: 900 },
-  { file: 'landing-polish-v2-390x844.png', w: 390, h: 844 },
+  { file: 'landing-live-demo-1440x900.png', w: 1440, h: 900 },
+  { file: 'landing-live-demo-390x844.png', w: 390, h: 844 },
 ]
 
 async function main() {

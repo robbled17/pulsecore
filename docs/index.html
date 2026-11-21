@@ -9,10 +9,6 @@
   <meta property="og:description" content="Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы" />
   <meta property="og:image" content="screenshots/overview.webp" />
   <link rel="icon" href="assets/appicon.png" />
-  <link rel="preload" as="image" href="screenshots/overview.webp" />
-  <link rel="preload" as="image" href="screenshots/lags.webp" />
-  <link rel="preload" as="image" href="screenshots/gamepulse.webp" />
-  <link rel="preload" as="image" href="screenshots/hardware-16threads.webp" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -335,37 +331,366 @@
       border-radius: 14px;
       overflow: hidden;
       border: 1px solid rgba(160, 190, 255, 0.12);
-      background: #05070f;
+      background: linear-gradient(180deg, #0a1020 0%, #05070f 100%);
       isolation: isolate;
       margin: 0;
       padding: 0;
       width: 100%;
-    }
-    .preview-frame img {
-      width: 100%;
-      height: auto;
-      display: block;
-      margin: 0;
-      padding: 0;
-      border: 0;
       max-width: 100%;
+    }
+    .demo-work {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-height: 420px;
+      padding: 14px 14px 16px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .demo-pane {
+      display: none;
+      animation: demoPaneIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-pane.active { display: block; }
+    @keyframes demoPaneIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .demo-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-head h3 {
+      font-size: 17px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+    .demo-head p {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+    .demo-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .demo-metric {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(61, 231, 200, 0.04) 55%, rgba(255,255,255,0.03)),
+        rgba(255, 255, 255, 0.035);
+      padding: 12px 12px 10px;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .demo-metric .lab {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 4px;
+    }
+    .demo-metric .val {
+      font-size: 22px;
+      font-weight: 780;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 6px;
+    }
+    .demo-metric canvas {
+      display: block;
+      width: 100%;
+      height: 28px;
+    }
+    .demo-bar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .demo-bar > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-3));
+      transition: width 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-alert {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(251, 191, 36, 0.28);
+      background: rgba(251, 191, 36, 0.1);
+      margin-bottom: 12px;
+      transition: opacity 0.35s ease, transform 0.35s ease, max-height 0.35s ease;
+    }
+    .demo-alert.hidden {
+      opacity: 0;
+      transform: translateY(-6px);
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin: 0;
+      overflow: hidden;
+      border-width: 0;
+      pointer-events: none;
+    }
+    .demo-alert .txt { font-size: 12.5px; font-weight: 600; flex: 1 1 180px; }
+    .demo-alert .btn-eco {
+      appearance: none;
+      border: 1px solid rgba(110, 168, 255, 0.4);
+      background: rgba(110, 168, 255, 0.16);
+      color: #eaf2ff;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .demo-alert .btn-eco:hover { background: rgba(110, 168, 255, 0.28); }
+    .demo-chart {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+      margin-bottom: 4px;
+    }
+    .demo-chart .ctitle {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+    .demo-chart canvas {
+      display: block;
+      width: 100%;
+      height: 120px;
+      max-width: 100%;
+    }
+    .demo-procs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .demo-proc {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 64px auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.035);
+      min-width: 0;
+    }
+    .demo-proc .name {
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .demo-proc .load {
+      font-variant-numeric: tabular-nums;
+      font-weight: 750;
+      text-align: right;
+    }
+    .demo-proc .btn-eco {
+      appearance: none;
+      border: 1px solid rgba(160, 190, 255, 0.22);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font: inherit;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+    }
+    .demo-proc .btn-eco.on {
+      background: rgba(74, 222, 128, 0.16);
+      border-color: rgba(74, 222, 128, 0.45);
+      color: #bbf7d0;
+    }
+    .demo-games {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-game {
+      appearance: none;
+      text-align: left;
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background: rgba(255,255,255,0.04);
+      color: inherit;
+      font: inherit;
+      padding: 12px;
+      cursor: pointer;
+      min-width: 0;
+      transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+    }
+    .demo-game:hover { border-color: rgba(110, 168, 255, 0.4); }
+    .demo-game.active {
+      border-color: rgba(110, 168, 255, 0.55);
+      background: rgba(110, 168, 255, 0.12);
+      box-shadow: 0 0 24px rgba(110, 168, 255, 0.12);
+    }
+    .demo-game .gname { font-weight: 750; font-size: 13px; margin-bottom: 4px; }
+    .demo-game .gsub { color: var(--muted); font-size: 11px; }
+    .demo-fps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .demo-fps .cell {
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.03);
+      padding: 10px;
+      text-align: center;
+      min-width: 0;
+    }
+    .demo-fps .cell .q { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .demo-fps .cell .f {
+      font-size: 20px;
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s ease;
+    }
+    .demo-fps .cell .f.pop { transform: scale(1.08); color: var(--accent-3); }
+    .demo-tip {
+      font-size: 12.5px;
+      color: var(--muted);
+      min-height: 1.4em;
+      transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-tip.flash {
       opacity: 0;
       transform: translateY(6px);
-      transition:
-        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-      pointer-events: none;
-      position: absolute;
-      left: 0;
-      top: 0;
-      z-index: 0;
     }
-    .preview-frame img.active {
-      position: relative;
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-      z-index: 1;
+    .demo-hw-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-hw-card {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(255,255,255,0.03));
+      padding: 12px;
+      min-width: 0;
+    }
+    .demo-hw-card .lab { font-size: 11px; color: var(--muted); font-weight: 650; margin-bottom: 4px; }
+    .demo-hw-card .big {
+      font-size: 15px;
+      font-weight: 750;
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .demo-hw-card .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .demo-core-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .demo-core {
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(61, 231, 200, 0.04) 50%, rgba(255,255,255,0.03));
+      padding: 8px 9px 7px;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .demo-core .ch {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      margin-bottom: 5px;
+      font-size: 10.5px;
+    }
+    .demo-core .ch .id { color: var(--muted); font-weight: 650; }
+    .demo-core .ch .v { font-weight: 750; font-variant-numeric: tabular-nums; }
+    .demo-core .pbar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .demo-core .pbar > i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-3));
+      transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-core .thr {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) 28px;
+      gap: 4px;
+      align-items: center;
+      font-size: 9.5px;
+      margin-top: 3px;
+    }
+    .demo-core .thr .tid { color: var(--muted); font-weight: 650; }
+    .demo-core .thr .tbar {
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+    .demo-core .thr .tbar > i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(110,168,255,0.85), rgba(61,231,200,0.7));
+      transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-core .thr .tv { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 900px) {
+      .demo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-fps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-hw-cards { grid-template-columns: 1fr; }
+      .demo-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+      .demo-work { padding: 10px; min-height: 360px; }
+      .demo-metrics { grid-template-columns: 1fr; }
+      .demo-games { grid-template-columns: 1fr; }
+      .demo-fps { grid-template-columns: 1fr 1fr; }
+      .demo-proc { grid-template-columns: minmax(0, 1fr) auto; }
+      .demo-proc .load { grid-column: 1; text-align: left; color: var(--muted); font-size: 12px; }
+      .demo-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     .bento {
@@ -551,12 +876,13 @@
       .preview-tab-pill {
         transition: none !important;
       }
-      .preview-frame img {
+      .demo-pane { animation: none !important; }
+      .demo-metric .val,
+      .demo-bar > i,
+      .demo-core .pbar > i,
+      .demo-core .thr .tbar > i,
+      .demo-fps .cell .f {
         transition: none !important;
-        transform: none !important;
-      }
-      .preview-frame img:not(.active) {
-        opacity: 0;
       }
       .reveal {
         opacity: 1 !important;
@@ -706,11 +1032,100 @@
           <button type="button" role="tab" aria-selected="false" data-tab="gamepulse">GamePulse</button>
           <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
         </div>
-        <div class="preview-frame">
-          <img class="active" data-tab="overview" src="screenshots/overview.webp" alt="Обзор системы PulseCore" width="1076" height="800" decoding="async" />
-          <img data-tab="lags" src="screenshots/lags.webp" alt="Лаги и сеть" width="1076" height="800" decoding="async" />
-          <img data-tab="gamepulse" src="screenshots/gamepulse.webp" alt="GamePulse FPS" width="1076" height="800" decoding="async" />
-          <img data-tab="hardware" src="screenshots/hardware-16threads.webp" alt="Железо: сетка потоков CPU" width="1076" height="800" decoding="async" />
+        <div class="preview-frame" id="demo-preview">
+          <div class="demo-work" id="demo-work">
+            <div class="demo-pane active" data-pane="overview">
+              <div class="demo-head">
+                <div>
+                  <h3>Обзор системы</h3>
+                  <p>Живые метрики CPU, GPU, RAM и температуры</p>
+                </div>
+              </div>
+              <div class="demo-alert" id="demo-alert">
+                <div class="txt">Пик ядра: Браузер нагружает систему</div>
+                <button type="button" class="btn-eco" id="demo-eco-alert">Eco Mode</button>
+              </div>
+              <div class="demo-metrics" id="demo-metrics">
+                <div class="demo-metric" data-k="cpu">
+                  <div class="lab">CPU</div>
+                  <div class="val" id="demo-cpu">48%</div>
+                  <canvas id="spark-demo-cpu" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-cpu-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="gpu">
+                  <div class="lab">GPU</div>
+                  <div class="val" id="demo-gpu">68%</div>
+                  <canvas id="spark-demo-gpu" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-gpu-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="ram">
+                  <div class="lab">RAM</div>
+                  <div class="val" id="demo-ram">63%</div>
+                  <canvas id="spark-demo-ram" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-ram-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="temp">
+                  <div class="lab">Temp</div>
+                  <div class="val" id="demo-temp">58°C</div>
+                  <canvas id="spark-demo-temp" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-temp-bar"></i></div>
+                </div>
+              </div>
+              <div class="demo-chart">
+                <div class="ctitle">Динамика</div>
+                <canvas id="demo-trend" width="900" height="160" aria-hidden="true"></canvas>
+              </div>
+            </div>
+
+            <div class="demo-pane" data-pane="lags">
+              <div class="demo-head">
+                <div>
+                  <h3>Лаги</h3>
+                  <p>Фоновые процессы и Eco Mode</p>
+                </div>
+              </div>
+              <div class="demo-procs" id="demo-procs"></div>
+            </div>
+
+            <div class="demo-pane" data-pane="gamepulse">
+              <div class="demo-head">
+                <div>
+                  <h3>GamePulse</h3>
+                  <p>Выберите игру для прогноза FPS</p>
+                </div>
+              </div>
+              <div class="demo-games" id="demo-games"></div>
+              <div class="demo-fps" id="demo-fps"></div>
+              <div class="demo-tip" id="demo-tip">Нажмите на игру, чтобы увидеть пресеты</div>
+            </div>
+
+            <div class="demo-pane" data-pane="hardware">
+              <div class="demo-head">
+                <div>
+                  <h3>Железо</h3>
+                  <p>Физические ядра и потоки SMT</p>
+                </div>
+              </div>
+              <div class="demo-hw-cards">
+                <div class="demo-hw-card">
+                  <div class="lab">CPU</div>
+                  <div class="big">Ryzen 7 5700X</div>
+                  <div class="sub" id="demo-hw-cpu-sub">8 / 16 · 42%</div>
+                </div>
+                <div class="demo-hw-card">
+                  <div class="lab">GPU</div>
+                  <div class="big">RTX 3060</div>
+                  <div class="sub" id="demo-hw-gpu-sub">8 GB · 68%</div>
+                </div>
+                <div class="demo-hw-card">
+                  <div class="lab">RAM</div>
+                  <div class="big">16 GB DDR4</div>
+                  <div class="sub" id="demo-hw-ram-sub">Dual Channel · 63%</div>
+                </div>
+              </div>
+              <div class="demo-core-grid" id="demo-core-grid"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -818,18 +1233,11 @@
       coarseOrNarrow.addEventListener("change", apply);
 
       const tabs = [...document.querySelectorAll(".preview-tabs button")];
-      const frames = [...document.querySelectorAll(".preview-frame img")];
+      const panes = [...document.querySelectorAll(".demo-pane")];
       const frame = document.querySelector(".preview-frame");
       const tablist = document.querySelector(".preview-tabs");
       const pill = document.querySelector(".preview-tab-pill");
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-      // Eager decode / warm cache (no loading=lazy)
-      frames.forEach((img) => {
-        img.loading = "eager";
-        img.decoding = "async";
-        if (img.decode) img.decode().catch(() => {});
-      });
 
       const movePill = (btn, instant) => {
         if (!pill || !tablist || !btn) return;
@@ -856,7 +1264,7 @@
             b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
           }
         });
-        frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
+        panes.forEach((p) => p.classList.toggle("active", p.dataset.pane === id));
         if (activeBtn) {
           requestAnimationFrame(() => movePill(activeBtn, reduceMotion.matches));
         }
@@ -891,8 +1299,8 @@
           const dy = e.clientY - y0;
           if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
           const ids = tabs.map((t) => t.dataset.tab);
-          const cur = frames.find((img) => img.classList.contains("active"));
-          const i = ids.indexOf(cur && cur.dataset.tab);
+          const cur = panes.find((p) => p.classList.contains("active"));
+          const i = ids.indexOf(cur && cur.dataset.pane);
           if (i < 0) return;
           const next = dx < 0 ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
           if (next !== i) activate(ids[next]);
@@ -920,6 +1328,338 @@
         if (e.matches) showAllReveals();
         syncPill();
       });
+
+      /* ---- Live interactive demo telemetry ---- */
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+      const HISTORY = 40;
+      const state = {
+        eco: false,
+        cpu: 50,
+        gpu: 69,
+        ram: 63.5,
+        temp: 58,
+        series: { cpu: [], gpu: [], ram: [], temp: [] },
+        display: { cpu: 50, gpu: 69, ram: 63.5, temp: 58 },
+        cores: Array.from({ length: 8 }, () => ({ t0: 30, t1: 28 })),
+        procs: [
+          { name: "chrome.exe", load: 38, eco: false },
+          { name: "Discord.exe", load: 22, eco: false },
+          { name: "Steam.exe", load: 14, eco: false },
+          { name: "Explorer.exe", load: 6, eco: false },
+        ],
+        gameId: "cs2",
+      };
+      ["cpu", "gpu", "ram", "temp"].forEach((k) => {
+        state.series[k] = Array(HISTORY).fill(state[k]);
+      });
+
+      const games = {
+        cs2: { name: "CS2", sub: "Competitive", fps: [240, 210, 165, 120], tip: "Стабильные 165+ на высоких" },
+        gtav: { name: "GTA V", sub: "Open world", fps: [144, 120, 90, 72], tip: "Комфортные 120 на средних" },
+        cyber: { name: "Cyberpunk", sub: "RTX ready", fps: [95, 72, 55, 42], tip: "DLSS держит 60 на высоких" },
+        dota: { name: "Dota 2", sub: "MOBA", fps: [200, 180, 150, 120], tip: "Запас FPS для турниров" },
+      };
+
+      const el = (id) => document.getElementById(id);
+      const sparkIds = {
+        cpu: "spark-demo-cpu",
+        gpu: "spark-demo-gpu",
+        ram: "spark-demo-ram",
+        temp: "spark-demo-temp",
+      };
+
+      function pushSeries(key, v) {
+        const arr = state.series[key];
+        arr.push(v);
+        if (arr.length > HISTORY) arr.shift();
+      }
+
+      function drawSpark(canvas, values, color) {
+        if (!canvas) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = canvas.clientWidth || 160;
+        const h = canvas.clientHeight || 28;
+        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+          canvas.width = Math.floor(w * dpr);
+          canvas.height = Math.floor(h * dpr);
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        if (!values.length) return;
+        const min = Math.min(...values) - 2;
+        const max = Math.max(...values) + 2;
+        const span = Math.max(1, max - min);
+        ctx.beginPath();
+        values.forEach((v, i) => {
+          const x = (i / Math.max(1, values.length - 1)) * w;
+          const y = h - ((v - min) / span) * (h - 4) - 2;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
+
+      function drawTrend(canvas) {
+        if (!canvas) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = canvas.clientWidth || 900;
+        const h = canvas.clientHeight || 120;
+        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+          canvas.width = Math.floor(w * dpr);
+          canvas.height = Math.floor(h * dpr);
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        const series = [
+          { key: "cpu", color: "rgba(142,192,255,0.95)" },
+          { key: "gpu", color: "rgba(95,240,212,0.9)" },
+          { key: "ram", color: "rgba(180,155,255,0.85)" },
+        ];
+        series.forEach((s) => {
+          const values = state.series[s.key];
+          ctx.beginPath();
+          values.forEach((v, i) => {
+            const x = (i / Math.max(1, values.length - 1)) * w;
+            const y = h - (clamp(v, 0, 100) / 100) * (h - 8) - 4;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        });
+      }
+
+      function renderProcs() {
+        const host = el("demo-procs");
+        if (!host) return;
+        host.innerHTML = state.procs.map((p, i) => `
+          <div class="demo-proc" data-i="${i}">
+            <div class="name">${p.name}</div>
+            <div class="load">${Math.round(p.load)}%</div>
+            <button type="button" class="btn-eco${p.eco ? " on" : ""}" data-eco="${i}">${p.eco ? "Eco ON" : "Eco Mode"}</button>
+          </div>`).join("");
+        host.querySelectorAll("[data-eco]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const i = Number(btn.getAttribute("data-eco"));
+            const p = state.procs[i];
+            if (!p) return;
+            p.eco = !p.eco;
+            if (p.eco) p.load = clamp(p.load * 0.35, 3, 12);
+            else p.load = clamp(rnd(12, 40), 8, 45);
+            renderProcs();
+          });
+        });
+      }
+
+      function renderGames() {
+        const host = el("demo-games");
+        const fpsHost = el("demo-fps");
+        const tip = el("demo-tip");
+        if (!host || !fpsHost) return;
+        const order = ["cs2", "gtav", "cyber", "dota"];
+        host.innerHTML = order.map((id) => {
+          const g = games[id];
+          return `<button type="button" class="demo-game${state.gameId === id ? " active" : ""}" data-game="${id}">
+            <div class="gname">${g.name}</div>
+            <div class="gsub">${g.sub}</div>
+          </button>`;
+        }).join("");
+        host.querySelectorAll("[data-game]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.gameId = btn.getAttribute("data-game");
+            renderGames();
+            if (tip) {
+              tip.classList.add("flash");
+              tip.textContent = games[state.gameId].tip;
+              requestAnimationFrame(() => {
+                tip.classList.remove("flash");
+              });
+            }
+            fpsHost.querySelectorAll(".f").forEach((n) => {
+              n.classList.remove("pop");
+              void n.offsetWidth;
+              n.classList.add("pop");
+            });
+          });
+        });
+        const g = games[state.gameId];
+        const labels = ["Low", "Med", "High", "Ultra"];
+        fpsHost.innerHTML = g.fps.map((f, i) => `
+          <div class="cell"><div class="q">${labels[i]}</div><div class="f">${f}</div></div>`).join("");
+        if (tip) tip.textContent = g.tip;
+      }
+
+      function renderCores() {
+        const host = el("demo-core-grid");
+        if (!host) return;
+        if (!host.childElementCount) {
+          host.innerHTML = state.cores.map((_, i) => `
+            <div class="demo-core" data-c="${i}">
+              <div class="ch"><span class="id">Ядро ${i}</span><span class="v">0%</span></div>
+              <div class="pbar"><i></i></div>
+              <div class="thr"><span class="tid">T0</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
+              <div class="thr"><span class="tid">T1</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
+            </div>`).join("");
+        }
+        state.cores.forEach((c, i) => {
+          const node = host.children[i];
+          if (!node) return;
+          const avg = (c.t0 + c.t1) / 2;
+          node.querySelector(".v").textContent = Math.round(avg) + "%";
+          node.querySelector(".pbar > i").style.width = clamp(avg, 0, 100) + "%";
+          const thr = node.querySelectorAll(".thr");
+          [c.t0, c.t1].forEach((load, ti) => {
+            thr[ti].querySelector(".tv").textContent = Math.round(load) + "%";
+            thr[ti].querySelector(".tbar > i").style.width = clamp(load, 0, 100) + "%";
+          });
+        });
+      }
+
+      function sampleMetrics() {
+        if (state.eco) {
+          state.cpu = rnd(18, 24);
+        } else {
+          state.cpu = rnd(42, 58);
+        }
+        state.gpu = rnd(64, 74);
+        state.ram = rnd(62, 65);
+        state.temp = rnd(56, 61);
+        pushSeries("cpu", state.cpu);
+        pushSeries("gpu", state.gpu);
+        pushSeries("ram", state.ram);
+        pushSeries("temp", state.temp);
+
+        state.cores.forEach((c) => {
+          const base = state.eco ? rnd(8, 22) : rnd(18, 72);
+          c.t0 = clamp(base + rnd(-8, 10), 4, 96);
+          c.t1 = clamp(base + rnd(-10, 8), 4, 96);
+        });
+
+        state.procs.forEach((p) => {
+          if (p.eco) p.load = clamp(p.load + rnd(-1.2, 1.2), 2, 14);
+          else p.load = clamp(p.load + rnd(-3, 3), 5, 48);
+        });
+        const procsHost = el("demo-procs");
+        if (procsHost && procsHost.querySelector(".demo-proc")) {
+          state.procs.forEach((p, i) => {
+            const row = procsHost.children[i];
+            if (!row) return;
+            const loadEl = row.querySelector(".load");
+            if (loadEl) loadEl.textContent = Math.round(p.load) + "%";
+          });
+        }
+
+        const avgCore = state.cores.reduce((s, c) => s + (c.t0 + c.t1) / 2, 0) / state.cores.length;
+        const hwCpu = el("demo-hw-cpu-sub");
+        const hwGpu = el("demo-hw-gpu-sub");
+        const hwRam = el("demo-hw-ram-sub");
+        if (hwCpu) hwCpu.textContent = "8 / 16 · " + Math.round(avgCore) + "%";
+        if (hwGpu) hwGpu.textContent = "8 GB · " + Math.round(state.gpu) + "%";
+        if (hwRam) hwRam.textContent = "Dual Channel · " + Math.round(state.ram) + "%";
+        renderCores();
+      }
+
+      function paintUI() {
+        const keys = [
+          { k: "cpu", id: "demo-cpu", bar: "demo-cpu-bar", unit: "%", color: "rgba(142,192,255,0.95)" },
+          { k: "gpu", id: "demo-gpu", bar: "demo-gpu-bar", unit: "%", color: "rgba(95,240,212,0.95)" },
+          { k: "ram", id: "demo-ram", bar: "demo-ram-bar", unit: "%", color: "rgba(180,155,255,0.95)" },
+          { k: "temp", id: "demo-temp", bar: "demo-temp-bar", unit: "°C", color: "rgba(255,209,102,0.95)", max: 100 },
+        ];
+        keys.forEach((item) => {
+          const target = state[item.k];
+          state.display[item.k] += (target - state.display[item.k]) * (reduceMotion.matches ? 1 : 0.12);
+          const v = state.display[item.k];
+          const node = el(item.id);
+          if (node) {
+            node.textContent = item.k === "temp"
+              ? Math.round(v) + "°C"
+              : Math.round(v) + "%";
+          }
+          const bar = el(item.bar);
+          if (bar) {
+            const pct = item.k === "temp" ? (v / 100) * 100 : v;
+            bar.style.width = clamp(pct, 0, 100) + "%";
+          }
+          drawSpark(el(sparkIds[item.k]), state.series[item.k], item.color);
+        });
+        drawTrend(el("demo-trend"));
+      }
+
+      let simTimer = 0;
+      let paintRaf = 0;
+      let previewInView = false;
+
+      function startSim() {
+        if (simTimer) return;
+        sampleMetrics();
+        simTimer = window.setInterval(sampleMetrics, 1200);
+        const loop = () => {
+          paintUI();
+          paintRaf = requestAnimationFrame(loop);
+        };
+        paintRaf = requestAnimationFrame(loop);
+      }
+      function stopSim() {
+        if (simTimer) {
+          clearInterval(simTimer);
+          simTimer = 0;
+        }
+        if (paintRaf) {
+          cancelAnimationFrame(paintRaf);
+          paintRaf = 0;
+        }
+      }
+
+      const alertEl = el("demo-alert");
+      const ecoAlertBtn = el("demo-eco-alert");
+      if (ecoAlertBtn) {
+        ecoAlertBtn.addEventListener("click", () => {
+          state.eco = true;
+          state.cpu = rnd(18, 24);
+          if (alertEl) alertEl.classList.add("hidden");
+          const browser = state.procs.find((p) => p.name === "chrome.exe");
+          if (browser) {
+            browser.eco = true;
+            browser.load = clamp(browser.load * 0.3, 3, 10);
+            renderProcs();
+          }
+        });
+      }
+
+      renderProcs();
+      renderGames();
+      renderCores();
+      sampleMetrics();
+      paintUI();
+
+      const previewShell = document.querySelector(".preview-shell") || frame;
+      if (previewShell && "IntersectionObserver" in window) {
+        const simIo = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            previewInView = entry.isIntersecting;
+            if (previewInView) startSim();
+            else stopSim();
+          });
+        }, { threshold: 0.12 });
+        simIo.observe(previewShell);
+      } else {
+        startSim();
+      }
+
+      window.addEventListener("resize", () => {
+        paintUI();
+        drawTrend(el("demo-trend"));
+      }, { passive: true });
     })();
   </script>
 </body>
