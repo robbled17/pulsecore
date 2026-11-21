@@ -242,7 +242,7 @@ func (a *App) collectOnce() {
 	vampires := a.GetVampireProcesses()
 	realTemp := snapshot.TemperatureC
 	if realTemp <= 0 {
-		// Do not invent a fake ACPI reading — UI shows Н/Д when TempAvailable=false.
+		// Do not invent a fake ACPI reading: UI shows Н/Д when TempAvailable=false.
 		snapshot.TemperatureC = 0
 		snapshot.TempAvailable = false
 	} else {
@@ -579,7 +579,7 @@ func (a *App) TriggerThermalCheck(temp float64) {
 }
 
 func (a *App) emitThermalAlarm(temp float64) {
-	// Native beep only — no hidden PowerShell toast hosts (AV/SmartScreen hygiene).
+	// Native beep only: no hidden PowerShell toast hosts (AV/SmartScreen hygiene).
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "thermal:alarm", map[string]interface{}{

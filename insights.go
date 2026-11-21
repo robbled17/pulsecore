@@ -303,7 +303,7 @@ func measureLocalJitterMs() float64 {
 func (a *App) CheckSleepBlockers() SleepReport {
 	rep := SleepReport{OK: true}
 
-	// Direct System32\powercfg.exe — no PowerShell wrapper (AV hygiene).
+	// Direct System32\powercfg.exe: no PowerShell wrapper (AV hygiene).
 	out, err := runHiddenOutput(system32("powercfg.exe"), "/requests")
 	if err != nil && len(out) == 0 {
 		rep.OK = false

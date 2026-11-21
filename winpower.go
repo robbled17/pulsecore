@@ -52,7 +52,7 @@ func powerSetActiveScheme(scheme *windows.GUID) error {
 }
 
 // powerWriteCPUMax tries to tune processor max state. Closed/OEM-locked
-// schemes often return ERROR_FILE_NOT_FOUND (0x2) — caller must soft-fail.
+// schemes often return ERROR_FILE_NOT_FOUND (0x2): caller must soft-fail.
 func powerWriteCPUMax(scheme *windows.GUID, maxPercent uint32) error {
 	r1, _, err := procPowerWriteACValueIndex.Call(
 		0,
@@ -103,7 +103,7 @@ func setPowerProfileNative(mode string) (string, error) {
 	}
 
 	// Soft-apply optional sub-parameter. ERROR_FILE_NOT_FOUND (0x2) is common
-	// on locked/OEM schemes — never abort the profile switch because of it.
+	// on locked/OEM schemes: never abort the profile switch because of it.
 	_ = powerWriteCPUMax(scheme, cpuMax)
 
 	if err := powerSetActiveScheme(scheme); err != nil {

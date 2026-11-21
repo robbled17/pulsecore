@@ -223,7 +223,7 @@ func gpuDiscreteRank(name string) int {
 			return 1
 		}
 	}
-	return 2 // unknown vendor — prefer over known iGPU when AdapterRAM ties
+	return 2 // unknown vendor: prefer over known iGPU when AdapterRAM ties
 }
 
 func readGPUInfoDetailed() (name string, vram uint64, driver string) {
@@ -570,7 +570,7 @@ func (a *App) CheckDiskHealth(driveLetter string) DiskHealthReport {
 	letter := sanitizeDriveLetter(driveLetter)
 
 	// Storage cmdlets require PowerShell; never use -ExecutionPolicy Bypass (AV heuristic).
-	// Drive letter is a single A–Z from sanitizeDriveLetter — no string-concat argv injection.
+	// Drive letter is a single A-Z from sanitizeDriveLetter: no string-concat argv injection.
 	ps := `$ErrorActionPreference='Stop'; $letter='` + letter + `'
 try {
   $part = Get-Partition -DriveLetter $letter -ErrorAction Stop
@@ -706,7 +706,7 @@ func normalizeMediaType(media string) string {
 	}
 }
 
-// sanitizeDriveLetter forces a single A–Z letter for Storage queries (no injection).
+// sanitizeDriveLetter forces a single A-Z letter for Storage queries (no injection).
 func sanitizeDriveLetter(driveLetter string) string {
 	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
 	letter = strings.TrimSuffix(letter, `:\`)

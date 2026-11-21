@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PulseCore — лёгкий системный монитор для Windows</title>
+  <title>PulseCore: лёгкий системный монитор для Windows</title>
   <meta name="description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows. Eco Mode, Mini-HUD, zero telemetry." />
   <meta property="og:title" content="PulseCore" />
   <meta property="og:description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows" />
@@ -35,10 +35,17 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    html { scroll-behavior: smooth; }
+    html {
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+      max-width: 100%;
+    }
 
     body {
       min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      max-width: 100%;
       color: var(--text);
       font-family: var(--font);
       background: linear-gradient(180deg, #080d18 0%, #05070f 52%, #04060c 100%);
@@ -52,6 +59,9 @@
     .ambient {
       position: fixed;
       inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
       z-index: 0;
       pointer-events: none;
       overflow: hidden;
@@ -70,18 +80,18 @@
       will-change: transform;
     }
     .spot-a {
-      width: 52vw; height: 52vw; max-width: 720px; max-height: 720px;
+      width: min(52vw, 720px); height: min(52vw, 720px);
       left: -8%; top: -12%;
       background: radial-gradient(circle, rgba(110, 168, 255, 0.55), transparent 68%);
     }
     .spot-b {
-      width: 44vw; height: 44vw; max-width: 620px; max-height: 620px;
+      width: min(44vw, 620px); height: min(44vw, 620px);
       right: -10%; top: 18%;
       background: radial-gradient(circle, rgba(61, 231, 200, 0.35), transparent 70%);
       opacity: 0.36;
     }
     .spot-c {
-      width: 40vw; height: 40vw; max-width: 560px; max-height: 560px;
+      width: min(40vw, 560px); height: min(40vw, 560px);
       left: 28%; bottom: -18%;
       background: radial-gradient(circle, rgba(155, 123, 255, 0.28), transparent 70%);
       opacity: 0.32;
@@ -90,7 +100,7 @@
     .wrap {
       position: relative;
       z-index: 1;
-      width: min(1120px, calc(100% - 40px));
+      width: min(1320px, calc(100% - 40px));
       margin: 0 auto;
     }
 
@@ -140,11 +150,12 @@
       animation: floatIn .7s ease both;
     }
     .hero h1 {
-      font-size: clamp(36px, 6vw, 64px);
+      font-size: clamp(32px, 7.2vw, 64px);
       font-weight: 800;
       letter-spacing: -0.045em;
       line-height: 1.05;
       margin-bottom: 14px;
+      max-width: 100%;
       background: linear-gradient(180deg, #ffffff 20%, #c9d7ff 100%);
       -webkit-background-clip: text;
       background-clip: text;
@@ -231,11 +242,20 @@
     }
     .preview-tabs {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 6px;
       margin-bottom: 12px;
-      justify-content: center;
+      justify-content: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+      padding: 2px 2px 6px;
+      max-width: 100%;
     }
+    .preview-tabs::-webkit-scrollbar { display: none; }
     .preview-tabs button {
       appearance: none;
       border: 1px solid transparent;
@@ -247,6 +267,9 @@
       padding: 8px 14px;
       border-radius: 999px;
       cursor: pointer;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      scroll-snap-align: start;
       transition: color .2s, background .2s, border-color .2s, box-shadow .2s;
     }
     .preview-tabs button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
@@ -261,7 +284,7 @@
       border-radius: 14px;
       overflow: hidden;
       border: 1px solid rgba(160, 190, 255, 0.12);
-      background: #05070f; /* opaque — no stacked shot bleed */
+      background: #05070f; /* opaque: no stacked shot bleed */
       isolation: isolate;
       aspect-ratio: 16 / 10;
     }
@@ -405,21 +428,90 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Tablet / laptop: 768-1440 */
+    @media (min-width: 768px) and (max-width: 1440px) {
+      .wrap { width: min(1120px, calc(100% - 48px)); }
+      .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card.span-2 { grid-column: span 2; }
+      .preview-frame { aspect-ratio: 16 / 10; }
+      .preview-frame img { object-fit: contain; background: #05070f; }
+      .preview-tabs { justify-content: center; flex-wrap: wrap; overflow-x: visible; }
+    }
+
     @media (max-width: 900px) {
       .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .card.span-2 { grid-column: span 2; }
       .steps { grid-template-columns: 1fr; }
       .hero { padding-top: 28px; }
     }
+
+    /* Phone: 320-480 (+ small tablets up to 640) */
     @media (max-width: 640px) {
-      .wrap { width: min(100% - 28px, 1120px); }
+      .wrap { width: min(100% - 24px, 1320px); }
+      .nav { padding-top: 16px; }
       .nav-links { display: none; }
+      .hero { padding: 28px 0 20px; }
+      .hero-logo { width: 56px; height: 56px; margin-bottom: 16px; }
+      .hero h1 { font-size: clamp(28px, 9vw, 40px); }
+      .hero p { font-size: clamp(14px, 3.8vw, 16px); margin-bottom: 20px; padding: 0 2px; }
+      .section-head h2 { font-size: clamp(20px, 5.5vw, 26px); }
       .bento { grid-template-columns: 1fr; }
       .card.span-2 { grid-column: span 1; }
-      .preview-shell { padding: 10px; border-radius: 16px; }
+      .preview-shell { padding: 8px; border-radius: 16px; }
       .preview-frame { aspect-ratio: 4 / 3; }
-      .cta-row { flex-direction: column; align-items: stretch; }
-      .btn { width: 100%; }
+      .preview-tabs {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        margin-left: -2px;
+        margin-right: -2px;
+        padding-left: 4px;
+        padding-right: 4px;
+      }
+      .preview-tabs button {
+        font-size: 12px;
+        padding: 7px 12px;
+      }
+      .cta-row {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+      }
+      .btn { width: 100%; min-height: 44px; }
+    }
+
+    @media (max-width: 480px) {
+      .wrap { width: calc(100% - 20px); }
+      .hero h1 { font-size: clamp(26px, 10vw, 34px); }
+      .preview-frame { aspect-ratio: 5 / 4; }
+    }
+
+    /* Wide / 2K / 4K: 1920-3440 */
+    @media (min-width: 1920px) {
+      .wrap { width: min(1360px, calc(100% - 80px)); }
+      .spot-a {
+        width: 42vw; height: 42vw; max-width: none; max-height: none;
+        left: -6%; top: -10%;
+      }
+      .spot-b {
+        width: 36vw; height: 36vw; max-width: none; max-height: none;
+        right: -8%; top: 12%;
+      }
+      .spot-c {
+        width: 34vw; height: 34vw; max-width: none; max-height: none;
+        left: 30%; bottom: -14%;
+      }
+      .hero h1 { font-size: clamp(52px, 3.2vw, 72px); }
+      .preview-frame { aspect-ratio: 16 / 9; }
+      .bento { gap: 16px; }
+    }
+
+    @media (min-width: 2560px) {
+      .wrap { width: min(1360px, calc(100% - 120px)); }
+      .ambient-spot { filter: blur(180px); }
+      .spot-a { width: 38vw; height: 38vw; }
+      .spot-b { width: 32vw; height: 32vw; }
+      .spot-c { width: 30vw; height: 30vw; }
     }
   </style>
 </head>
@@ -461,7 +553,7 @@
     <section class="section" id="preview">
       <div class="section-head">
         <h2>Живой интерфейс</h2>
-        <p>Тот же aurora-glass UI, что в приложении — переключайте вкладки</p>
+        <p>Тот же aurora-glass UI, что в приложении. Переключайте вкладки</p>
       </div>
       <div class="preview-shell">
         <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
@@ -474,21 +566,21 @@
           <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" />
           <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" />
           <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" />
-          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо — сетка потоков CPU" />
+          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо: сетка потоков CPU" />
         </div>
       </div>
     </section>
 
     <section class="section" id="features">
       <div class="section-head">
-        <h2>Всё нужное — без тяжёлых SDK</h2>
+        <h2>Всё нужное, без тяжёлых SDK</h2>
         <p>Стек Go + Wails: точность датчиков и спокойный UI</p>
       </div>
       <div class="bento">
         <article class="card span-2">
           <div class="card-icon">⚡</div>
           <h3>Микролаги + Eco Mode</h3>
-          <p>Ловит пики ядер и паузы ≥300 мс, показывает виновника. Eco Mode мягко усмиряет фон без закрытия процессов — с безопасным denylist и откатом.</p>
+          <p>Ловит пики ядер и паузы ≥300 мс, показывает виновника. Eco Mode мягко усмиряет фон без закрытия процессов, с безопасным denylist и откатом.</p>
         </article>
         <article class="card teal">
           <div class="card-icon">🎯</div>
@@ -503,12 +595,12 @@
         <article class="card teal">
           <div class="card-icon">🛡</div>
           <h3>Без прав админа</h3>
-          <p>asInvoker-манифест. Вкладки работают без elevation; админ-действия — с понятным отказом.</p>
+          <p>asInvoker-манифест. Вкладки работают без elevation; админ-действия с понятным отказом.</p>
         </article>
         <article class="card">
           <div class="card-icon">🔒</div>
           <h3>Zero telemetry</h3>
-          <p>Нет скрытого HTTP. Сеть — только по кнопке; Steam CDN — только при поиске игр.</p>
+          <p>Нет скрытого HTTP. Сеть только по кнопке; Steam CDN только при поиске игр.</p>
         </article>
         <article class="card teal">
           <div class="card-icon">💨</div>
@@ -575,17 +667,45 @@
 
       const tabs = [...document.querySelectorAll(".preview-tabs button")];
       const frames = [...document.querySelectorAll(".preview-frame img")];
-      tabs.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const id = btn.dataset.tab;
-          tabs.forEach((b) => {
-            const on = b === btn;
-            b.classList.toggle("active", on);
-            b.setAttribute("aria-selected", on ? "true" : "false");
-          });
-          frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
+      const frame = document.querySelector(".preview-frame");
+      const activate = (id) => {
+        tabs.forEach((b) => {
+          const on = b.dataset.tab === id;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+          if (on) b.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
         });
+        frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
+      };
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => activate(btn.dataset.tab));
       });
+      // Swipe preview on touch / trackpad-ish pointer drag
+      if (frame) {
+        let x0 = 0;
+        let y0 = 0;
+        let tracking = false;
+        frame.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          tracking = true;
+          x0 = e.clientX;
+          y0 = e.clientY;
+        }, { passive: true });
+        frame.addEventListener("pointerup", (e) => {
+          if (!tracking) return;
+          tracking = false;
+          const dx = e.clientX - x0;
+          const dy = e.clientY - y0;
+          if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+          const ids = tabs.map((t) => t.dataset.tab);
+          const cur = frames.find((img) => img.classList.contains("active"));
+          const i = ids.indexOf(cur && cur.dataset.tab);
+          if (i < 0) return;
+          const next = dx < 0 ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
+          if (next !== i) activate(ids[next]);
+        }, { passive: true });
+        frame.addEventListener("pointercancel", () => { tracking = false; }, { passive: true });
+      }
     })();
   </script>
 </body>

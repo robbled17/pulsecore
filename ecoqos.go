@@ -41,7 +41,7 @@ var ecoDenylist = map[string]struct{}{
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
 }
 
-// Kernel / PPL protected security / AV stack — EcoQoS cannot be applied.
+// Kernel / PPL protected security / AV stack: EcoQoS cannot be applied.
 var ecoPPLProtected = map[string]struct{}{
 	"msmpeng.exe":               {},
 	"mssense.exe":               {},
@@ -265,7 +265,7 @@ func isDefenderTarget(name string) bool {
 // Defender / AV targets are never touched (no Set-MpPreference / hidden PS).
 func (a *App) EcoModeByProcessName(name string, enable bool) error {
 	if isDefenderTarget(name) {
-		// Soft-success for UI calmness — never shell out to modify AV preferences
+		// Soft-success for UI calmness: never shell out to modify AV preferences
 		// (unsigned Release builds get SmartScreen / Defender heuristics otherwise).
 		return nil
 	}

@@ -18,7 +18,7 @@ async function waitReady(page) {
   await page.waitForSelector('#tab-overview.tab.active', { timeout: 15000 })
   await page.waitForFunction(() => {
     const el = document.getElementById('ov-cpu')
-    return el && el.textContent && !el.textContent.includes('—')
+    return el && el.textContent && el.textContent.trim() !== '-'
   }, { timeout: 15000 }).catch(() => {})
   await page.waitForTimeout(1600)
 }

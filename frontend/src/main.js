@@ -161,7 +161,7 @@ function na() {
 }
 
 function dash() {
-  return '—'
+  return '-'
 }
 
 async function changeLanguage(next) {
@@ -349,7 +349,7 @@ function drawTrendFrame() {
   let theme = chartThemes[activeMetric] || chartThemes.cpu
   if (activeMetric === 'battery') theme = batteryTheme(last)
 
-  // Keep X locked to sample index — only Y is lerped, so Bezier stays stable.
+  // Keep X locked to sample index; only Y is lerped, so Bezier stays stable.
   const pts = buildPoints(values, cssW, cssH, padL, padR, padT, padB)
 
   fillSmooth(ctx, pts, cssH, theme.top, theme.bottom)
@@ -405,7 +405,7 @@ function safeNum(n, fallback = 0) {
   return Number.isFinite(v) ? v : fallback
 }
 
-/** Reject null/NaN/0/-1 and absurd temps — always Н/Д or —. */
+/** Reject null/NaN/0/-1 and absurd temps: always Н/Д or '-'. */
 function fmtTemp(n, digits = 1) {
   const v = Number(n)
   if (!Number.isFinite(v) || v <= 0 || v > 150) return na()
@@ -1036,7 +1036,7 @@ function periphGroupMeta(group) {
     case 'audio': return { title: t('groupAudio'), ico: '🎧' }
     case 'storage': return { title: t('groupStorage'), ico: '💾' }
     case 'display': return { title: t('groupDisplay'), ico: '🖥' }
-    default: return { title: group || '—', ico: '🔌' }
+    default: return { title: group || '-', ico: '🔌' }
   }
 }
 
@@ -1044,7 +1044,7 @@ function renderPeripherals(items) {
   const box = $('periph-list')
   if (!box) return
   if (!items || !items.length) {
-    box.innerHTML = `<div class="empty">—</div>`
+    box.innerHTML = `<div class="empty">-</div>`
     return
   }
   const order = ['input', 'audio', 'storage', 'display']
@@ -1112,7 +1112,7 @@ async function runNetDiag() {
           <div class="hint">${t('netRouterHint')}</div>
           ${netBadge(!!d.gatewayBadgeOK, d.gatewayBadge || 'netBadgeIdeal')}
         </div>
-        <div class="net-ms">${d.gatewayMs < 0 ? '—' : fmt(d.gatewayMs, 0) + ' ms'}</div>
+        <div class="net-ms">${d.gatewayMs < 0 ? '-' : fmt(d.gatewayMs, 0) + ' ms'}</div>
       </div>
       <div class="net-card">
         <div>
@@ -1120,7 +1120,7 @@ async function runNetDiag() {
           <div class="hint">${t('netInternetHint')}</div>
           ${netBadge(!!d.publicBadgeOK, d.publicBadge || 'netBadgeFast')}
         </div>
-        <div class="net-ms">${d.publicMs < 0 ? '—' : fmt(d.publicMs, 0) + ' ms'}</div>
+        <div class="net-ms">${d.publicMs < 0 ? '-' : fmt(d.publicMs, 0) + ' ms'}</div>
       </div>
       <div class="net-card">
         <div>
@@ -1150,7 +1150,7 @@ async function runSleepCheck() {
       box.innerHTML = `<div class="verdict-card ok"><div class="v-title">${t('sleepOk')}</div></div>`
       return
     }
-    const name = blockers[0] || '—'
+    const name = blockers[0] || '-'
     const title = t('sleepBlocked').replace('{name}', name)
     box.innerHTML = `
       <div class="verdict-card warn">
@@ -1453,7 +1453,7 @@ function renderGameGrid() {
   if (!list.length) {
     host.innerHTML = q
       ? `<div class="game-empty-card">${t('gameNotFound')}</div>`
-      : `<div class="empty">—</div>`
+      : `<div class="empty">-</div>`
     return
   }
   host.innerHTML = list.map((g) => `
@@ -1986,7 +1986,7 @@ function wireUI() {
       try {
         await EcoModeByProcessName(name, true)
       } catch (_) {
-        // No kernel/PPL error toasts — button still reflects intended outcome for Defender.
+        // No kernel/PPL error toasts; button still reflects intended outcome for Defender.
       }
       eco.textContent = isDefenderName(name) ? t('ecoLimited15') : t('ecoLimited')
       eco.classList.remove('danger')
@@ -2046,7 +2046,7 @@ function wireTooltips() {
     let left = rect.left
     if (left < 12) left = 12
     if (left + width > window.innerWidth - 12) left = window.innerWidth - width - 12
-    // Near left edge / sidebar — nudge right.
+    // Near left edge / sidebar: nudge right.
     if (rect.left < 200) left = Math.max(left, 12)
     floatEl.style.width = `${width}px`
     floatEl.style.left = `${left}px`

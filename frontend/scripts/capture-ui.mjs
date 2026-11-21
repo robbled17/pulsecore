@@ -23,7 +23,7 @@ async function waitReady(page) {
   await page.waitForSelector('#tab-overview.tab.active', { timeout: 15000 })
   await page.waitForFunction(() => {
     const el = document.getElementById('ov-cpu')
-    return el && el.textContent && !el.textContent.includes('—') && !el.textContent.includes('Н/Д')
+    return el && el.textContent && el.textContent.trim() !== '-' && !el.textContent.includes('Н/Д')
   }, { timeout: 15000 }).catch(() => {})
   // let sparklines accumulate samples + fonts settle
   await page.waitForTimeout(2800)

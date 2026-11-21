@@ -1,6 +1,6 @@
 /**
  * Browser mock for Wails Go bindings + runtime.
- * Loaded only by demo.html / screenshot harness — production Wails path unchanged.
+ * Loaded only by demo.html / screenshot harness; production Wails path unchanged.
  * Supports hardware matrix profiles A/B/C for GamePulse + sensor fallback demos.
  */
 
@@ -46,7 +46,7 @@ const PROFILES = {
     cpuBase: 72,
     gpuBase: 55,
     ramBase: 91,
-    tempMode: 'hot', // ~88–94°C
+    tempMode: 'hot', // ~88-94°C
     cpuScore: 34,
     gpuScore: 11,
     vramGB: 0,
@@ -545,7 +545,7 @@ const App = {
   },
   SearchGamesOnline: async (q) => App.SearchGames(q),
   PredictGameFPS: async (id) => predictFPS(id),
-  /** Demo-only helper — not present on live Wails App. */
+  /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,
 }
