@@ -422,6 +422,7 @@
       letter-spacing: -0.03em;
       font-variant-numeric: tabular-nums;
       margin-bottom: 6px;
+      transition: color 0.4s ease, opacity 0.28s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .demo-metric canvas {
       display: block;
@@ -708,10 +709,64 @@
       padding: 14px;
       margin-bottom: 12px;
       background: rgba(255,255,255,0.03);
+      transition:
+        max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.35s ease,
+        margin 0.45s ease,
+        padding 0.45s ease,
+        border-width 0.3s ease,
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 220px;
+      overflow: hidden;
+    }
+    .demo-uninstall-app.is-collapsing {
+      max-height: 0;
+      opacity: 0;
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-width: 0;
+      transform: scaleY(0.92);
+      pointer-events: none;
     }
     .demo-uninstall-app .name { font-weight: 700; margin-bottom: 4px; }
     .demo-uninstall-app .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
-    .demo-residual { display: flex; flex-direction: column; gap: 8px; }
+    .demo-uninstall-status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--text);
+      min-height: 1.4em;
+    }
+    .demo-uninstall-status.is-on { display: flex; }
+    .demo-uninstall-spin {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(110, 168, 255, 0.25);
+      border-top-color: rgba(110, 168, 255, 0.95);
+      flex: 0 0 auto;
+      animation: demo-spin 0.7s linear infinite;
+    }
+    @keyframes demo-spin {
+      to { transform: rotate(360deg); }
+    }
+    .demo-residual {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 0.35s ease, max-height 0.45s ease, margin 0.45s ease;
+      max-height: 240px;
+      overflow: hidden;
+    }
+    .demo-residual.is-gone {
+      opacity: 0;
+      max-height: 0;
+      margin: 0;
+      pointer-events: none;
+    }
     .demo-check {
       display: flex; align-items: center; gap: 10px;
       border: 1px solid var(--line);
@@ -719,6 +774,57 @@
       padding: 10px 12px;
       font-size: 13px;
       background: rgba(255,255,255,0.03);
+      transition: opacity 0.35s ease, border-color 0.35s ease, background 0.35s ease;
+    }
+    .demo-check .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(160, 190, 255, 0.28);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      font-size: 11px;
+      color: transparent;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+    .demo-check .lab-txt {
+      transition: color 0.3s ease, text-decoration-color 0.3s ease;
+    }
+    .demo-check.is-cleared {
+      border-color: rgba(34, 197, 94, 0.32);
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .demo-check.is-cleared .mark {
+      color: #86efac;
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.16);
+    }
+    .demo-check.is-cleared .lab-txt {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: rgba(134, 239, 172, 0.55);
+    }
+    .demo-uninstall-done {
+      display: none;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      border-radius: 14px;
+      padding: 16px 14px;
+      background: rgba(34, 197, 94, 0.1);
+      text-align: center;
+    }
+    .demo-uninstall-done.is-on { display: block; }
+    .demo-uninstall-done .ok {
+      color: #86efac;
+      font-weight: 750;
+      font-size: 14.5px;
+      margin-bottom: 12px;
+      line-height: 1.35;
+    }
+    .demo-uninstall-done .btn-eco {
+      margin: 0 auto;
     }
     .demo-core-grid {
       display: grid;
@@ -1208,18 +1314,22 @@
       .bento { grid-template-columns: 1fr; }
       .card.span-2 { grid-column: span 1; }
       .preview-shell { padding: 8px; border-radius: 16px; }
+      .preview-shell > .preview-tabs {
+        overflow-x: visible;
+      }
       .preview-tabs {
         justify-content: flex-start;
         flex-wrap: nowrap;
         margin-left: 0;
         margin-right: 0;
         padding-left: 2px;
-        padding-right: 16px;
+        padding-right: 4px;
         overflow-x: auto;
+        gap: 4px;
       }
       .preview-tabs button {
-        font-size: 11.5px;
-        padding: 7px 10px;
+        font-size: 11px;
+        padding: 6px 8px;
       }
       .cta-row {
         flex-direction: column;
@@ -1233,6 +1343,23 @@
     @media (max-width: 480px) {
       .wrap { width: calc(100% - 20px); }
       .hero h1 { font-size: clamp(26px, 10vw, 34px); }
+      .preview-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        overflow-y: visible;
+        scroll-snap-type: none;
+        gap: 4px 5px;
+        padding: 2px 2px 4px;
+        row-gap: 6px;
+      }
+      .preview-tabs button {
+        font-size: 11px;
+        padding: 6px 9px;
+        scroll-snap-align: none;
+      }
+      .preview-shell > .preview-tabs {
+        overflow-x: visible;
+      }
     }
 
     /* Wide / 2K / 4K: 1920-3440 */
@@ -1470,15 +1597,23 @@
                   <p data-i18n="demoUninstallSub">Процессы, остатки и трассировка</p>
                 </div>
               </div>
-              <div class="demo-uninstall-app">
+              <div class="demo-uninstall-app" id="demo-uninstall-card">
                 <div class="name">Chatty 1.8.0</div>
-                <div class="sub" data-i18n="demoUninstallWarn">Найден процесс Chatty.exe. Можно завершить и удалить.</div>
+                <div class="sub" id="demo-uninstall-warn" data-i18n="demoUninstallWarn">Найден процесс Chatty.exe. Можно завершить и удалить.</div>
+                <div class="demo-uninstall-status" id="demo-uninstall-status" aria-live="polite">
+                  <span class="demo-uninstall-spin" aria-hidden="true"></span>
+                  <span class="msg" id="demo-uninstall-status-msg"></span>
+                </div>
                 <button type="button" class="btn-eco" id="demo-kill-remove" data-i18n="uninstallKillRemove">Завершить и удалить</button>
               </div>
               <div class="demo-residual" id="demo-residual">
-                <label class="demo-check"><input type="checkbox" checked disabled /> Local · Chatty</label>
-                <label class="demo-check"><input type="checkbox" checked disabled /> Roaming · Chatty</label>
-                <label class="demo-check"><input type="checkbox" checked disabled /> HKCU\Software\Chatty</label>
+                <div class="demo-check" data-residual="local"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">Local · Chatty</span></div>
+                <div class="demo-check" data-residual="roaming"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">Roaming · Chatty</span></div>
+                <div class="demo-check" data-residual="registry"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">HKCU\Software\Chatty</span></div>
+              </div>
+              <div class="demo-uninstall-done" id="demo-uninstall-done">
+                <div class="ok" data-i18n="uninstallDone">Программа и хвосты полностью удалены</div>
+                <button type="button" class="btn-eco" id="demo-uninstall-replay" data-i18n="uninstallReplay">Повторить демо</button>
               </div>
             </div>
           </div>
@@ -1660,6 +1795,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слота",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слота · 1× NVMe",
           uninstallKillRemove: "Завершить и удалить",
+          uninstallStepKill: "Завершение фоновых процессов...",
+          uninstallStepClean: "Очистка файлов и хвостов реестра...",
+          uninstallDone: "Программа и хвосты полностью удалены",
+          uninstallReplay: "Повторить демо",
           featUpgradeTitle: "Советник апгрейда",
           featUpgradeBody: "Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями",
           featUninstallTitle: "Умное удаление",
@@ -1756,6 +1895,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 slots",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 slots · 1× NVMe",
           uninstallKillRemove: "Kill and uninstall",
+          uninstallStepKill: "Stopping background processes...",
+          uninstallStepClean: "Cleaning files and registry leftovers...",
+          uninstallDone: "App and leftovers fully removed",
+          uninstallReplay: "Replay demo",
           featUpgradeTitle: "Upgrade Advisor",
           featUpgradeBody: "PC passport: socket, RAM slots, NVMe. Local tips for FPS, quiet, work or budget, with plain pitfalls",
           featUninstallTitle: "Smart Uninstaller",
@@ -1852,6 +1995,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
           uninstallKillRemove: "Тоқтатып жою",
+          uninstallStepKill: "Фондық процестерді аяқтау...",
+          uninstallStepClean: "Файлдар мен реестр қалдықтарын тазалау...",
+          uninstallDone: "Бағдарлама мен қалдықтар толық жойылды",
+          uninstallReplay: "Демоны қайталау",
           featUpgradeTitle: "Апгрейд кеңесшісі",
           featUpgradeBody: "ПК паспорты: сокет, RAM слоттары, NVMe. FPS, тыныштық, жұмыс не бюджетке сай жергілікті кеңестер",
           featUninstallTitle: "Ақылды жою",
@@ -1948,6 +2095,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
           uninstallKillRemove: "Туктатып бетерү",
+          uninstallStepKill: "Фон процессларын туктату...",
+          uninstallStepClean: "Файллар һәм реестр калдыкларын чистарту...",
+          uninstallDone: "Программа һәм калдыклар тулысынча бетерелде",
+          uninstallReplay: "Демоны кабатлау",
           featUpgradeTitle: "Апгрейд киңәшчесе",
           featUpgradeBody: "ПК паспорты: сокет, RAM слотлары, NVMe. FPS, тынлык, эш яки бюджет өчен җирле киңәшләр",
           featUninstallTitle: "Акыллы бетерү",
@@ -2044,6 +2195,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 Slots",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 Slots · 1× NVMe",
           uninstallKillRemove: "Beenden und entfernen",
+          uninstallStepKill: "Hintergrundprozesse werden beendet...",
+          uninstallStepClean: "Dateien und Registry-Reste werden bereinigt...",
+          uninstallDone: "Programm und Reste vollständig entfernt",
+          uninstallReplay: "Demo wiederholen",
           featUpgradeTitle: "Upgrade-Berater",
           featUpgradeBody: "PC-Pass: Sockel, RAM-Slots, NVMe. Lokale Tipps für FPS, Ruhe, Arbeit oder Budget mit klaren Fallstricken",
           featUninstallTitle: "Intelligente Deinstallation",
@@ -2140,6 +2295,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 スロット",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 スロット · 1× NVMe",
           uninstallKillRemove: "終了して削除",
+          uninstallStepKill: "バックグラウンドプロセスを終了中...",
+          uninstallStepClean: "ファイルとレジストリの残留を清掃中...",
+          uninstallDone: "プログラムと残留を完全に削除しました",
+          uninstallReplay: "デモを再実行",
           featUpgradeTitle: "アップグレード助言",
           featUpgradeBody: "PCパスポート: ソケット、RAMスロット、NVMe。FPS・静音・作業・予算向けのローカル提案と注意点",
           featUninstallTitle: "スマートアンインストール",
@@ -2236,6 +2395,10 @@
           passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 插槽",
           passLaptopSub: "BGA · 16 GB DDR4 · 1/2 插槽 · 1× NVMe",
           uninstallKillRemove: "结束并卸载",
+          uninstallStepKill: "正在结束后台进程...",
+          uninstallStepClean: "正在清理文件与注册表残留...",
+          uninstallDone: "程序与残留已完全删除",
+          uninstallReplay: "重播演示",
           featUpgradeTitle: "升级顾问",
           featUpgradeBody: "电脑护照: 插槽、内存槽、NVMe。按帧率、安静、办公或省钱给出本地建议与坑点",
           featUninstallTitle: "智能卸载",
@@ -2443,9 +2606,11 @@
       /* ---- Live interactive demo telemetry ---- */
       const rnd = (a, b) => a + Math.random() * (b - a);
       const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
-      const HISTORY = 20;
-      const EMA = 0.22;
-      const LERP = 0.14;
+      const HISTORY = 24;
+      const SERIES_LEN = HISTORY + 1;
+      const SAMPLE_MS = 1050;
+      const SOFT = 0.045;
+      const LERP = 0.16;
       const themes = {
         cpu: { stroke: "rgba(142,192,255,0.98)", glow: "rgba(110,168,255,0.85)", top: "rgba(110,168,255,0.34)", bottom: "rgba(110,168,255,0.02)" },
         gpu: { stroke: "rgba(95,240,212,0.95)", glow: "rgba(61,231,200,0.8)", top: "rgba(61,231,200,0.3)", bottom: "rgba(61,231,200,0.02)" },
@@ -2458,8 +2623,10 @@
         gpu: 68,
         ram: 63.5,
         temp: 58,
+        target: { cpu: 48, gpu: 68, ram: 63.5, temp: 58 },
         series: { cpu: [], gpu: [], ram: [], temp: [] },
         display: { cpu: 48, gpu: 68, ram: 63.5, temp: 58 },
+        scrollPhase: 0,
         cores: Array.from({ length: 8 }, () => ({ t0: 30, t1: 28 })),
         procs: [
           { name: "chrome.exe", load: 38, eco: false },
@@ -2474,12 +2641,13 @@
       function seedSeries(key, base, wobble) {
         const arr = [];
         let v = base;
-        for (let i = 0; i < HISTORY; i++) {
+        for (let i = 0; i < SERIES_LEN; i++) {
           v = clamp(v + rnd(-wobble, wobble), 5, 96);
           arr.push(v);
         }
         state.series[key] = arr;
         state[key] = v;
+        state.target[key] = v;
         state.display[key] = v;
       }
       seedSeries("cpu", 48, 3.2);
@@ -2509,13 +2677,11 @@
         temp: "spark-demo-temp"
       };
 
-      function pushSeries(key, raw) {
+      function rollSeries(key, raw) {
         const arr = state.series[key];
-        const last = arr.length ? arr[arr.length - 1] : raw;
-        const v = EMA * raw + (1 - EMA) * last;
-        arr.push(v);
-        if (arr.length > HISTORY) arr.shift();
-        state[key] = v;
+        arr.shift();
+        arr.push(raw);
+        state[key] = raw;
       }
 
       function strokeSmooth(ctx, points) {
@@ -2569,24 +2735,32 @@
         ctx.fill();
       }
 
-      function pointsFromValues(values, w, h, padX, padY, absScale) {
-        const n = Math.max(values.length - 1, 1);
-        if (absScale) {
-          return values.map((raw, i) => {
+      function pointsFromValues(values, w, h, padX, padY, absScale, phase) {
+        const slots = Math.max(HISTORY - 1, 1);
+        const step = (w - padX * 2) / slots;
+        const ph = phase || 0;
+        const yOf = (raw) => {
+          if (absScale) {
             const v = clamp(raw, 0, 100);
-            return {
-              x: padX + (i / n) * (w - padX * 2),
-              y: padY + (h - padY * 2) - (v / 100) * (h - padY * 2)
-            };
-          });
+            return padY + (h - padY * 2) - (v / 100) * (h - padY * 2);
+          }
+          return 0;
+        };
+        let min = 0;
+        let max = 100;
+        let span = 100;
+        if (!absScale) {
+          min = Math.min(...values) - 2;
+          max = Math.max(...values) + 2;
+          span = Math.max(1, max - min);
         }
-        const min = Math.min(...values) - 2;
-        const max = Math.max(...values) + 2;
-        const span = Math.max(1, max - min);
-        return values.map((v, i) => ({
-          x: padX + (i / n) * (w - padX * 2),
-          y: padY + (h - padY * 2) - ((v - min) / span) * (h - padY * 2)
-        }));
+        return values.map((raw, i) => {
+          const x = padX + (i - ph) * step;
+          const y = absScale
+            ? yOf(raw)
+            : padY + (h - padY * 2) - ((raw - min) / span) * (h - padY * 2);
+          return { x, y };
+        });
       }
 
       function drawSpark(canvas, values, theme) {
@@ -2602,7 +2776,11 @@
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
-        const pts = pointsFromValues(values, w, h, 2, 3, false);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
+        const pts = pointsFromValues(values, w, h, 2, 3, false, state.scrollPhase);
         fillSmooth(ctx, pts, h, theme.top, theme.bottom);
         ctx.save();
         ctx.lineWidth = 2.6;
@@ -2622,6 +2800,7 @@
         ctx.shadowBlur = 6;
         strokeSmooth(ctx, pts);
         ctx.shadowBlur = 0;
+        ctx.restore();
       }
 
       function drawTrend(canvas) {
@@ -2637,9 +2816,13 @@
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
         ["cpu", "gpu", "ram"].forEach((key) => {
           const theme = themes[key];
-          const pts = pointsFromValues(state.series[key], w, h, 4, 6, true);
+          const pts = pointsFromValues(state.series[key], w, h, 4, 6, true, state.scrollPhase);
           fillSmooth(ctx, pts, h, theme.top, theme.bottom);
           ctx.lineWidth = 2;
           ctx.lineJoin = "round";
@@ -2650,6 +2833,7 @@
           strokeSmooth(ctx, pts);
           ctx.shadowBlur = 0;
         });
+        ctx.restore();
       }
 
       function renderProcs() {
@@ -2750,19 +2934,19 @@
         });
       }
 
-      function sampleMetrics() {
-        // Natural random-walk dynamics (no sawtooth jumps)
-        const cpuTarget = state.eco ? rnd(16, 26) : rnd(40, 58);
-        const nextCpu = clamp(state.cpu + (cpuTarget - state.cpu) * 0.35 + rnd(-2.2, 2.2), state.eco ? 12 : 28, state.eco ? 32 : 72);
-        const nextGpu = clamp(state.gpu + rnd(-1.8, 1.8), 58, 78);
-        const nextRam = clamp(state.ram + rnd(-0.35, 0.35), 60, 67);
-        const nextTemp = clamp(state.temp + (nextCpu - state.cpu) * 0.08 + rnd(-0.4, 0.4), 52, 68);
+      function retargetMetrics() {
+        const cpuBand = state.eco ? [16, 26] : [40, 58];
+        state.target.cpu = clamp(state.target.cpu + rnd(-3.5, 3.5), cpuBand[0], cpuBand[1]);
+        state.target.gpu = clamp(state.target.gpu + rnd(-2.2, 2.2), 58, 78);
+        state.target.ram = clamp(state.target.ram + rnd(-0.45, 0.45), 60, 67);
+        state.target.temp = clamp(
+          state.target.temp + (state.target.cpu - state.cpu) * 0.06 + rnd(-0.5, 0.5),
+          52,
+          68
+        );
+      }
 
-        pushSeries("cpu", nextCpu);
-        pushSeries("gpu", nextGpu);
-        pushSeries("ram", nextRam);
-        pushSeries("temp", nextTemp);
-
+      function updateAuxMetrics() {
         state.cores.forEach((c) => {
           const base = state.eco ? rnd(8, 22) : clamp(state.cpu + rnd(-18, 18), 10, 90);
           c.t0 = clamp(c.t0 + (base - c.t0) * 0.4 + rnd(-4, 4), 4, 96);
@@ -2783,7 +2967,6 @@
           });
         }
 
-        // Soft SSD jitter (still healthy)
         state.ssd.temp = clamp(state.ssd.temp + rnd(-0.25, 0.25), 36, 41);
         const avgCore = state.cores.reduce((s, c) => s + (c.t0 + c.t1) / 2, 0) / state.cores.length;
         const hwCpu = el("demo-hw-cpu-sub");
@@ -2805,6 +2988,13 @@
         renderCores(false);
       }
 
+      function advanceSeries() {
+        ["cpu", "gpu", "ram", "temp"].forEach((key) => {
+          rollSeries(key, state[key]);
+        });
+        updateAuxMetrics();
+      }
+
       function paintUI() {
         const keys = [
           { k: "cpu", id: "demo-cpu", bar: "demo-cpu-bar" },
@@ -2818,10 +3008,17 @@
           const v = state.display[item.k];
           const node = el(item.id);
           if (node) {
-            node.textContent = item.k === "temp" ? Math.round(v) + "°C" : Math.round(v) + "%";
+            const next = item.k === "temp" ? Math.round(v) + "°C" : Math.round(v) + "%";
+            if (node.textContent !== next) node.textContent = next;
           }
           const bar = el(item.bar);
-          if (bar) bar.style.width = clamp(item.k === "temp" ? v : v, 0, 100) + "%";
+          if (bar) {
+            const w = clamp(v, 0, 100).toFixed(1) + "%";
+            if (bar.style.width !== w) bar.style.width = w;
+          }
+          // live tip of the series follows soft value (no discrete jump redraw)
+          const arr = state.series[item.k];
+          if (arr && arr.length) arr[arr.length - 1] = state[item.k];
           drawSpark(el(sparkIds[item.k]), state.series[item.k], themes[item.k]);
         });
         drawTrend(el("demo-trend"));
@@ -2829,12 +3026,36 @@
 
       let simTimer = 0;
       let paintRaf = 0;
+      let lastFrameTs = 0;
+      let reducedAccum = 0;
 
       function startSim() {
-        if (simTimer) return;
-        sampleMetrics();
-        simTimer = window.setInterval(sampleMetrics, 1100);
-        const loop = () => {
+        if (paintRaf) return;
+        retargetMetrics();
+        simTimer = window.setInterval(retargetMetrics, 900);
+        lastFrameTs = performance.now();
+        reducedAccum = 0;
+        const loop = (now) => {
+          const dt = Math.min(48, Math.max(0, now - lastFrameTs));
+          lastFrameTs = now;
+          const soft = reduceMotion.matches ? 1 : SOFT;
+          ["cpu", "gpu", "ram", "temp"].forEach((key) => {
+            state[key] += (state.target[key] - state[key]) * soft;
+          });
+          if (!reduceMotion.matches) {
+            state.scrollPhase += dt / SAMPLE_MS;
+            while (state.scrollPhase >= 1) {
+              state.scrollPhase -= 1;
+              advanceSeries();
+            }
+          } else {
+            state.scrollPhase = 0;
+            reducedAccum += dt;
+            if (reducedAccum >= SAMPLE_MS) {
+              reducedAccum = 0;
+              advanceSeries();
+            }
+          }
           paintUI();
           paintRaf = requestAnimationFrame(loop);
         };
@@ -3130,20 +3351,93 @@
       });
       window.__pcRenderUpgrade = renderUpgradeDemo;
       renderUpgradeDemo();
+      const uninstallCard = el("demo-uninstall-card");
+      const uninstallStatus = el("demo-uninstall-status");
+      const uninstallStatusMsg = el("demo-uninstall-status-msg");
+      const uninstallWarn = el("demo-uninstall-warn");
+      const uninstallResidual = el("demo-residual");
+      const uninstallDone = el("demo-uninstall-done");
       const killBtn = el("demo-kill-remove");
-      if (killBtn) {
-        killBtn.addEventListener("click", () => {
-          const warn = document.querySelector(".demo-uninstall-app .sub");
-          if (warn) warn.textContent = t("featUninstallTitle") + ": OK";
-          killBtn.disabled = true;
-        });
+      const replayBtn = el("demo-uninstall-replay");
+      let uninstallTimers = [];
+      let uninstallBusy = false;
+
+      function clearUninstallTimers() {
+        uninstallTimers.forEach((id) => clearTimeout(id));
+        uninstallTimers = [];
       }
 
+      function resetUninstallDemo() {
+        clearUninstallTimers();
+        uninstallBusy = false;
+        if (uninstallCard) uninstallCard.classList.remove("is-collapsing");
+        if (uninstallResidual) {
+          uninstallResidual.classList.remove("is-gone");
+          uninstallResidual.querySelectorAll(".demo-check").forEach((row) => row.classList.remove("is-cleared"));
+        }
+        if (uninstallStatus) uninstallStatus.classList.remove("is-on");
+        if (uninstallStatusMsg) uninstallStatusMsg.textContent = "";
+        if (uninstallDone) uninstallDone.classList.remove("is-on");
+        if (uninstallWarn) {
+          uninstallWarn.hidden = false;
+          uninstallWarn.textContent = t("demoUninstallWarn");
+        }
+        if (killBtn) {
+          killBtn.hidden = false;
+          killBtn.disabled = false;
+          killBtn.textContent = t("uninstallKillRemove");
+        }
+        const doneLabel = uninstallDone && uninstallDone.querySelector(".ok");
+        if (doneLabel) doneLabel.textContent = t("uninstallDone");
+        if (replayBtn) replayBtn.textContent = t("uninstallReplay");
+      }
+
+      function runUninstallDemo() {
+        if (uninstallBusy || !killBtn) return;
+        uninstallBusy = true;
+        clearUninstallTimers();
+        if (uninstallDone) uninstallDone.classList.remove("is-on");
+        if (uninstallCard) uninstallCard.classList.remove("is-collapsing");
+        if (uninstallResidual) {
+          uninstallResidual.classList.remove("is-gone");
+          uninstallResidual.querySelectorAll(".demo-check").forEach((row) => row.classList.remove("is-cleared"));
+        }
+        if (uninstallWarn) uninstallWarn.hidden = true;
+        killBtn.hidden = true;
+        killBtn.disabled = true;
+        if (uninstallStatus) uninstallStatus.classList.add("is-on");
+        if (uninstallStatusMsg) uninstallStatusMsg.textContent = t("uninstallStepKill");
+
+        // ~2.2s total sequence
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallStatusMsg) uninstallStatusMsg.textContent = t("uninstallStepClean");
+          const rows = uninstallResidual ? [...uninstallResidual.querySelectorAll(".demo-check")] : [];
+          rows.forEach((row, i) => {
+            uninstallTimers.push(setTimeout(() => row.classList.add("is-cleared"), 120 + i * 160));
+          });
+        }, 750));
+
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallStatus) uninstallStatus.classList.remove("is-on");
+          if (uninstallCard) uninstallCard.classList.add("is-collapsing");
+          if (uninstallResidual) uninstallResidual.classList.add("is-gone");
+        }, 1750));
+
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallDone) uninstallDone.classList.add("is-on");
+          uninstallBusy = false;
+        }, 2200));
+      }
+
+      if (killBtn) killBtn.addEventListener("click", runUninstallDemo);
+      if (replayBtn) replayBtn.addEventListener("click", resetUninstallDemo);
+
       applyI18n();
+      resetUninstallDemo();
       renderProcs();
       renderGames();
       renderCores(true);
-      sampleMetrics();
+      retargetMetrics();
       paintUI();
 
       const previewShell = document.querySelector(".preview-shell") || frame;
