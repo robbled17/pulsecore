@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PulseCore — лёгкий системный монитор для Windows</title>
+  <meta name="description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows. Eco Mode, Mini-HUD, zero telemetry." />
+  <meta property="og:title" content="PulseCore" />
+  <meta property="og:description" content="Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows" />
+  <meta property="og:image" content="screenshots/overview.png" />
+  <link rel="icon" href="assets/appicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05070f;
+      --ink: #080d18;
+      --card: rgba(18, 24, 42, 0.58);
+      --glass: rgba(255, 255, 255, 0.055);
+      --line: rgba(160, 190, 255, 0.14);
+      --line-soft: rgba(180, 210, 255, 0.28);
+      --text: #f7f9ff;
+      --muted: #b7c0d4;
+      --accent: #6ea8ff;
+      --accent-2: #9b7bff;
+      --accent-3: #3de7c8;
+      --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      --radius: 18px;
+      --blur: blur(22px) saturate(165%);
+      --mouse-x: 0;
+      --mouse-y: 0;
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(140, 180, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-height: 100vh;
+      color: var(--text);
+      font-family: var(--font);
+      background: linear-gradient(180deg, #080d18 0%, #05070f 52%, #04060c 100%);
+      letter-spacing: -0.015em;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .ambient-spot {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(140px);
+      opacity: 0.42;
+      transform: translate3d(
+        calc(var(--mouse-x) * 18px),
+        calc(var(--mouse-y) * 14px),
+        0
+      );
+      transition: transform 0.35s ease-out;
+      will-change: transform;
+    }
+    .spot-a {
+      width: 52vw; height: 52vw; max-width: 720px; max-height: 720px;
+      left: -8%; top: -12%;
+      background: radial-gradient(circle, rgba(110, 168, 255, 0.55), transparent 68%);
+    }
+    .spot-b {
+      width: 44vw; height: 44vw; max-width: 620px; max-height: 620px;
+      right: -10%; top: 18%;
+      background: radial-gradient(circle, rgba(61, 231, 200, 0.35), transparent 70%);
+      opacity: 0.36;
+    }
+    .spot-c {
+      width: 40vw; height: 40vw; max-width: 560px; max-height: 560px;
+      left: 28%; bottom: -18%;
+      background: radial-gradient(circle, rgba(155, 123, 255, 0.28), transparent 70%);
+      opacity: 0.32;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0 8px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 750;
+      font-size: 15px;
+      letter-spacing: -0.03em;
+    }
+    .brand img {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.2), 0 0 24px rgba(110, 168, 255, 0.25);
+    }
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .nav-links a {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 999px;
+      transition: color .2s, background .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+    .hero {
+      padding: 48px 0 28px;
+      text-align: center;
+    }
+    .hero-logo {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      margin: 0 auto 22px;
+      display: block;
+      box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.25), 0 12px 40px rgba(0,0,0,0.45), 0 0 48px rgba(110, 168, 255, 0.28);
+      animation: floatIn .7s ease both;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 800;
+      letter-spacing: -0.045em;
+      line-height: 1.05;
+      margin-bottom: 14px;
+      background: linear-gradient(180deg, #ffffff 20%, #c9d7ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: floatIn .75s .05s ease both;
+    }
+    .hero p {
+      max-width: 560px;
+      margin: 0 auto 28px;
+      color: var(--muted);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.55;
+      animation: floatIn .75s .1s ease both;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      animation: floatIn .75s .15s ease both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 650;
+      border: 1px solid transparent;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(110,168,255,0.95), rgba(61,231,200,0.75));
+      color: #051018;
+      box-shadow: 0 10px 32px rgba(110, 168, 255, 0.28), 0 0 0 1px rgba(255,255,255,0.12) inset;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 14px 40px rgba(110, 168, 255, 0.38), 0 0 0 1px rgba(255,255,255,0.16) inset;
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,0.04);
+      border-color: var(--line-soft);
+      color: var(--text);
+      backdrop-filter: var(--blur);
+    }
+    .btn-ghost:hover {
+      border-color: rgba(110, 168, 255, 0.45);
+      background: rgba(110, 168, 255, 0.1);
+    }
+
+    .section {
+      padding: 36px 0 20px;
+    }
+    .section-head {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+    .section-head h2 {
+      font-size: clamp(22px, 3.2vw, 30px);
+      font-weight: 750;
+      letter-spacing: -0.035em;
+      margin-bottom: 8px;
+    }
+    .section-head p {
+      color: var(--muted);
+      font-size: 14.5px;
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    .preview-shell {
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(32, 42, 72, 0.55), rgba(16, 22, 38, 0.52));
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      overflow: hidden;
+      padding: 14px;
+    }
+    .preview-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+      justify-content: center;
+    }
+    .preview-tabs button {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: color .2s, background .2s, border-color .2s, box-shadow .2s;
+    }
+    .preview-tabs button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+    .preview-tabs button.active {
+      color: #eaf2ff;
+      background: rgba(110, 168, 255, 0.16);
+      border-color: rgba(110, 168, 255, 0.35);
+      box-shadow: 0 0 20px rgba(110, 168, 255, 0.12);
+    }
+    .preview-frame {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: #0a0e18;
+      aspect-ratio: 16 / 10;
+    }
+    .preview-frame img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      opacity: 0;
+      transform: scale(1.02);
+      transition: opacity .45s ease, transform .55s ease;
+      pointer-events: none;
+    }
+    .preview-frame img.active {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(28, 38, 68, 0.55), rgba(14, 18, 32, 0.5));
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      padding: 20px 18px 18px;
+      transition: transform .2s ease, border-color .2s, box-shadow .2s;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(110, 168, 255, 0.35);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.4), 0 0 28px rgba(110, 168, 255, 0.1);
+    }
+    .card.span-2 { grid-column: span 2; }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 11px;
+      display: grid; place-items: center;
+      margin-bottom: 14px;
+      font-size: 16px;
+      background: rgba(110, 168, 255, 0.12);
+      border: 1px solid rgba(110, 168, 255, 0.22);
+      color: var(--accent);
+      box-shadow: 0 0 18px rgba(110, 168, 255, 0.12);
+    }
+    .card.teal .card-icon {
+      background: rgba(61, 231, 200, 0.1);
+      border-color: rgba(61, 231, 200, 0.25);
+      color: var(--accent-3);
+      box-shadow: 0 0 18px rgba(61, 231, 200, 0.12);
+    }
+    .card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      counter-reset: step;
+    }
+    .step {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      padding: 22px 18px;
+      position: relative;
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: inline-grid;
+      place-items: center;
+      width: 28px; height: 28px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      font-weight: 750;
+      color: #051018;
+      background: linear-gradient(135deg, var(--accent), var(--accent-3));
+      box-shadow: 0 0 18px rgba(110, 168, 255, 0.35);
+    }
+    .step h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .step p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    footer {
+      padding: 48px 0 36px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid rgba(160, 190, 255, 0.08);
+      margin-top: 40px;
+    }
+    footer a {
+      color: var(--accent);
+      border-bottom: 1px solid transparent;
+    }
+    footer a:hover { border-bottom-color: var(--accent); }
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-weight: 700;
+    }
+    .footer-brand img { width: 20px; height: 20px; border-radius: 6px; }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 900px) {
+      .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .card.span-2 { grid-column: span 2; }
+      .steps { grid-template-columns: 1fr; }
+      .hero { padding-top: 28px; }
+    }
+    @media (max-width: 640px) {
+      .wrap { width: min(100% - 28px, 1120px); }
+      .nav-links { display: none; }
+      .bento { grid-template-columns: 1fr; }
+      .card.span-2 { grid-column: span 1; }
+      .preview-shell { padding: 10px; border-radius: 16px; }
+      .preview-frame { aspect-ratio: 4 / 3; }
+      .cta-row { flex-direction: column; align-items: stretch; }
+      .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient-spot spot-a"></div>
+    <div class="ambient-spot spot-b"></div>
+    <div class="ambient-spot spot-c"></div>
+  </div>
+
+  <div class="wrap">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <img src="assets/appicon.png" alt="" width="28" height="28" />
+        PulseCore
+      </a>
+      <div class="nav-links">
+        <a href="#preview">Интерфейс</a>
+        <a href="#features">Возможности</a>
+        <a href="#start">Старт</a>
+        <a href="https://github.com/robbled17/pulsecore">GitHub</a>
+      </div>
+    </nav>
+
+    <header class="hero" id="top">
+      <img class="hero-logo" src="assets/appicon.png" alt="PulseCore" width="72" height="72" />
+      <h1>PulseCore</h1>
+      <p>Лёгкий системный монитор, детектор микролагов и предиктор FPS для Windows</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/robbled17/pulsecore/releases/latest">
+          Скачать для Windows (.exe)
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/robbled17/pulsecore">
+          Исходный код на GitHub
+        </a>
+      </div>
+    </header>
+
+    <section class="section" id="preview">
+      <div class="section-head">
+        <h2>Живой интерфейс</h2>
+        <p>Тот же aurora-glass UI, что в приложении — переключайте вкладки</p>
+      </div>
+      <div class="preview-shell">
+        <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
+          <button type="button" class="active" role="tab" aria-selected="true" data-tab="overview">Обзор</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="lags">Лаги</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="gamepulse">GamePulse</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="hardware">Железо</button>
+        </div>
+        <div class="preview-frame">
+          <img class="active" data-tab="overview" src="screenshots/overview.png" alt="Обзор системы PulseCore" />
+          <img data-tab="lags" src="screenshots/lags.png" alt="Лаги и сеть" />
+          <img data-tab="gamepulse" src="screenshots/gamepulse.png" alt="GamePulse FPS" />
+          <img data-tab="hardware" src="screenshots/hardware-16threads.png" alt="Железо — сетка потоков CPU" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-head">
+        <h2>Всё нужное — без тяжёлых SDK</h2>
+        <p>Стек Go + Wails: точность датчиков и спокойный UI</p>
+      </div>
+      <div class="bento">
+        <article class="card span-2">
+          <div class="card-icon">⚡</div>
+          <h3>Микролаги + Eco Mode</h3>
+          <p>Ловит пики ядер и паузы ≥300 мс, показывает виновника. Eco Mode мягко усмиряет фон без закрытия процессов — с безопасным denylist и откатом.</p>
+        </article>
+        <article class="card teal">
+          <div class="card-icon">🎯</div>
+          <h3>Предиктор FPS</h3>
+          <p>GamePulse оценивает Low/Med/High/Ultra по CPU, GPU и каналам RAM.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">⧉</div>
+          <h3>Mini-HUD</h3>
+          <p>Компактный оверлей поверх окон: CPU, GPU, RAM и температуры.</p>
+        </article>
+        <article class="card teal">
+          <div class="card-icon">🛡</div>
+          <h3>Без прав админа</h3>
+          <p>asInvoker-манифест. Вкладки работают без elevation; админ-действия — с понятным отказом.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon">🔒</div>
+          <h3>Zero telemetry</h3>
+          <p>Нет скрытого HTTP. Сеть — только по кнопке; Steam CDN — только при поиске игр.</p>
+        </article>
+        <article class="card teal">
+          <div class="card-icon">💨</div>
+          <h3>Мало RAM / CPU</h3>
+          <p>Лёгкий desk-app без Electron-жира. Опрос датчиков настраивается: 0.5 / 1 / 2 с.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="start">
+      <div class="section-head">
+        <h2>Быстрый старт</h2>
+        <p>Три шага до первого запуска на Windows 10/11</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Скачайте релиз</h3>
+          <p>Откройте Releases и возьмите <code>PulseCore-*-windows-amd64.zip</code>.</p>
+        </div>
+        <div class="step">
+          <h3>Распакуйте</h3>
+          <p>Проверьте SHA256 при желании и извлеките <code>PulseCore.exe</code>.</p>
+        </div>
+        <div class="step">
+          <h3>Запустите</h3>
+          <p>Нужен WebView2 (уже есть на современных Windows). Готово.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      <div class="footer-brand">
+        <img src="assets/appicon.png" alt="" width="20" height="20" />
+        PulseCore
+      </div>
+      <div>MIT License · <a href="https://github.com/robbled17/pulsecore">github.com/robbled17/pulsecore</a></div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      let raf = 0;
+      let mx = 0;
+      let my = 0;
+      const apply = () => {
+        raf = 0;
+        root.style.setProperty("--mouse-x", mx.toFixed(4));
+        root.style.setProperty("--mouse-y", my.toFixed(4));
+      };
+      window.addEventListener("pointermove", (e) => {
+        const w = window.innerWidth || 1;
+        const h = window.innerHeight || 1;
+        mx = (e.clientX / w) * 2 - 1;
+        my = (e.clientY / h) * 2 - 1;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }, { passive: true });
+      window.addEventListener("pointerleave", () => {
+        mx = 0; my = 0;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }, { passive: true });
+
+      const tabs = [...document.querySelectorAll(".preview-tabs button")];
+      const frames = [...document.querySelectorAll(".preview-frame img")];
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.tab;
+          tabs.forEach((b) => {
+            const on = b === btn;
+            b.classList.toggle("active", on);
+            b.setAttribute("aria-selected", on ? "true" : "false");
+          });
+          frames.forEach((img) => img.classList.toggle("active", img.dataset.tab === id));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
