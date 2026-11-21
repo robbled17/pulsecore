@@ -197,3 +197,15 @@ export function ToggleMiniHUD(arg1) {
 export function TriggerThermalCheck(arg1) {
   return window['go']['main']['App']['TriggerThermalCheck'](arg1);
 }
+
+export function RunSelfDiagnostics() {
+  return window['go']['main']['App']['RunSelfDiagnostics']();
+}
+
+export function SetMiniHUDHotkey(arg1) {
+  return window['go']['main']['App']['SetMiniHUDHotkey'](arg1);
+}
+
+export function GetMiniHUDHotkey() {
+  return window['go']['main']['App']['GetMiniHUDHotkey']();
+}

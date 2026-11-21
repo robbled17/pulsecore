@@ -31,6 +31,9 @@ import {
   CleanupFromTrace,
   CleanSafeDiskCaches,
   PreviewSafeDiskCaches,
+  RunSelfDiagnostics,
+  SetMiniHUDHotkey,
+  GetMiniHUDHotkey,
 } from '../wailsjs/go/main/App.js'
 import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
@@ -39,7 +42,7 @@ import {
   getDevState,
 } from './devMode.js'
 
-const MIT_LICENSE = `PulseCore v1.5.1
+const MIT_LICENSE = `PulseCore v1.6.0
 
 MIT License
 
@@ -75,7 +78,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.5.1'
+const APP_VERSION = 'v1.6.0'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 
 let lang = localStorage.getItem('zp_lang') || 'ru'
@@ -105,12 +108,14 @@ function loadHudPrefs() {
       ram: raw.ram !== false,
       temps: raw.temps !== false,
       opacity: Number.isFinite(Number(raw.opacity)) ? Math.min(95, Math.max(35, Number(raw.opacity))) : 78,
+      hotkey: typeof raw.hotkey === 'string' && raw.hotkey.trim() ? raw.hotkey.trim() : 'Ctrl+Shift+M',
     }
   } catch (_) {
-    return { cpu: true, gpu: true, ram: true, temps: true, opacity: 78 }
+    return { cpu: true, gpu: true, ram: true, temps: true, opacity: 78, hotkey: 'Ctrl+Shift+M' }
   }
 }
 let hudPrefs = loadHudPrefs()
+let lastDiagReport = null
 
 function saveHudPrefs() {
   localStorage.setItem('zp_minihud', JSON.stringify(hudPrefs))
@@ -1897,6 +1902,123 @@ async function copyPCConfig() {
   }
 }
 
+function diagStatusLabel(status) {
+  switch (String(status || '')) {
+    case 'ok': return t('diagStatusOk')
+    case 'fallback': return t('diagStatusFallback')
+    case 'admin': return t('diagStatusAdmin')
+    default: return t('diagStatusUnavailable')
+  }
+}
+
+function diagItemTitle(id, fallback) {
+  const map = {
+    cpu: 'diagItemCPU',
+    gpu: 'diagItemGPU',
+    ram: 'diagItemRAM',
+    drives: 'diagItemDrives',
+    registry: 'diagItemRegistry',
+    runmode: 'diagItemRunMode',
+  }
+  const key = map[id]
+  return key ? t(key) : (fallback || id)
+}
+
+function closeDiagModal() {
+  $('diag-modal')?.classList.add('hidden')
+}
+
+function renderDiagReport(rep) {
+  lastDiagReport = rep
+  const list = $('diag-list')
+  const line = $('diag-status-line')
+  if (!list) return
+  const modeKey = rep?.runMode === 'admin' ? 'diagRunModeAdmin' : 'diagRunModeUser'
+  if (line) {
+    line.textContent = `${t('diagItemRunMode')}: ${t(modeKey)} · ${rep?.generatedAt || ''}`
+  }
+  const items = Array.isArray(rep?.items) ? rep.items : []
+  list.innerHTML = items.map((it) => {
+    const st = String(it.status || 'unavailable')
+    const facts = Array.isArray(it.facts) ? it.facts : []
+    const factsHtml = facts.length
+      ? `<ul class="diag-item-facts">${facts.map((f) => `<li>${escapeHtml(String(f))}</li>`).join('')}</ul>`
+      : ''
+    return `
+      <div class="diag-item" data-diag-id="${escapeHtml(it.id || '')}">
+        <div class="diag-item-head">
+          <span class="diag-item-title">${escapeHtml(diagItemTitle(it.id, it.title))}</span>
+          <span class="diag-badge ${escapeHtml(st)}">${escapeHtml(diagStatusLabel(st))}</span>
+        </div>
+        <div class="diag-item-detail">${escapeHtml(it.detail || '')}</div>
+        ${factsHtml}
+      </div>`
+  }).join('')
+}
+
+async function openSelfDiagnostics() {
+  const modal = $('diag-modal')
+  const list = $('diag-list')
+  const line = $('diag-status-line')
+  if (line) line.textContent = t('diagRunning')
+  if (list) list.innerHTML = ''
+  modal?.classList.remove('hidden')
+  try {
+    const rep = await RunSelfDiagnostics()
+    renderDiagReport(rep || {})
+  } catch (err) {
+    if (line) line.textContent = String(err)
+    showToast(String(err), false)
+  }
+}
+
+async function copyDiagReport() {
+  const text = lastDiagReport?.textReport || ''
+  if (!text) {
+    showToast(t('diagStatusUnavailable'), false)
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast(t('diagCopied'), true)
+  } catch (_) {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      ta.remove()
+      showToast(t('diagCopied'), true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  }
+}
+
+async function applyMiniHUDHotkeySetting(chord, { toast = true } = {}) {
+  const value = (chord || hudPrefs.hotkey || 'Ctrl+Shift+M').trim() || 'Ctrl+Shift+M'
+  hudPrefs.hotkey = value
+  saveHudPrefs()
+  const input = $('mh-hotkey')
+  if (input && input.value !== value) input.value = value
+  try {
+    const res = await SetMiniHUDHotkey(value)
+    const saved = res?.chord || value
+    hudPrefs.hotkey = saved
+    saveHudPrefs()
+    if (input) input.value = saved
+    if (toast) {
+      if (res?.ok || res?.active) showToast(t('mhHotkeySaved'), true)
+      else showToast(t('mhHotkeyFailed'), false)
+    }
+  } catch (_) {
+    if (toast) showToast(t('mhHotkeyFailed'), false)
+  }
+}
+
 function showToast(text, ok = false) {
   const el = $('toast')
   el.textContent = text
@@ -2347,8 +2469,14 @@ function wireUI() {
 
   document.addEventListener('keydown', async (ev) => {
     if (ev.key === 'Escape') {
+      const diag = $('diag-modal')
       const about = $('about-modal')
       const modal = $('modal')
+      if (diag && !diag.classList.contains('hidden')) {
+        ev.preventDefault()
+        closeDiagModal()
+        return
+      }
       if (about && !about.classList.contains('hidden')) {
         ev.preventDefault()
         about.classList.add('hidden')
@@ -2431,6 +2559,31 @@ function wireUI() {
     if (ev.target.id === 'about-modal') closeAbout()
   })
   $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+  $('btn-check-sensors')?.addEventListener('click', openSelfDiagnostics)
+  $('diag-close')?.addEventListener('click', closeDiagModal)
+  $('diag-modal')?.addEventListener('click', (ev) => {
+    if (ev.target.id === 'diag-modal') closeDiagModal()
+  })
+  $('btn-copy-diag')?.addEventListener('click', copyDiagReport)
+  const hotkeyInput = $('mh-hotkey')
+  if (hotkeyInput) {
+    hotkeyInput.value = hudPrefs.hotkey || 'Ctrl+Shift+M'
+    hotkeyInput.addEventListener('change', () => applyMiniHUDHotkeySetting(hotkeyInput.value))
+    hotkeyInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault()
+        applyMiniHUDHotkeySetting(hotkeyInput.value)
+      }
+    })
+  }
+  applyMiniHUDHotkeySetting(hudPrefs.hotkey, { toast: false }).catch(() => {})
+  GetMiniHUDHotkey?.().then((res) => {
+    if (res?.chord && hotkeyInput) {
+      hotkeyInput.value = res.chord
+      hudPrefs.hotkey = res.chord
+      saveHudPrefs()
+    }
+  }).catch(() => {})
   $('about-github')?.addEventListener('click', (ev) => {
     ev.preventDefault()
     try {

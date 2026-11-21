@@ -173,6 +173,7 @@ let state = {
   powerMode: 'balanced',
   pollIntervalMS: 1000,
   miniHUD: false,
+  miniHUDHotkey: 'Ctrl+Shift+M',
   gameOverlay: false,
   fullscreen: false,
   tick: 0,
@@ -883,6 +884,79 @@ const App = {
     errors: 0,
     targets: ['%TEMP%', 'D3DSCache', 'Chrome/Default/Cache'],
     message: 'Удалено файлов: 12 (48.0 МБ), пропущено: 3, ошибок: 0',
+  }),
+  RunSelfDiagnostics: async () => {
+    const p = profile()
+    const broken = p.tempMode === 'broken'
+    const items = [
+      {
+        id: 'cpu',
+        title: 'CPU',
+        status: broken ? 'admin' : 'ok',
+        detail: broken ? 'Needs administrator rights for ACPI temperature' : 'Working',
+        facts: [`model=${p.cpuName}`, `cores=${p.physicalCores}/${p.logicalCores}`, broken ? 'temp=unavailable' : 'temp=48C', `load=${p.cpuBase}%`],
+      },
+      {
+        id: 'gpu',
+        title: 'GPU',
+        status: broken ? 'fallback' : 'ok',
+        detail: broken ? 'Fallback calculation (vendor load counter missing)' : 'Working',
+        facts: [`primary=${p.gpuName}`, ...(p.secondaryGpuName ? [`integrated=${p.secondaryGpuName}`] : []), `vram=${p.dedicatedMB || 0}MB`],
+      },
+      {
+        id: 'ram',
+        title: 'RAM',
+        status: 'ok',
+        detail: 'Working',
+        facts: [`capacity=${p.ramTotalMB}MB`, `slots=${p.slotsUsed}/${p.slotsTotal}`, `freq=${p.ramSpeed}MHz`],
+      },
+      {
+        id: 'drives',
+        title: 'Drives + SMART',
+        status: broken ? 'fallback' : 'ok',
+        detail: broken ? 'Fallback calculation (SMART counters unavailable)' : 'Working',
+        facts: [`C:\\ ${p.diskUsed}/${p.diskTotal}GB`, ...(p.extraDisks || []).map((d) => `${d.mount} ${d.usedGB}/${d.totalGB}GB`)],
+      },
+      {
+        id: 'registry',
+        title: 'Program registry + cleaner',
+        status: 'ok',
+        detail: 'Working',
+        facts: ['cleaner_roots=4/4', 'registry=ok', 'backups=%LOCALAPPDATA%\\PulseCore\\backups'],
+      },
+      {
+        id: 'runmode',
+        title: 'Run mode',
+        status: 'ok',
+        detail: 'Normal user',
+        facts: ['mode=user'],
+      },
+    ]
+    const textReport = [
+      'PulseCore self-diagnostics',
+      'generated: mock',
+      'platform: mock',
+      'run_mode: user',
+      ...items.map((it) => `- ${it.id} [${it.status}] ${it.detail} | ${it.facts.join('; ')}`),
+    ].join('\n')
+    return {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      platform: 'mock',
+      runMode: 'user',
+      items,
+      textReport,
+    }
+  },
+  SetMiniHUDHotkey: async (chord) => {
+    const value = String(chord || 'Ctrl+Shift+M').trim() || 'Ctrl+Shift+M'
+    state.miniHUDHotkey = value
+    return { ok: true, chord: value, active: true }
+  },
+  GetMiniHUDHotkey: async () => ({
+    ok: true,
+    chord: state.miniHUDHotkey || 'Ctrl+Shift+M',
+    active: true,
   }),
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
