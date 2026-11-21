@@ -1580,7 +1580,8 @@ async function predictSelectedGame() {
     const p = await PredictGameFPS(selectedGameId)
     const recKey = ({ low: 'presetLow', med: 'presetMed', high: 'presetHigh', ultra: 'presetUltra' })[p.recommend] || 'presetMed'
     const warnKeys = Array.isArray(p.warnings) ? p.warnings : []
-    const bottleneck = warnKeys.length ? t(warnKeys[0]) : ''
+    const displayWarn = warnKeys.find((k) => k !== 'fpsWarnApprox') || ''
+    const bottleneck = displayWarn ? t(displayWarn) : ''
     const verdictKey = p.verdict || ''
     const verdictText = verdictKey ? t(verdictKey) : ''
     const verdictCls = p.verdictLevel === 'bad' ? 'bad' : (p.verdictLevel === 'ok' ? 'ok' : 'warn')
@@ -1592,6 +1593,10 @@ async function predictSelectedGame() {
     const ramLabel = p.dualChannel ? t('fpsDualChannel') : t('fpsSingleChannel')
     const scores = `${t('fpsScoreGPU')} <b>${fmt(p.gpuScore, 0)}</b> · ${t('fpsScoreCPU')} <b>${fmt(p.cpuScore, 0)}</b> · VRAM <b>${vramLabel}</b> · RAM <b>${ramLabel}</b>`
     const badge = p.badge || p.genre || p.category || ''
+    const approx = !!(p.approximate || p.note === 'approximate' || warnKeys.includes('fpsWarnApprox'))
+    const approxBadge = approx
+      ? `<span class="game-badge approx" title="${t('approxFromSpecs')}">${t('approxFromSpecs')}</span>`
+      : ''
     const statusBits = [
       `${t('fpsRec')}: <b>${t(recKey)}</b>`,
       verdictText ? `<b>${verdictText}</b>` : '',
@@ -1607,6 +1612,7 @@ async function predictSelectedGame() {
             <span class="game-badge era">${badge}</span>
             ${p.engine ? `<span class="game-badge">${p.engine}</span>` : ''}
             ${p.year ? `<span class="game-badge">${p.year}</span>` : ''}
+            ${approxBadge}
           </div>
           <div class="game-compact-scores">${scores}</div>
         </div>
@@ -1802,8 +1808,12 @@ function renderPassport(pass) {
     return `${d.model || '-'} (${d.interfaceType || '?'} ${d.mediaType || ''} ${size})`.trim()
   }).join('<br>') || '-'
   const notes = (pass.notes || []).map((n) => `<li>${escapeHtml(n)}</li>`).join('')
+  const approxChip = pass.approximate
+    ? `<div class="upgrade-chip approx">${escapeHtml(t('upgradeApproxBadge'))}</div>`
+    : ''
   host.innerHTML = `
     <div class="upgrade-chip">${escapeHtml(chassisLabel(pass))}</div>
+    ${approxChip}
     <div class="hw-grid upgrade-grid">
       <div><span class="muted" data-i18n="lblModel">CPU</span><div class="hw-val">${escapeHtml(pass.cpuName || '-')}</div></div>
       <div><span class="muted" data-i18n="lblCores">Cores</span><div class="hw-val metric">${pass.physicalCores || '-'} / ${pass.logicalCores || '-'}</div></div>

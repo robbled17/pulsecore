@@ -98,12 +98,18 @@ func TestUnknownGPUScoreUsesVRAM(t *testing.T) {
 	if integrated {
 		t.Fatal("should be discrete")
 	}
-	score := calcGPUPowerScore("Unknown GPU", false, 8)
-	if score < 5 || score != score { // NaN check
-		t.Fatalf("bad score %v", score)
+	gpu := scoreGPU("Unknown GPU", false, 8)
+	if gpu.Score < 5 || gpu.Score != gpu.Score { // NaN check
+		t.Fatalf("bad score %v", gpu.Score)
 	}
-	cpu := calcCPUPowerScore("Mystery CPU", 8, 16, 3600)
-	if cpu < 5 || cpu != cpu {
-		t.Fatalf("bad cpu score %v", cpu)
+	if !gpu.Approximate || gpu.Class != ClassMid {
+		t.Fatalf("8GB unknown must be approximate mid, got approx=%v class=%s", gpu.Approximate, gpu.Class)
+	}
+	cpu := scoreCPU("Mystery CPU", 8, 16, 3600)
+	if cpu.Score < 5 || cpu.Score != cpu.Score {
+		t.Fatalf("bad cpu score %v", cpu.Score)
+	}
+	if !cpu.Approximate || cpu.Class != ClassMid {
+		t.Fatalf("mystery 8c CPU must be approximate mid, got approx=%v class=%s", cpu.Approximate, cpu.Class)
 	}
 }

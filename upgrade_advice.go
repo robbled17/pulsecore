@@ -23,12 +23,30 @@ func upgradeSummary(pass PCPassport, goal, lang string) string {
 	}
 }
 
+func enrichPassportFallback(pass *PCPassport) {
+	if pass == nil {
+		return
+	}
+	gpu := scoreGPU(pass.GPUName, pass.GPUIntegrated, pass.VRAMGB)
+	cpu := scoreCPU(pass.CPUName, pass.PhysicalCores, pass.LogicalCores, 0)
+	if pass.GPUClass == "" {
+		pass.GPUClass = gpu.Class
+	}
+	if pass.CPUClass == "" {
+		pass.CPUClass = cpu.Class
+	}
+	if gpu.Approximate || cpu.Approximate {
+		pass.Approximate = true
+	}
+}
+
 func buildUpgradeRecommendations(pass PCPassport, goal, lang string) []UpgradeRecommendation {
 	// Hard-split: force laptop path when markers say so even if IsLaptop was missed.
 	if !pass.IsLaptop && looksLikeLaptopHardware(pass.CPUName, pass.GPUName, false) {
 		pass.IsLaptop = true
 		pass.Chassis = "laptop"
 	}
+	enrichPassportFallback(&pass)
 	var recs []UpgradeRecommendation
 	if pass.IsLaptop {
 		recs = laptopRecommendations(pass, goal, lang)
@@ -386,10 +404,37 @@ func pickGPUUpgrade(pass PCPassport, goal string) (model, gain string) {
 		strings.Contains(name, "5500") || strings.Contains(name, "5600") {
 		return "RTX 4060", "+80-120% FPS"
 	}
-	if goal == UpgradeGoalBudget {
-		return "RTX 4060", "+40-80% FPS"
+
+	// Unknown / off-DB GPU: recommend from VRAM class, never empty.
+	class := pass.GPUClass
+	if class == "" {
+		class = classifyGPUClass(pass.GPUName, pass.GPUIntegrated, pass.VRAMGB)
 	}
-	return "RTX 4070 Super", "+40-70% FPS"
+	switch class {
+	case ClassIntegrated, ClassWeak:
+		if goal == UpgradeGoalBudget {
+			return "RTX 4060", "+150-200% FPS vs weak GPU"
+		}
+		return "RTX 4060 / RX 7600", "+150-200% FPS vs weak GPU"
+	case ClassBudget:
+		if goal == UpgradeGoalBudget {
+			return "RTX 4060 Ti (used OK)", "+40-70% FPS"
+		}
+		return "RTX 4060 Ti / 4070", "+50-80% FPS"
+	case ClassHigh:
+		if goal == UpgradeGoalBudget {
+			return "Keep current GPU / used 4070 Ti", "small / used deal"
+		}
+		return "RTX 4070 Ti Super / 5070", "+20-35% FPS"
+	default: // mid
+		if goal == UpgradeGoalBudget {
+			return "RTX 4060 Ti 16GB (used OK)", "+30-50% FPS"
+		}
+		if goal == UpgradeGoalQuiet {
+			return "RTX 4070 Super (3-fan)", "+40-60% FPS, quieter"
+		}
+		return "RTX 4070 Super", "+40-70% FPS"
+	}
 }
 
 func pickCPUUpgrade(pass PCPassport, goal, socket string) (model, gain string) {
@@ -518,6 +563,7 @@ var upgradeI18n = map[string]map[string]string{
 		"gainProjects": "быстрее проекты", "gainQuieter": "тише на 5-15°C", "gainStableFPS": "стабильнее FPS",
 		"gainMuchQuieter": "заметно тише", "gainQuietGPU": "тише под нагрузкой", "gainLowerTemp": "ниже температура",
 		"gainRAM32": "меньше статтеров", "gainDualChannel": "+dual-channel / меньше лагов",
+		"noteApprox": "Примерный расчёт по характеристикам (точной модели нет в базе)",
 	},
 	"en": {
 		"kindDesktop": "desktop", "kindLaptop": "laptop",
@@ -571,6 +617,7 @@ var upgradeI18n = map[string]map[string]string{
 		"gainProjects": "faster projects", "gainQuieter": "5-15°C quieter", "gainStableFPS": "more stable FPS",
 		"gainMuchQuieter": "much quieter", "gainQuietGPU": "quieter under load", "gainLowerTemp": "lower temps",
 		"gainRAM32": "fewer stutters", "gainDualChannel": "+dual-channel / fewer hitches",
+		"noteApprox": "Approximate estimate from specs (exact model not in database)",
 	},
 }
 
@@ -598,6 +645,7 @@ func init() {
 	de["pitGPU1"] = "Vor dem GPU-Kauf Gehaeuseplatz messen und Netzteil-Leistung sowie Stecker pruefen."
 	de["pitCPU1"] = "BIOS aktualisieren, bevor Sie eine neuere CPU einbauen."
 	de["pitRAM2"] = "Frequenz und Timings der Module angleichen."
+	de["noteApprox"] = "Ungefaehre Schaetzung nach Specs (genaue Modell nicht in der Datenbank)"
 	// Japanese overlays
 	ja := upgradeI18n["ja"]
 	ja["kindDesktop"] = "デスクトップ"
@@ -613,6 +661,7 @@ func init() {
 	ja["pitGPU1"] = "GPU購入前にケース寸法と電源の容量・コネクタを確認してください。"
 	ja["pitCPU1"] = "新しいCPUの前にBIOSを更新してください。"
 	ja["pitRAM2"] = "モジュールの周波数とタイミングを揃えてください。"
+	ja["noteApprox"] = "スペックからの概算 (正確なモデルがデータベースにありません)"
 	// Chinese overlays
 	zh := upgradeI18n["zh"]
 	zh["kindDesktop"] = "台式机"
@@ -628,6 +677,7 @@ func init() {
 	zh["pitGPU1"] = "买显卡前量好机箱空间，并检查电源功率与接口。"
 	zh["pitCPU1"] = "安装更新的 CPU 前先升级主板 BIOS。"
 	zh["pitRAM2"] = "内存条频率与时序要一致。"
+	zh["noteApprox"] = "按规格近似估算 (数据库中无精确型号)"
 	// Kazakh overlays (short)
 	kk := upgradeI18n["kk"]
 	kk["kindDesktop"] = "ПК"
@@ -639,6 +689,7 @@ func init() {
 	kk["pitGPU1"] = "GPU сатып алмас бұрын корпусты өлшеп, БҚ қуаты мен қосқыштарын тексеріңіз."
 	kk["pitCPU1"] = "Жаңа CPU алдында BIOS жаңартыңыз."
 	kk["pitRAM2"] = "Модульдердің жиілігі мен таймингтерін сәйкестендіріңіз."
+	kk["noteApprox"] = "Сипаттамалар бойынша шамамен есеп (нақты модель базада жоқ)"
 	// Tatar overlays (short)
 	tt := upgradeI18n["tt"]
 	tt["kindDesktop"] = "ПК"
@@ -650,4 +701,5 @@ func init() {
 	tt["pitGPU1"] = "GPU алганчы корпусны үлчәгез һәм БП көчен/тоташтыргычларын тикшерегез."
 	tt["pitCPU1"] = "Яңарак CPU алдыннан BIOS яңартыгыз."
 	tt["pitRAM2"] = "Модульләрнең ешлыгын һәм таймингларын туры китерегез."
+	tt["noteApprox"] = "Характеристикалар буенча якынча исәп (төгәл модель базада юк)"
 }
