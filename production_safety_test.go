@@ -8,7 +8,8 @@ import (
 
 func TestEcoDenylistCriticalProcesses(t *testing.T) {
 	protected := []string{
-		"csrss.exe", "lsass.exe", "svchost.exe", "dwm.exe",
+		"system", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe",
+		"lsass.exe", "services.exe", "svchost.exe", "dwm.exe",
 		"pulsecore.exe", "zeropulse.exe", "PulseCore.EXE",
 	}
 	for _, n := range protected {
@@ -16,8 +17,26 @@ func TestEcoDenylistCriticalProcesses(t *testing.T) {
 			t.Fatalf("expected protected: %s", n)
 		}
 	}
+	av := []string{"msmpeng.exe", "mssense.exe", "smartscreen.exe", "MpCmdRun.exe"}
+	for _, n := range av {
+		if !isPPLProtected(n) {
+			t.Fatalf("expected AV/PPL protected: %s", n)
+		}
+	}
 	if isEcoProtected("chrome.exe") {
 		t.Fatal("chrome should not be denylisted")
+	}
+}
+
+func TestSanitizeDriveLetter(t *testing.T) {
+	cases := map[string]string{
+		"c": "C", "D:\\": "D", "e:": "E",
+		"": "C", "../x": "C", "C;calc": "C", "ZZ": "C",
+	}
+	for in, want := range cases {
+		if got := sanitizeDriveLetter(in); got != want {
+			t.Fatalf("sanitizeDriveLetter(%q)=%q want %q", in, got, want)
+		}
 	}
 }
 

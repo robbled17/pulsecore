@@ -20,7 +20,7 @@ import {
   SearchGamesOnline,
   PredictGameFPS,
 } from '../wailsjs/go/main/App.js'
-import { EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
 
 const MIT_LICENSE = `PulseCore v1.0
@@ -1729,6 +1729,14 @@ function wireUI() {
     if (ev.target.id === 'about-modal') closeAbout()
   })
   $('btn-copy-pc')?.addEventListener('click', copyPCConfig)
+  $('about-github')?.addEventListener('click', (ev) => {
+    ev.preventDefault()
+    try {
+      BrowserOpenURL(GITHUB_URL)
+    } catch (_) {
+      window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')
+    }
+  })
 
   // Demo-only hardware matrix switcher (present only when mock bindings loaded)
   const mockBar = $('mock-profile-bar')

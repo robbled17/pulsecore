@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -33,7 +31,6 @@ const (
 	gameOverlayH    = 64
 	mainMinW        = 880
 	mainMinH        = 560
-	createNoWindow  = 0x08000000 // CREATE_NO_WINDOW
 	lagSpikeCore    = 95.0
 	lagSpikeOverall = 70.0
 	vampireCPUPct   = 4.0
@@ -582,14 +579,16 @@ func (a *App) TriggerThermalCheck(temp float64) {
 }
 
 func (a *App) emitThermalAlarm(temp float64) {
+	// Native beep only — no hidden PowerShell toast hosts (AV/SmartScreen hygiene).
 	_, _, _ = procMessageBeep.Call(0x00000030) // MB_ICONEXCLAMATION
-	title := "PulseCore Emergency Hardware Alarm"
-	body := fmt.Sprintf("CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.", temp, thermalLimitC, thermalHoldSec)
-	showWindowsToast(title, body)
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "thermal:alarm", map[string]interface{}{
 			"temperature": temp,
 			"limit":       thermalLimitC,
+			"message": fmt.Sprintf(
+				"CPU temperature %.1f°C exceeded %.0f°C for %ds. Consider Silent mode.",
+				temp, thermalLimitC, thermalHoldSec,
+			),
 		})
 	}
 }
@@ -1145,71 +1144,3 @@ func foregroundPID() int32 {
 	return int32(pid)
 }
 
-func showWindowsToast(title, message string) {
-	// Native toast via PowerShell WinRT (no extra SDK weight in the binary beyond OS).
-	ps := fmt.Sprintf(`
-$ErrorActionPreference='SilentlyContinue'
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] > $null
-$template = @"
-<toast>
-  <visual>
-    <binding template="ToastGeneric">
-      <text>%s</text>
-      <text>%s</text>
-    </binding>
-  </visual>
-</toast>
-"@
-$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$xml.LoadXml($template)
-$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("PulseCore").Show($toast)
-`, xmlEscape(title), xmlEscape(message))
-
-	_ = runHiddenStart("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps)
-}
-
-const hiddenCmdTimeout = 5 * time.Second
-
-func runHiddenCommand(name string, args ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), hiddenCmdTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Run()
-}
-
-func runHiddenOutput(name string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), hiddenCmdTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Output()
-}
-
-func runHiddenStart(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: createNoWindow,
-	}
-	return cmd.Start()
-}
-
-func xmlEscape(s string) string {
-	r := strings.NewReplacer(
-		`&`, `&amp;`,
-		`<`, `&lt;`,
-		`>`, `&gt;`,
-		`"`, `&quot;`,
-		`'`, `&apos;`,
-	)
-	return r.Replace(s)
-}

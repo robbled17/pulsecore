@@ -484,17 +484,13 @@ func buildRAMDeepInfo(static staticHardware, totalMB, usedMB, freeMB uint64, pct
 
 // CheckDiskHealth queries real PhysicalDisk + StorageReliabilityCounter data.
 func (a *App) CheckDiskHealth(driveLetter string) DiskHealthReport {
-	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
-	letter = strings.TrimSuffix(letter, `:\`)
-	letter = strings.TrimSuffix(letter, ":")
-	if letter == "" {
-		letter = "C"
-	}
+	letter := sanitizeDriveLetter(driveLetter)
 
-	ps := fmt.Sprintf(`
-$ErrorActionPreference='Stop'
+	// Storage cmdlets require PowerShell; never use -ExecutionPolicy Bypass (AV heuristic).
+	// Drive letter is a single A–Z from sanitizeDriveLetter — no string-concat argv injection.
+	ps := `$ErrorActionPreference='Stop'; $letter='` + letter + `'
 try {
-  $part = Get-Partition -DriveLetter '%s' -ErrorAction Stop
+  $part = Get-Partition -DriveLetter $letter -ErrorAction Stop
   $disk = $part | Get-Disk -ErrorAction Stop
   $phys = $disk | Get-PhysicalDisk -ErrorAction Stop
   $rel = $null
@@ -511,17 +507,6 @@ try {
     else { $iface = 'SSD' }
   } elseif ($media -match 'HDD' -or $media -eq '2' -or $bus -match 'SATA|ATA|USB') {
     $iface = 'HDD'
-  }
-  $tbwGB = 0.0
-  if ($rel -and $rel.WriteLatencyMax -ne $null) { }
-  if ($rel) {
-    try {
-      $bytes = [double]$rel.FlushLatencyMax
-    } catch {}
-    try {
-      if ($rel.PSObject.Properties.Name -contains 'Wear') { }
-      # StorageReliabilityCounter exposes Read/Write errors; TBW approximated from Wear when possible.
-    } catch {}
   }
   $obj = [ordered]@{
     Model = [string]$phys.FriendlyName
@@ -541,10 +526,9 @@ try {
   $obj | ConvertTo-Json -Compress
 } catch {
   @{ Error = $_.Exception.Message } | ConvertTo-Json -Compress
-}
-`, letter)
+}`
 
-	out, err := runHiddenOutput("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ps)
+	out, err := runHiddenOutput(systemPowerShell(), "-NoProfile", "-NonInteractive", "-Command", ps)
 	report := DiskHealthReport{
 		DriveLetter: letter + ":",
 		OK:          false,
@@ -637,6 +621,17 @@ func normalizeMediaType(media string) string {
 		}
 		return media
 	}
+}
+
+// sanitizeDriveLetter forces a single A–Z letter for Storage queries (no injection).
+func sanitizeDriveLetter(driveLetter string) string {
+	letter := strings.ToUpper(strings.TrimSpace(driveLetter))
+	letter = strings.TrimSuffix(letter, `:\`)
+	letter = strings.TrimSuffix(letter, ":")
+	if len(letter) != 1 || letter[0] < 'A' || letter[0] > 'Z' {
+		return "C"
+	}
+	return letter
 }
 
 func asString(v interface{}) string {

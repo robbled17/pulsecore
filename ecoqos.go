@@ -32,23 +32,32 @@ type processPowerThrottlingState struct {
 }
 
 var ecoDenylist = map[string]struct{}{
-	"system": {}, "registry": {}, "idle": {},
-	"smss.exe": {}, "csrss.exe": {}, "wininit.exe": {},
-	"services.exe": {}, "lsass.exe": {}, "svchost.exe": {},
-	"explorer.exe": {}, "dwm.exe": {},
+	"system": {}, "registry": {}, "idle": {}, "system idle process": {},
+	"secure system": {}, "memory compression": {},
+	"smss.exe": {}, "csrss.exe": {}, "wininit.exe": {}, "winlogon.exe": {},
+	"services.exe": {}, "lsass.exe": {}, "lsm.exe": {}, "svchost.exe": {},
+	"explorer.exe": {}, "dwm.exe": {}, "fontdrvhost.exe": {},
+	"sihost.exe": {}, "taskhostw.exe": {}, "conhost.exe": {},
 	"pulsecore.exe": {}, "zeropulse.exe": {}, "zeropulse-gui.exe": {},
 }
 
-// Kernel / PPL protected security stack — EcoQoS cannot be applied.
+// Kernel / PPL protected security / AV stack — EcoQoS cannot be applied.
 var ecoPPLProtected = map[string]struct{}{
 	"msmpeng.exe":               {},
 	"mssense.exe":               {},
 	"securityhealthservice.exe": {},
 	"securityhealthsystray.exe": {},
+	"securityhealthhost.exe":    {},
 	"wdavscannerservice.exe":    {},
 	"nisrv.exe":                 {},
 	"mpcmdrun.exe":              {},
 	"sgrmbroker.exe":            {},
+	"smartscreen.exe":           {},
+	"avp.exe":                   {},
+	"avgui.exe":                 {},
+	"avastui.exe":               {},
+	"bdagent.exe":               {},
+	"ekrn.exe":                  {},
 }
 
 func isEcoProtected(name string) bool {
@@ -251,34 +260,13 @@ func isDefenderTarget(name string) bool {
 	return false
 }
 
-// throttleDefenderScanCPU uses the official Microsoft preference to cap
-// Defender background scan average CPU load (PPL-safe, no OpenProcess).
-func throttleDefenderScanCPU(pct int) error {
-	if pct < 5 {
-		pct = 5
-	}
-	if pct > 100 {
-		pct = 100
-	}
-	script := fmt.Sprintf("Set-MpPreference -ScanAvgCPULoadFactor %d", pct)
-	return runHiddenCommand("powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script)
-}
-
 // EcoModeByProcessName finds running process(es) by exe name and toggles EcoQoS
 // on every matching PID (browsers / messengers / launchers / IDEs).
-// Windows Defender is handled via Set-MpPreference (PPL-safe).
+// Defender / AV targets are never touched (no Set-MpPreference / hidden PS).
 func (a *App) EcoModeByProcessName(name string, enable bool) error {
 	if isDefenderTarget(name) {
-		if !enable {
-			// Restore a balanced default scan budget.
-			_ = throttleDefenderScanCPU(50)
-			return nil
-		}
-		if err := throttleDefenderScanCPU(15); err != nil {
-			// Still treat as soft-success for UI: preference may require elevation
-			// on some SKUs, but never surface raw PPL/kernel errors.
-			return nil
-		}
+		// Soft-success for UI calmness — never shell out to modify AV preferences
+		// (unsigned Release builds get SmartScreen / Defender heuristics otherwise).
 		return nil
 	}
 
