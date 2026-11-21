@@ -77,8 +77,10 @@ jobs:
             exit 1
           fi
           mkdir -p dist
+          # Canonical release asset name for docs direct-download button.
+          cp "$exe" dist/pulsecore.exe
           cp "$exe" dist/PulseCore.exe
-          echo "EXE_PATH=dist/PulseCore.exe" >> "$GITHUB_ENV"
+          echo "EXE_PATH=dist/pulsecore.exe" >> "$GITHUB_ENV"
           echo "EXE_SIZE=$size" >> "$GITHUB_ENV"
 
       - name: Package zip + SHA256
@@ -95,8 +97,9 @@ jobs:
           fi
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
           zip_name="PulseCore-${tag}-windows-amd64.zip"
-          powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/PulseCore.exe' -DestinationPath '${zip_name}' -Force"
+          powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/pulsecore.exe' -DestinationPath '${zip_name}' -Force"
           sha256sum "${zip_name}" | tee "${zip_name}.sha256"
+          sha256sum dist/pulsecore.exe | tee dist/pulsecore.exe.sha256
           echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
 
       - name: Build changelog
@@ -108,8 +111,8 @@ jobs:
             echo
             echo "Windows amd64 release build."
             echo
-            echo "- Artifact: \`${ZIP_NAME}\`"
-            echo "- Binary: \`PulseCore.exe\` (${EXE_SIZE} bytes)"
+            echo "- Binary: \`pulsecore.exe\` (${EXE_SIZE} bytes) - direct download"
+            echo "- Archive: \`${ZIP_NAME}\`"
             echo "- Platform: windows/amd64"
             echo "- Flags: \`wails build -clean -platform windows/amd64 -ldflags \"-s -w\"\`"
             echo
@@ -136,6 +139,8 @@ jobs:
           body_path: release-notes.md
           draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag == '' }}
           files: |
+            dist/pulsecore.exe
+            dist/pulsecore.exe.sha256
             ${{ env.ZIP_NAME }}
             ${{ env.ZIP_NAME }}.sha256
         env:
