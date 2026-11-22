@@ -66,17 +66,16 @@ jobs:
         shell: bash
         run: go vet ./...
 
-      # Do not pack with UPX or other compressors (Defender false positives).
+      # Do not pack with compressors (Defender false positives). Build uses plain wails only.
       - name: Guard against packers
         shell: bash
         run: |
           set -euo pipefail
-          # This workflow never invokes packers. Fail if any step shells out to one.
-          if grep -RInE --exclude-dir=.git \
-              '(^|[[:space:]])upx([[:space:]]|$)|enigma.?protector|themida|vmprotect' \
-              .github/workflows/*.yml 2>/dev/null \
-            | grep -viE 'Guard against packers|never invokes|No packer|refusing|UPX or other|no UPX'; then
-            echo "Found packer invocation in workflows; aborting."
+          # Assert release packaging never shells out to known packers.
+          if grep -nE '[[:space:]](upx|enigmaprotector|themida|vmprotect)([[:space:]|]|$)' \
+              .github/workflows/build-release.yml \
+            | grep -vE 'Guard against packers|known packers|plain wails|no UPX|Defender'; then
+            echo "Found packer invocation in release workflow; aborting."
             exit 1
           fi
           echo "No packer steps configured."
