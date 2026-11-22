@@ -14,17 +14,16 @@ func TestCompareSemver(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"1.6.2", "1.6.3", -1},
-		{"v1.6.2", "v1.6.3", -1},
-		{"1.6.3", "1.6.3", 0},
-		{"v1.6.3", "1.6.3", 0},
-		{"1.6.5", "1.6.4", 1},
-		{"1.6.4", "1.6.3", 1},
-		{"1.7.0", "1.6.9", 1},
-		{"1.6", "1.6.0", 0},
-		{"1.6.0", "1.6", 0},
+		{"1.0.0", "1.0.1", -1},
+		{"v1.0.0", "v1.0.1", -1},
+		{"1.0.0", "1.0.0", 0},
+		{"v1.0.0", "1.0.0", 0},
+		{"1.0.1", "1.0.0", 1},
+		{"1.1.0", "1.0.9", 1},
 		{"2.0.0", "1.9.9", 1},
-		{"1.6.3-rc1", "1.6.3", 0},
+		{"1.0", "1.0.0", 0},
+		{"1.0.0", "1.0", 0},
+		{"1.0.0-rc1", "1.0.0", 0},
 	}
 	for _, tc := range cases {
 		got := compareSemver(tc.a, tc.b)
@@ -35,7 +34,7 @@ func TestCompareSemver(t *testing.T) {
 }
 
 func TestNormalizeVersion(t *testing.T) {
-	if got := normalizeVersion(" v1.6.5 "); got != "1.6.5" {
+	if got := normalizeVersion(" v1.0.0 "); got != "1.0.0" {
 		t.Fatalf("normalizeVersion got %q", got)
 	}
 }
@@ -43,8 +42,8 @@ func TestNormalizeVersion(t *testing.T) {
 func TestCheckForUpdatesOnline(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"tag_name": "v1.9.9",
-			"body":     "## PulseCore v1.9.9\n\n- Demo notes line\n- Second line",
+			"tag_name": "v1.0.1",
+			"body":     "## PulseCore v1.0.1\n\n- Demo notes line\n- Second line",
 			"assets": []map[string]string{
 				{
 					"name":                 "pulsecore.exe",
@@ -55,17 +54,17 @@ func TestCheckForUpdatesOnline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res := checkForUpdates(context.Background(), "1.6.5", srv.URL, 2*time.Second)
+	res := checkForUpdates(context.Background(), "1.0.0", srv.URL, 2*time.Second)
 	if res.Status != updateStatusAvailable {
 		t.Fatalf("status=%q want %q notes=%q", res.Status, updateStatusAvailable, res.Notes)
 	}
-	if res.LatestVersion != "1.9.9" {
+	if res.LatestVersion != "1.0.1" {
 		t.Fatalf("latest=%q", res.LatestVersion)
 	}
 	if res.DownloadURL != "https://example.com/pulsecore.exe" {
 		t.Fatalf("download=%q", res.DownloadURL)
 	}
-	if res.CurrentVersion != "1.6.5" {
+	if res.CurrentVersion != "1.0.0" {
 		t.Fatalf("current=%q", res.CurrentVersion)
 	}
 }
@@ -73,25 +72,25 @@ func TestCheckForUpdatesOnline(t *testing.T) {
 func TestCheckForUpdatesUpToDate(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"tag_name": "v1.6.5",
+			"tag_name": "v1.0.0",
 			"body":     "same",
 			"assets":   []any{},
 		})
 	}))
 	defer srv.Close()
 
-	res := checkForUpdates(context.Background(), "v1.6.5", srv.URL, 2*time.Second)
+	res := checkForUpdates(context.Background(), "v1.0.0", srv.URL, 2*time.Second)
 	if res.Status != updateStatusUpToDate {
 		t.Fatalf("status=%q", res.Status)
 	}
 }
 
 func TestCheckForUpdatesOffline(t *testing.T) {
-	res := checkForUpdates(context.Background(), "1.6.5", "http://127.0.0.1:1/nope", 200*time.Millisecond)
+	res := checkForUpdates(context.Background(), "1.0.0", "http://127.0.0.1:1/nope", 200*time.Millisecond)
 	if res.Status != updateStatusOffline {
 		t.Fatalf("status=%q want offline", res.Status)
 	}
-	if res.CurrentVersion != "1.6.5" {
+	if res.CurrentVersion != "1.0.0" {
 		t.Fatalf("current=%q", res.CurrentVersion)
 	}
 }

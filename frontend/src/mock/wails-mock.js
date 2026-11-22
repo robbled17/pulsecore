@@ -969,7 +969,7 @@ const App = {
     if (force === 'offline') {
       return {
         status: 'offline',
-        currentVersion: '1.6.5',
+        currentVersion: '1.0.0',
         latestVersion: '',
         notes: '',
         downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
@@ -978,7 +978,7 @@ const App = {
     if (force === 'available' || force === true) {
       return {
         status: 'update_available',
-        currentVersion: '1.6.5',
+        currentVersion: '1.0.0',
         latestVersion: '1.9.9',
         notes: 'Mock release notes for UI capture',
         downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
@@ -986,8 +986,8 @@ const App = {
     }
     return {
       status: 'up_to_date',
-      currentVersion: '1.6.5',
-      latestVersion: '1.6.5',
+      currentVersion: '1.0.0',
+      latestVersion: '1.0.0',
       notes: '',
       downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
     }
