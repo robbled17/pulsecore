@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.5
+
+### Added
+- Windows manifest `requireAdministrator` embedded into `pulsecore.exe`
+- Startup self-elevation via `ShellExecuteW` `runas` when the process is not elevated
+- Release asset `SHA256SUMS.txt` next to `pulsecore.exe`
+- Optional Authenticode `signtool` step when repo secret `SIGN_CERT_PFX` is set
+
+### Changed
+- PE VersionInfo: ProductName PulseCore, FileDescription PulseCore System Monitor & Utility, CompanyName robbled17, version 1.6.5
+- Release builds explicitly avoid UPX and other packers
+
+
 ## 1.6.4
 
 ### Added

@@ -13,6 +13,11 @@ import (
 var assets embed.FS
 
 func main() {
+	// Elevate before the single-instance mutex so a non-admin stub cannot block the elevated process.
+	if !ensureElevatedOrRelaunch() {
+		return
+	}
+
 	si := ensureSingleInstance()
 	if !si.IsPrimary {
 		// Second launch: existing window was activated via mutex/IPC. Do not start a duplicate.

@@ -66,10 +66,26 @@ jobs:
         shell: bash
         run: go vet ./...
 
+      # Do not pack with UPX or other compressors (Defender false positives).
+      - name: Guard against packers
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This workflow never invokes packers. Fail if any step shells out to one.
+          if grep -RInE --exclude-dir=.git \
+              '(^|[[:space:]])upx([[:space:]]|$)|enigma.?protector|themida|vmprotect' \
+              .github/workflows/*.yml 2>/dev/null \
+            | grep -viE 'Guard against packers|never invokes|No packer|refusing|UPX or other|no UPX'; then
+            echo "Found packer invocation in workflows; aborting."
+            exit 1
+          fi
+          echo "No packer steps configured."
+
       - name: Wails build (windows/amd64)
         shell: bash
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin"
+          # Wails embeds build/windows/wails.exe.manifest + info.json into the PE via .syso.
           wails build -clean -platform windows/amd64 -ldflags "-s -w"
 
       - name: Verify PulseCore.exe
@@ -105,7 +121,79 @@ jobs:
           echo "EXE_PATH=dist/pulsecore.exe" >> "$GITHUB_ENV"
           echo "EXE_SIZE=$size" >> "$GITHUB_ENV"
 
-      - name: Package zip + SHA256
+      - name: Verify embedded requireAdministrator manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          data = Path("dist/pulsecore.exe").read_bytes()
+          needles = {
+              "requireAdministrator": "requireAdministrator".encode("utf-16le"),
+              "asInvoker": "asInvoker".encode("utf-16le"),
+          }
+          # Also check UTF-8 in case the resource was stored that way.
+          utf8_req = b"requireAdministrator"
+          utf8_as = b"asInvoker"
+          has_req = needles["requireAdministrator"] in data or utf8_req in data
+          has_as = needles["asInvoker"] in data or utf8_as in data
+          print(f"requireAdministrator present: {has_req}")
+          print(f"asInvoker present: {has_as}")
+          if not has_req:
+              raise SystemExit("PE missing requireAdministrator in embedded manifest")
+          if has_as and not has_req:
+              raise SystemExit("PE still requests asInvoker")
+          # Prefer requireAdministrator; asInvoker must not be the execution level.
+          # Some toolchains may leave the token in unused strings; require the req token.
+          print("Manifest elevation check OK")
+          PY
+
+      - name: Optional code sign (signtool)
+        shell: bash
+        env:
+          SIGN_CERT_PFX: ${{ secrets.SIGN_CERT_PFX }}
+          SIGN_CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGN_CERT_PFX:-}" ]]; then
+            echo "SIGN_CERT_PFX secret absent; skipping signtool."
+            exit 0
+          fi
+          echo "SIGN_CERT_PFX present; attempting Authenticode sign."
+          python - <<'PY'
+          import base64, os
+          raw = os.environ["SIGN_CERT_PFX"]
+          # Accept raw base64 or data-URI-ish whitespace.
+          blob = base64.b64decode("".join(raw.split()))
+          open("sign-cert.pfx", "wb").write(blob)
+          print(f"Wrote sign-cert.pfx ({len(blob)} bytes)")
+          PY
+          SIGNTOOL=""
+          for cand in \
+            "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe \
+            "/c/Program Files/Windows Kits/10/bin/"*/x64/signtool.exe; do
+            if [[ -f "$cand" ]]; then
+              SIGNTOOL="$cand"
+            fi
+          done
+          if [[ -z "$SIGNTOOL" ]]; then
+            SIGNTOOL=$(ls "/c/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe 2>/dev/null | sort -V | tail -1 || true)
+          fi
+          if [[ -z "${SIGNTOOL}" || ! -f "$SIGNTOOL" ]]; then
+            echo "signtool.exe not found; skipping sign gracefully."
+            rm -f sign-cert.pfx
+            exit 0
+          fi
+          PASS_ARGS=()
+          if [[ -n "${SIGN_CERT_PASSWORD:-}" ]]; then
+            PASS_ARGS=(/p "$SIGN_CERT_PASSWORD")
+          fi
+          "$SIGNTOOL" sign /fd SHA256 /f sign-cert.pfx "${PASS_ARGS[@]}" /tr http://timestamp.digicert.com /td SHA256 dist/pulsecore.exe
+          cp dist/pulsecore.exe dist/PulseCore.exe
+          rm -f sign-cert.pfx
+          echo "Signed dist/pulsecore.exe"
+
+      - name: Package zip + SHA256SUMS
         shell: bash
         run: |
           set -euo pipefail
@@ -120,8 +208,16 @@ jobs:
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
           zip_name="PulseCore-${tag}-windows-amd64.zip"
           powershell.exe -NoProfile -Command "Compress-Archive -Path 'dist/pulsecore.exe' -DestinationPath '${zip_name}' -Force"
+          (
+            cd dist
+            sha256sum pulsecore.exe
+          ) | tee dist/pulsecore.exe.sha256
           sha256sum "${zip_name}" | tee "${zip_name}.sha256"
-          sha256sum dist/pulsecore.exe | tee dist/pulsecore.exe.sha256
+          # Canonical multi-file checksum list for the Release page.
+          {
+            sha256sum dist/pulsecore.exe | sed 's|dist/||'
+            sha256sum "${zip_name}"
+          } | tee SHA256SUMS.txt
           echo "ZIP_NAME=${zip_name}" >> "$GITHUB_ENV"
 
       - name: Build changelog
@@ -134,9 +230,11 @@ jobs:
             echo "Windows amd64 release build."
             echo
             echo "- Binary: \`pulsecore.exe\` (${EXE_SIZE} bytes) - direct download"
+            echo "- Checksums: \`SHA256SUMS.txt\`"
             echo "- Archive: \`${ZIP_NAME}\`"
             echo "- Platform: windows/amd64"
-            echo "- Flags: \`wails build -clean -platform windows/amd64 -ldflags \"-s -w\"\`"
+            echo "- Elevation: requireAdministrator (embedded manifest)"
+            echo "- Flags: \`wails build -clean -platform windows/amd64 -ldflags \"-s -w\"\` (no UPX)"
             echo
             echo "### Commits"
             if git describe --tags --abbrev=0 >/dev/null 2>&1; then
@@ -163,6 +261,7 @@ jobs:
           files: |
             dist/pulsecore.exe
             dist/pulsecore.exe.sha256
+            SHA256SUMS.txt
             ${{ env.ZIP_NAME }}
             ${{ env.ZIP_NAME }}.sha256
         env:
