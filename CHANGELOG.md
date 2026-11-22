@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0
+
+### Added
+- Public showcase storefront README with module screenshots and demo GIFs under `assets/showcase/`
+- Landing: dark `theme-color` / `color-scheme` to stop iOS overscroll white flash
+- Landing: continuous rAF scroll for Dynamics CPU/GPU/RAM chart (sparkline parity)
+
+### Changed
+- Official public product version set to **1.0.0** across Go, PE VersionInfo, Wails, frontend, and docs
+- Download CTA points at `releases/latest/download/pulsecore.exe`
+- Author attribution cleaned to Robert Sharafutdinov (`robbled17`)
+
+
 ## 1.6.5
 
 ### Added
