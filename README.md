@@ -49,8 +49,8 @@ PulseCore is a lightweight Windows hardware desk app: live CPU/GPU/RAM/disk metr
 ### From Releases
 
 1. Download [`pulsecore.exe`](https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe) (or grab the zip from [Releases](https://github.com/robbled17/pulsecore/releases))
-2. Optionally verify SHA256 from the matching `.sha256` asset
-3. Run `pulsecore.exe`
+2. Optionally verify SHA256 from [`SHA256SUMS.txt`](https://github.com/robbled17/pulsecore/releases/latest/download/SHA256SUMS.txt) or the matching `.sha256` asset
+3. Run `pulsecore.exe` (UAC elevation is required for ACPI temps and full SMART)
 
 Requires **Windows 10/11** with **WebView2** (preinstalled on modern Windows).
 

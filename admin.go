@@ -21,8 +21,30 @@ func (a *App) IsElevated() bool {
 	return isProcessElevated()
 }
 
+// ensureElevatedOrRelaunch returns true when the process is already elevated and
+// may continue. When not elevated, it relaunches via ShellExecuteW "runas" and
+// returns false so the caller exits before acquiring the single-instance mutex.
+func ensureElevatedOrRelaunch() bool {
+	if isProcessElevated() {
+		return true
+	}
+	if err := relaunchElevated(); err != nil {
+		println("Elevation required:", err.Error())
+		return false
+	}
+	return false
+}
+
 // RestartAsAdministrator relaunches pulsecore.exe with a UAC elevation prompt, then quits.
 func (a *App) RestartAsAdministrator() error {
+	if err := relaunchElevated(); err != nil {
+		return err
+	}
+	go a.QuitApp()
+	return nil
+}
+
+func relaunchElevated() error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
@@ -62,6 +84,5 @@ func (a *App) RestartAsAdministrator() error {
 		}
 		return fmt.Errorf("ShellExecute runas failed (%d)", r)
 	}
-	go a.QuitApp()
 	return nil
 }

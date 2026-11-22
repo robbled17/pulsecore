@@ -48,7 +48,7 @@ import {
 /** Dev Mode UI is compile-time gated: Vite production (wails build) never ships it. */
 const DEV_MODE_ENABLED = import.meta.env.DEV === true
 
-const MIT_LICENSE = `PulseCore v1.6.4
+const MIT_LICENSE = `PulseCore v1.6.5
 
 MIT License
 
@@ -84,7 +84,7 @@ const chartThemes = {
   battery: { stroke: '#ffd166', glow: 'rgba(255, 209, 102, 0.9)', top: 'rgba(251, 191, 36, 0.45)', bottom: 'rgba(251, 191, 36, 0.04)' },
 }
 
-const APP_VERSION = 'v1.6.4'
+const APP_VERSION = 'v1.6.5'
 const GITHUB_URL = 'https://github.com/robbled17/pulsecore'
 const DEFAULT_EXE_URL = 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe'
 

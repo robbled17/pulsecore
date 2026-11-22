@@ -11,10 +11,10 @@
     "email": ""
   },
   "info": {
-    "companyName": "PulseCore",
+    "companyName": "robbled17",
     "productName": "PulseCore",
-    "productVersion": "1.6.4",
+    "productVersion": "1.6.5",
     "copyright": "Copyright (c) 2026 Robert Sharafutdinov",
-    "comments": "PulseCore: live metrics, Eco Mode, GamePulse. Free & open source."
+    "comments": "PulseCore System Monitor & Utility"
   }
 }

@@ -18,6 +18,7 @@ func TestCompareSemver(t *testing.T) {
 		{"v1.6.2", "v1.6.3", -1},
 		{"1.6.3", "1.6.3", 0},
 		{"v1.6.3", "1.6.3", 0},
+		{"1.6.5", "1.6.4", 1},
 		{"1.6.4", "1.6.3", 1},
 		{"1.7.0", "1.6.9", 1},
 		{"1.6", "1.6.0", 0},
@@ -34,7 +35,7 @@ func TestCompareSemver(t *testing.T) {
 }
 
 func TestNormalizeVersion(t *testing.T) {
-	if got := normalizeVersion(" v1.6.4 "); got != "1.6.4" {
+	if got := normalizeVersion(" v1.6.5 "); got != "1.6.5" {
 		t.Fatalf("normalizeVersion got %q", got)
 	}
 }
@@ -54,7 +55,7 @@ func TestCheckForUpdatesOnline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res := checkForUpdates(context.Background(), "1.6.4", srv.URL, 2*time.Second)
+	res := checkForUpdates(context.Background(), "1.6.5", srv.URL, 2*time.Second)
 	if res.Status != updateStatusAvailable {
 		t.Fatalf("status=%q want %q notes=%q", res.Status, updateStatusAvailable, res.Notes)
 	}
@@ -64,7 +65,7 @@ func TestCheckForUpdatesOnline(t *testing.T) {
 	if res.DownloadURL != "https://example.com/pulsecore.exe" {
 		t.Fatalf("download=%q", res.DownloadURL)
 	}
-	if res.CurrentVersion != "1.6.4" {
+	if res.CurrentVersion != "1.6.5" {
 		t.Fatalf("current=%q", res.CurrentVersion)
 	}
 }
@@ -72,25 +73,25 @@ func TestCheckForUpdatesOnline(t *testing.T) {
 func TestCheckForUpdatesUpToDate(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"tag_name": "v1.6.4",
+			"tag_name": "v1.6.5",
 			"body":     "same",
 			"assets":   []any{},
 		})
 	}))
 	defer srv.Close()
 
-	res := checkForUpdates(context.Background(), "v1.6.4", srv.URL, 2*time.Second)
+	res := checkForUpdates(context.Background(), "v1.6.5", srv.URL, 2*time.Second)
 	if res.Status != updateStatusUpToDate {
 		t.Fatalf("status=%q", res.Status)
 	}
 }
 
 func TestCheckForUpdatesOffline(t *testing.T) {
-	res := checkForUpdates(context.Background(), "1.6.4", "http://127.0.0.1:1/nope", 200*time.Millisecond)
+	res := checkForUpdates(context.Background(), "1.6.5", "http://127.0.0.1:1/nope", 200*time.Millisecond)
 	if res.Status != updateStatusOffline {
 		t.Fatalf("status=%q want offline", res.Status)
 	}
-	if res.CurrentVersion != "1.6.4" {
+	if res.CurrentVersion != "1.6.5" {
 		t.Fatalf("current=%q", res.CurrentVersion)
 	}
 }

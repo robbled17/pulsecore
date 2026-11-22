@@ -4,8 +4,8 @@
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
         <security>
             <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-                <!-- Never request elevation: unsigned GitHub Releases stay asInvoker. -->
-                <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+                <!-- Admin elevation: ACPI temps and full SMART need elevated rights. -->
+                <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
             </requestedPrivileges>
         </security>
     </trustInfo>
