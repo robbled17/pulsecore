@@ -37,13 +37,13 @@ func TestPEInfoVersionAndIdentity(t *testing.T) {
 		t.Fatalf("read wails.json: %v", err)
 	}
 	w := string(wails)
-	if !strings.Contains(w, `"productVersion": "1.0.0"`) {
-		t.Fatal("wails.json productVersion must be 1.0.0")
+	if !strings.Contains(w, `"productVersion": "1.0.1"`) {
+		t.Fatal("wails.json productVersion must be 1.0.1")
 	}
 	if !strings.Contains(w, `"companyName": "robbled17"`) {
 		t.Fatal("wails.json companyName must be robbled17")
 	}
-	if appVersion != "1.0.0" {
-		t.Fatalf("appVersion=%q want 1.0.0", appVersion)
+	if appVersion != "1.0.1" {
+		t.Fatalf("appVersion=%q want 1.0.1", appVersion)
 	}
 }

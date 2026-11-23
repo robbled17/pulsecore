@@ -563,12 +563,16 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
   gap: 8px;
 }
 .metric-temp {
-  font-size: 12px;
-  font-weight: 650;
-  color: #9eb6ff;
+  font-size: 18px;
+  font-weight: 750;
+  color: #6ea8ff;
   white-space: nowrap;
 }
 .metric-temp.hidden { display: none; }
+.metric-card.hidden { display: none !important; }
+.cards:has(.metric-card[data-metric="battery"].hidden) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .section-head h1 {
   font-size: 24px;
   font-weight: 750;
@@ -1806,7 +1810,7 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 .games-carousel-wrapper,
 .games-grid-container {
   height: auto;
-  max-height: min(58vh, 620px);
+  max-height: min(34vh, 260px);
   overflow-x: hidden;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -1827,13 +1831,13 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 
 .game-grid, .games-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 125px));
+  grid-template-columns: repeat(auto-fill, minmax(95px, 110px));
   justify-content: start;
-  gap: 10px;
+  gap: 8px;
 }
 .game-card {
   width: 100%;
-  max-width: 125px;
+  max-width: 110px;
   height: auto;
   min-width: 0;
   display: flex;
@@ -1872,6 +1876,7 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 .game-card img.game-poster {
   width: 100%;
   aspect-ratio: 2 / 3;
+  max-height: 120px;
   height: auto;
   object-fit: cover;
   object-position: center;
@@ -2089,14 +2094,13 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 }
 .minihud-capsule, .gameoverlay-capsule {
   --hud-bg-opacity: 0.78;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-width: min(280px, 100%);
+  width: fit-content;
   max-width: 560px;
-  width: max-content;
-  padding: 14px 14px 14px 16px;
+  padding: 10px 14px;
   border-radius: 20px;
   background: linear-gradient(
     135deg,
@@ -2201,6 +2205,9 @@ html[data-theme="light"] .gameoverlay-capsule {
   background: rgba(110, 168, 255, 0.14) !important;
   color: #ffffff !important;
   box-shadow: 0 0 16px rgba(110, 168, 255, 0.18);
+}
+#go-close {
+  margin-left: 12px;
 }
 body.mini-hud-active, body.game-overlay-active {
   overflow: hidden;

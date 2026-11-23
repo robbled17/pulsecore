@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	appVersion            = "1.0.0"
+	appVersion            = "1.0.1"
 	githubLatestAPI       = "https://api.github.com/repos/robbled17/pulsecore/releases/latest"
 	githubExeDownloadURL  = "https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe"
 	updateCheckTimeout    = 4 * time.Second

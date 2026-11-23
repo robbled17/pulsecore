@@ -326,7 +326,49 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 			vram = smiBytes
 		}
 	}
+	if known := knownDiscreteVRAMBytes(name); known > vram {
+		vram = known
+	}
 	return name, vram, driver
+}
+
+func knownDiscreteVRAMBytes(name string) uint64 {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "2060 super"):
+		return 8 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "2070 super"), strings.Contains(lower, "2070"):
+		return 8 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "2080 super"), strings.Contains(lower, "2080 ti"):
+		if strings.Contains(lower, "ti") {
+			return 11 * 1024 * 1024 * 1024
+		}
+		return 8 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "2080"):
+		return 8 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "3070 ti"), strings.Contains(lower, "3070"):
+		return 8 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "3080 ti"):
+		return 12 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "3080"):
+		return 10 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "3090"):
+		return 24 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "4070 ti"), strings.Contains(lower, "4070"):
+		return 12 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "4080"):
+		return 16 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "4090"):
+		return 24 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "rx 6700 xt"), strings.Contains(lower, "rx 6750 xt"):
+		return 12 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "rx 6800"):
+		return 16 * 1024 * 1024 * 1024
+	case strings.Contains(lower, "rx 7800 xt"), strings.Contains(lower, "rx 7900"):
+		return 16 * 1024 * 1024 * 1024
+	default:
+		return 0
+	}
 }
 
 // readVRAMBytesFromRegistry reads HardwareInformation.qwMemorySize (64-bit) for display adapters.

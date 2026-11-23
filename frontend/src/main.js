@@ -44,12 +44,12 @@ import { i18n } from './i18n.js'
 import {
   initDevMode,
   getDevState,
+  isDevModeActive,
 } from './devMode.js'
 
-/** Dev Mode UI is compile-time gated: Vite production (wails build) never ships it. */
-const DEV_MODE_ENABLED = import.meta.env.DEV === true
+const DEV_MODE_ENABLED = true
 
-const MIT_LICENSE = `PulseCore v1.0.0
+const MIT_LICENSE = `PulseCore v1.0.1
 
 MIT License
 
@@ -216,8 +216,7 @@ async function changeLanguage(next) {
 let activeTabName = 'overview'
 
 function setActiveTab(name) {
-  // Production builds never expose Dev Mode; ignore any stray navigation.
-  if (name === 'dev' && !DEV_MODE_ENABLED) return
+  if (name === 'dev' && !isDevModeActive()) return
   const prev = activeTabName
   activeTabName = name
   document.querySelectorAll('.nav-item').forEach((btn) => {
@@ -801,6 +800,10 @@ function renderOverview(m) {
   $('ov-ram-bar').style.width = `${Math.min(100, safeNum(m.ramPercent, 0))}%`
 
   const bat = m.battery || {}
+  const batCard = document.querySelector('.metric-card[data-metric="battery"]')
+  if (batCard) {
+    batCard.classList.toggle('hidden', !bat.available)
+  }
   if (bat.available) {
     $('ov-bat').textContent = fmtPct(bat.percent, 0)
     const wear = bat.wearLabel ? ` · ${bat.wearLabel}` : ''
@@ -3375,6 +3378,7 @@ function boot() {
   // Production wails build: Dev Mode nav/badge never appear (compile-time flag).
   if (DEV_MODE_ENABLED) {
     initDevMode({
+      openAbout,
       showToast,
       setActiveTab,
       t,
@@ -3432,6 +3436,12 @@ function boot() {
       setChartActive(visible && !document.hidden)
     })
     EventsOn('peripherals:update', (items) => renderPeripherals(items || []))
+  } catch (_) {}
+
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const tabParam = params.get('tab')
+    if (tabParam) setActiveTab(tabParam)
   } catch (_) {}
 }
 

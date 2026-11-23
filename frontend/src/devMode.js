@@ -47,8 +47,10 @@ export function isDevModeActive() {
 export function loadDevState() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    // Never restore Dev Mode badge/nav across sessions - requires About 7-click again.
-    state = { ...DEFAULTS, ...raw, active: false }
+    state = { ...DEFAULTS, ...raw }
+    if (state.active) {
+      setTimeout(() => enableDevModeUI(false), 0)
+    }
   } catch (_) {
     state = { ...DEFAULTS }
   }
@@ -56,9 +58,7 @@ export function loadDevState() {
 }
 
 function persist() {
-  // Persist thresholds/prefs, but keep `active` session-only so production stays clean.
-  const { active, ...rest } = state
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...rest, active: false }))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   hooks.onChange(getDevState())
 }
 
@@ -118,6 +118,8 @@ export function enableDevModeUI(userTrigger = false) {
   persist()
   $('dev-mode-badge')?.classList.remove('hidden')
   document.querySelectorAll('.dev-mode-nav').forEach((n) => n.classList.remove('hidden'))
+  const opt = $('opt-dev-mode')
+  if (opt) opt.checked = true
   syncForm()
   if (userTrigger) {
     hooks.setActiveTab('dev')
@@ -130,11 +132,42 @@ export function disableDevModeUI() {
   persist()
   $('dev-mode-badge')?.classList.add('hidden')
   document.querySelectorAll('.dev-mode-nav').forEach((n) => n.classList.add('hidden'))
+  const opt = $('opt-dev-mode')
+  if (opt) opt.checked = false
   if ($('tab-dev')?.classList.contains('active')) hooks.setActiveTab('overview')
   hooks.showToast(hooks.t('devModeDisabledToast'), false)
 }
 
 function wireVersionClick() {
+  const brandVer = $('brand-ver')
+  if (brandVer) {
+    let brandTimer = null
+    let brandSingleTimer = null
+    let brandClicks = 0
+    brandVer.addEventListener('click', () => {
+      brandClicks += 1
+      if (brandTimer) clearTimeout(brandTimer)
+      brandTimer = setTimeout(() => { brandClicks = 0 }, 3000)
+
+      if (brandClicks >= 5) {
+        brandClicks = 0
+        if (brandSingleTimer) {
+          clearTimeout(brandSingleTimer)
+          brandSingleTimer = null
+        }
+        enableDevModeUI(true)
+      } else {
+        if (brandSingleTimer) clearTimeout(brandSingleTimer)
+        brandSingleTimer = setTimeout(() => {
+          if (brandClicks < 5 && typeof hooks.openAbout === 'function') {
+            hooks.openAbout()
+          }
+          brandClicks = 0
+        }, 350)
+      }
+    })
+  }
+
   const triggers = [$('about-app-ver'), $('about-app-name')].filter(Boolean)
   triggers.forEach((el) => {
     el.style.cursor = 'pointer'
@@ -142,14 +175,22 @@ function wireVersionClick() {
       if (state.active) return
       clearTimeout(versionClickTimer)
       versionClickCount += 1
-      if (versionClickCount >= 4 && versionClickCount < 7) {
-        hooks.showToast(hooks.t('devModeClicksRemaining').replace('{count}', String(7 - versionClickCount)), true)
-      } else if (versionClickCount >= 7) {
+      if (versionClickCount >= 3 && versionClickCount < 5) {
+        hooks.showToast(hooks.t('devModeClicksRemaining').replace('{count}', String(5 - versionClickCount)), true)
+      } else if (versionClickCount >= 5) {
         versionClickCount = 0
         enableDevModeUI(true)
       }
       versionClickTimer = setTimeout(() => { versionClickCount = 0 }, 2500)
     })
+  })
+
+  $('opt-dev-mode')?.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      enableDevModeUI(true)
+    } else {
+      disableDevModeUI()
+    }
   })
 }
 

@@ -2,7 +2,7 @@
   <img src="assets/showcase/logo.png" alt="PulseCore" width="96" height="96" />
 </p>
 
-<h1 align="center">PulseCore v1.0.0</h1>
+<h1 align="center">PulseCore v1.0.1</h1>
 
 <p align="center">
   <strong>See heat. Kill lag. Play smooth.</strong><br/>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/robbled17/pulsecore/releases/tag/v1.0.0"><img alt="Release" src="https://img.shields.io/badge/release-v1.0.0-0b0f19?style=flat-square" /></a>
+  <a href="https://github.com/robbled17/pulsecore/releases/tag/v1.0.1"><img alt="Release" src="https://img.shields.io/badge/release-v1.0.1-0b0f19?style=flat-square" /></a>
   <a href="https://github.com/robbled17/pulsecore/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/robbled17/pulsecore/total?style=flat-square&label=downloads" /></a>
   <a href="#install"><img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=flat-square" /></a>
   <a href="#stack"><img alt="Go + Wails" src="https://img.shields.io/badge/Go%20%2B%20Wails-v2-00ADD8?style=flat-square" /></a>
@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe"><img alt="Download pulsecore.exe" src="https://img.shields.io/badge/Download%20pulsecore.exe-v1.0.0-6ea8ff?style=for-the-badge&logo=windows&logoColor=white" /></a>
+  <a href="https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe"><img alt="Download pulsecore.exe" src="https://img.shields.io/badge/Download%20pulsecore.exe-v1.0.1-6ea8ff?style=for-the-badge&logo=windows&logoColor=white" /></a>
 </p>
 
 <p align="center">

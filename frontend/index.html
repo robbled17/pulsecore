@@ -64,7 +64,7 @@
         <img class="brand-logo" src="./src/assets/logo.svg" alt="PulseCore" />
         <div class="brand-text">
           <div class="brand-name">PulseCore</div>
-          <div class="brand-ver">v1.0.0</div>
+          <div class="brand-ver" id="brand-ver" style="cursor: pointer;" title="About / Dev Mode">v1.0.1</div>
         </div>
       </div>
       <nav class="nav">
@@ -535,11 +535,15 @@
           <div class="update-row">
             <div class="update-current">
               <span class="muted" data-i18n="currentVersion">Текущая версия</span>
-              <b id="settings-app-ver" class="metric">v1.0.0</b>
+              <b id="settings-app-ver" class="metric">v1.0.1</b>
             </div>
             <button type="button" class="btn" id="btn-check-updates-settings" data-i18n="checkUpdates">Проверить обновления</button>
           </div>
           <div id="settings-update-result" class="update-result muted" aria-live="polite"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" data-i18n="devModeTitle">Режим разработчика</div>
+          <label class="check-row"><input type="checkbox" id="opt-dev-mode" /> <span data-i18n="devModeToggle">Включить режим разработчика (Dev Mode)</span></label>
         </div>
       </section>
 
@@ -638,7 +642,7 @@
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-card">
       <div class="modal-head">
-        <h2 id="modal-title" data-i18n="diskHealthTitle">S.M.A.R.T.</h2>
+        <h2 id="modal-title" data-i18n="diskHealthTitle">Здоровье диска</h2>
         <div class="modal-head-actions">
           <button type="button" class="btn compact" id="modal-smart-refresh" title="Refresh">⟳ <span data-i18n="refresh">Обновить</span></button>
           <button type="button" class="win-btn" id="modal-close">✕</button>
@@ -658,7 +662,7 @@
       <div class="modal-body about-body">
         <div class="about-brand">
           <div class="about-app" id="about-app-name">PulseCore</div>
-          <div class="about-ver" id="about-app-ver">v1.0.0</div>
+          <div class="about-ver" id="about-app-ver">v1.0.1</div>
         </div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: <span data-i18n="aboutFOSS">Свободное ПО с открытым исходным кодом</span></div>
