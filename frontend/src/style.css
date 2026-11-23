@@ -2,12 +2,14 @@
 
 :root {
   --bg: #05070f;
-  /* Monolithic shell fill shared by sidebar + right work area (gaps show this). */
-  --window-bg: #080c14;
+  /* Fallback only; painted volume lives on .ambient (one full-window layer). */
+  --window-bg: #05070f;
   --bg-elevated: rgba(14, 18, 32, 0.66);
-  --card: rgba(18, 24, 42, 0.58);
-  --card-2: rgba(26, 34, 56, 0.62);
+  --card: rgba(13, 20, 36, 0.72);
+  --card-2: rgba(18, 28, 48, 0.78);
   --glass: rgba(255, 255, 255, 0.055);
+  --glass-fill: rgba(13, 20, 36, 0.72);
+  --glass-border: rgba(96, 165, 250, 0.14);
   --line: rgba(160, 190, 255, 0.14);
   --line-soft: rgba(180, 210, 255, 0.28);
   --text: #f7f9ff;
@@ -21,9 +23,9 @@
   --nav-active: rgba(110, 168, 255, 0.18);
   --radius: 16px;
   --radius-sm: 10px;
-  /* Inset-only capsule edge: outer drop shadows darken 10px gaps off --window-bg. */
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-  --shadow-soft: none;
+  /* Soft depth OK: gaps show continuous ambient, not a flat plate. */
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.32), 0 0 18px rgba(110, 168, 255, 0.05);
   --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --strip-h: 56px;
   --blur: blur(22px) saturate(165%);
@@ -36,9 +38,11 @@ html[data-theme="light"] {
   --bg: #f3f5f9;
   --window-bg: #eef2f8;
   --bg-elevated: rgba(252, 253, 255, 0.72);
-  --card: rgba(255, 255, 255, 0.62);
+  --card: rgba(255, 255, 255, 0.72);
   --card-2: rgba(248, 250, 253, 0.78);
   --glass: rgba(255, 255, 255, 0.48);
+  --glass-fill: rgba(252, 253, 255, 0.72);
+  --glass-border: rgba(96, 165, 250, 0.22);
   --line: rgba(15, 40, 80, 0.08);
   --line-soft: rgba(40, 90, 180, 0.16);
   --text: #1a2336;
@@ -47,8 +51,8 @@ html[data-theme="light"] {
   --accent-2: #6366f1;
   --accent-3: #0d9488;
   --nav-active: rgba(59, 130, 246, 0.12);
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  --shadow-soft: none;
+  --shadow: 0 8px 22px rgba(30, 50, 90, 0.08), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --shadow-soft: 0 6px 16px rgba(30, 50, 90, 0.06), 0 0 14px rgba(59, 130, 246, 0.04);
   --blur: blur(28px) saturate(140%);
 }
 
@@ -60,10 +64,8 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
   overflow-y: hidden;
-  /* Solid opaque window fill (no blue gradient underlay under card gaps). */
+  /* Dark fallback; volumetric paint is the fixed .ambient layer. */
   background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
   color: var(--text);
   font-family: var(--font);
   font-size: 13.5px;
@@ -73,17 +75,27 @@ html, body {
 }
 html[data-theme="light"], html[data-theme="light"] body {
   background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
 }
 
-/* Soft ambient aurora: parallax spots (blur ≥120px, muted opacity) */
+/* One continuous full-window layer: deep blue volume + soft radial accents + mouse parallax spots. */
 .ambient {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(90, 150, 255, 0.2), transparent 58%),
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(61, 231, 200, 0.12), transparent 55%),
+    radial-gradient(ellipse 65% 50% at 72% 88%, rgba(100, 130, 255, 0.14), transparent 58%),
+    linear-gradient(180deg, #080d18 0%, #05070f 52%, #04060c 100%);
+}
+html[data-theme="light"] .ambient {
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 12%, rgba(59, 130, 246, 0.16), transparent 58%),
+    radial-gradient(ellipse 55% 45% at 88% 18%, rgba(13, 148, 136, 0.1), transparent 55%),
+    radial-gradient(ellipse 65% 50% at 72% 88%, rgba(99, 102, 241, 0.1), transparent 58%),
+    linear-gradient(180deg, #f7f9fc 0%, #eef2f8 55%, #e8edf5 100%);
 }
 .ambient-spot {
   position: absolute;
@@ -250,16 +262,12 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
   overflow-x: hidden;
   min-width: 0;
   box-sizing: border-box;
-  background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
+  background: transparent;
 }
 .sidebar {
-  border-right: 1px solid var(--line);
-  /* Opaque solid matching .content so the shell reads as one window. */
-  background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
+  /* Translucent glass over the shared ambient layer (no heavy list blur). */
+  border-right: 1px solid var(--glass-border);
+  background: var(--glass-fill);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   padding: 18px 14px 22px;
@@ -354,8 +362,9 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 }
 .btn-about:hover { color: var(--text); border-color: var(--line-soft); }
 
-/* Intermediate section wrappers: chrome-free so only real capsules
-   (.panel / .metric-card / …) sit on the shared window background. */
+/* Tab/section/card wrappers stay chrome-free so gaps show the shared ambient layer. */
+main.content,
+.content,
 .main-content,
 .page-container,
 .tab-panel,
@@ -387,16 +396,6 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 #tab-dev {
   background: transparent;
   background-color: transparent;
-  background-image: none;
-  border: none;
-  box-shadow: none;
-}
-
-/* Right work area: same opaque solid as .sidebar (blocks body gradient + ambient). */
-main.content,
-.content {
-  background: var(--window-bg);
-  background-color: var(--window-bg);
   background-image: none;
   border: none;
   box-shadow: none;
@@ -539,7 +538,7 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
 .tab.active {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 0;
   animation: fadeIn 0.22s ease;
 }
@@ -584,10 +583,10 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-height: var(--strip-h);
   margin-bottom: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
-  /* Opaque like .panel so gaps show page bg, not stacked glass. */
-  background: linear-gradient(165deg, #1b2438, #121826);
+  /* Glass capsule over shared ambient (no backdrop-filter on large strips). */
+  background: var(--glass-fill);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -811,7 +810,7 @@ html[data-theme="light"] .insight-body { color: #92400e; }
 .cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 0;
   padding: 0;
 }
@@ -824,13 +823,14 @@ html[data-theme="light"] .insight-body { color: #92400e; }
   .metric-card { min-height: 148px; }
 }
 .metric-card, .panel {
-  /* Opaque card fill so gaps between panels show solid app background, not nested glass strips. */
-  background: linear-gradient(165deg, #1b2438, #121826);
-  border: 1px solid var(--line);
+  /* Glass capsules over shared ambient. No backdrop-filter on large cards/lists (CPU). */
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  /* No backdrop-filter on large cards/lists: WebView2 blur is costly on weak laptops. */
 }
+html[data-theme="light"] main.content,
+html[data-theme="light"] .content,
 html[data-theme="light"] .main-content,
 html[data-theme="light"] .page-container,
 html[data-theme="light"] .tab-panel,
@@ -866,19 +866,12 @@ html[data-theme="light"] #tab-dev {
   border: none;
   box-shadow: none;
 }
-html[data-theme="light"] main.content,
-html[data-theme="light"] .content,
-html[data-theme="light"] .sidebar {
-  background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
-}
+html[data-theme="light"] .sidebar,
 html[data-theme="light"] .metric-card,
 html[data-theme="light"] .panel,
 html[data-theme="light"] .status-strip {
-  /* Opaque light cards so gaps show the shared window background, not stacked glass. */
-  background: linear-gradient(165deg, #f8fbff, #eef3fa);
-  border-color: var(--line-soft);
+  background: var(--glass-fill);
+  border-color: var(--glass-border);
 }
 .metric-card {
   padding: 16px 16px 14px;
@@ -1044,7 +1037,7 @@ html[data-theme="light"] .bar { background: rgba(15,23,42,0.08); }
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
 }
@@ -1845,8 +1838,8 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--line);
-  background: #151b2b;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
   border-radius: 12px;
   padding: 0;
   cursor: pointer;
@@ -2211,10 +2204,8 @@ html[data-theme="light"] .gameoverlay-capsule {
 }
 body.mini-hud-active, body.game-overlay-active {
   overflow: hidden;
-  /* Solid window fill; ambient spots still provide soft aurora behind HUD */
-  background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
+  /* Ambient layer still paints volumetric aurora behind HUD */
+  background: transparent;
 }
 body.mini-hud-active .titlebar, body.mini-hud-active .shell,
 body.game-overlay-active .titlebar, body.game-overlay-active .shell { display: none !important; }
@@ -2460,7 +2451,7 @@ html[data-theme="light"] .nav-item { color: #3b4660; }
 html[data-theme="light"] .nav-item:hover,
 html[data-theme="light"] .nav-item.active { color: #152038; }
 html[data-theme="light"] .status-strip {
-  background: linear-gradient(165deg, #f8fbff, #eef3fa);
+  background: var(--glass-fill);
 }
 html[data-theme="light"] .status-label { color: #64748b; }
 html[data-theme="light"] .status-value { color: #152038; }
@@ -2472,9 +2463,7 @@ html[data-theme="light"] .modal-card {
 }
 html[data-theme="light"] body.mini-hud-active,
 html[data-theme="light"] body.game-overlay-active {
-  background: var(--window-bg);
-  background-color: var(--window-bg);
-  background-image: none;
+  background: transparent;
 }
 
 @keyframes fadeIn {
