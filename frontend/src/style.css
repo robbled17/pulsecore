@@ -2,6 +2,8 @@
 
 :root {
   --bg: #05070f;
+  /* Monolithic shell fill shared by sidebar + right work area (gaps show this). */
+  --window-bg: #080c14;
   --bg-elevated: rgba(14, 18, 32, 0.66);
   --card: rgba(18, 24, 42, 0.58);
   --card-2: rgba(26, 34, 56, 0.62);
@@ -19,9 +21,9 @@
   --nav-active: rgba(110, 168, 255, 0.18);
   --radius: 16px;
   --radius-sm: 10px;
-  /* Drop the 0 0 0 1px outline ring: with border it reads as a second outer shell. */
-  --shadow: 0 10px 28px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  --shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.32), 0 0 18px rgba(110, 168, 255, 0.05);
+  /* Compact shadow so 10px gaps stay near --window-bg (no blue bloom into gaps). */
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-soft: 0 4px 10px rgba(0, 0, 0, 0.28);
   --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --strip-h: 56px;
   --blur: blur(22px) saturate(165%);
@@ -32,6 +34,7 @@
 html[data-theme="light"] {
   /* Windows 11 Mica Light */
   --bg: #f3f5f9;
+  --window-bg: #eef2f8;
   --bg-elevated: rgba(252, 253, 255, 0.72);
   --card: rgba(255, 255, 255, 0.62);
   --card-2: rgba(248, 250, 253, 0.78);
@@ -245,9 +248,12 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 }
 .sidebar {
   border-right: 1px solid var(--line);
-  background: var(--bg-elevated);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
+  /* Opaque solid matching .content so the shell reads as one window. */
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 18px 14px 22px;
   display: flex;
   flex-direction: column;
@@ -340,10 +346,8 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 }
 .btn-about:hover { color: var(--text); border-color: var(--line-soft); }
 
-/* Right work area + intermediate section wrappers: chrome-free so only
-   real capsules (.panel / .metric-card / …) sit on the page background. */
-main.content,
-.content,
+/* Intermediate section wrappers: chrome-free so only real capsules
+   (.panel / .metric-card / …) sit on the shared window background. */
 .main-content,
 .page-container,
 .tab-panel,
@@ -375,6 +379,16 @@ main.content,
 #tab-dev {
   background: transparent;
   background-color: transparent;
+  background-image: none;
+  border: none;
+  box-shadow: none;
+}
+
+/* Right work area: same opaque solid as .sidebar (blocks body gradient + ambient). */
+main.content,
+.content {
+  background: var(--window-bg);
+  background-color: var(--window-bg);
   background-image: none;
   border: none;
   box-shadow: none;
@@ -517,7 +531,7 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
 .tab.active {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   padding: 0;
   animation: fadeIn 0.22s ease;
 }
@@ -789,7 +803,7 @@ html[data-theme="light"] .insight-body { color: #92400e; }
 .cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
   margin-bottom: 0;
   padding: 0;
 }
@@ -809,8 +823,6 @@ html[data-theme="light"] .insight-body { color: #92400e; }
   box-shadow: var(--shadow);
   /* No backdrop-filter on large cards/lists: WebView2 blur is costly on weak laptops. */
 }
-html[data-theme="light"] main.content,
-html[data-theme="light"] .content,
 html[data-theme="light"] .main-content,
 html[data-theme="light"] .page-container,
 html[data-theme="light"] .tab-panel,
@@ -845,6 +857,13 @@ html[data-theme="light"] #tab-dev {
   background-image: none;
   border: none;
   box-shadow: none;
+}
+html[data-theme="light"] main.content,
+html[data-theme="light"] .content,
+html[data-theme="light"] .sidebar {
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
 }
 html[data-theme="light"] .metric-card,
 html[data-theme="light"] .panel,
@@ -1017,7 +1036,7 @@ html[data-theme="light"] .bar { background: rgba(15,23,42,0.08); }
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 10px;
   margin: 0;
   padding: 0;
 }
