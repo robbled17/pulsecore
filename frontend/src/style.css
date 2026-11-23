@@ -339,6 +339,26 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
 }
 .btn-about:hover { color: var(--text); border-color: var(--line-soft); }
 
+/* Right work area: no local fill so gaps between capsules match body / sidebar. */
+main.content,
+.content,
+.main-content,
+.page-container,
+.tab-panel,
+.tab,
+#tab-overview,
+#tab-lag,
+#tab-hardware,
+#tab-upgrade,
+#tab-uninstall,
+#tab-gamelab,
+#tab-settings,
+#tab-dev {
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+}
+
 .content {
   overflow-x: hidden;
   overflow-y: auto;
@@ -761,18 +781,28 @@ html[data-theme="light"] .insight-body { color: #92400e; }
   box-shadow: var(--shadow);
   /* No backdrop-filter on large cards/lists: WebView2 blur is costly on weak laptops. */
 }
-#tab-overview,
-#tab-lag,
-#tab-hardware,
-#tab-upgrade,
-#tab-uninstall,
-#tab-gamelab,
-#tab-settings {
+html[data-theme="light"] main.content,
+html[data-theme="light"] .content,
+html[data-theme="light"] .main-content,
+html[data-theme="light"] .page-container,
+html[data-theme="light"] .tab-panel,
+html[data-theme="light"] .tab,
+html[data-theme="light"] #tab-overview,
+html[data-theme="light"] #tab-lag,
+html[data-theme="light"] #tab-hardware,
+html[data-theme="light"] #tab-upgrade,
+html[data-theme="light"] #tab-uninstall,
+html[data-theme="light"] #tab-gamelab,
+html[data-theme="light"] #tab-settings,
+html[data-theme="light"] #tab-dev {
   background: transparent;
+  background-color: transparent;
+  background-image: none;
 }
 html[data-theme="light"] .metric-card,
 html[data-theme="light"] .panel {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.72), rgba(244, 248, 255, 0.58));
+  /* Opaque light cards so gaps show the shared window background, not stacked glass. */
+  background: linear-gradient(165deg, #f8fbff, #eef3fa);
   border-color: var(--line-soft);
 }
 .metric-card {

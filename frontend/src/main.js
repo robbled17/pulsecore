@@ -2816,7 +2816,7 @@ async function refreshTraceList() {
       <div class="row">
         <div class="row-main">
           <b>${escapeHtml(tr.appName || tr.appId)}</b>
-          <span class="muted">${escapeHtml(tr.finishedAt || tr.createdAt || '')} · keys ${tr.newKeys || 0} · dirs ${tr.newDirs || 0}</span>
+          <span class="muted">${escapeHtml(formatDiagTime(tr.finishedAt || tr.createdAt || ''))} · keys ${tr.newKeys || 0} · dirs ${tr.newDirs || 0}</span>
         </div>
         <button type="button" class="btn compact danger" data-trace-id="${escapeHtml(tr.appId)}">${t('traceCleanup')}</button>
       </div>`).join('')
