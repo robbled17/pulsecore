@@ -12,6 +12,10 @@
 - Download CTA points at `releases/latest/download/pulsecore.exe`
 - Author attribution cleaned to Robert Sharafutdinov (`robbled17`)
 
+### Fixed (silent audit)
+- Production builds ignore `setActiveTab('dev')` and clear any Dev Mode active state at boot
+- Release workflow sets `overwrite_files` / `make_latest` so a force-moved `v1.0.0` tag replaces assets cleanly
+
 
 ## 1.6.5
 
