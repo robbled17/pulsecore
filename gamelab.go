@@ -141,10 +141,10 @@ var gameRequirements = map[string]gameReqSet{
 		Heavy: true,
 	},
 	"rdr2": {
-		Low:   gameReq{50, 48, 36, 3},
-		Med:   gameReq{50, 62, 46, 5},
-		High:  gameReq{55, 72, 55, 8},
-		Ultra: gameReq{52, 85, 65, 10},
+		Low:   gameReq{60, 46, 36, 4},
+		Med:   gameReq{54, 58, 48, 6},
+		High:  gameReq{48, 68, 55, 8},
+		Ultra: gameReq{38, 78, 65, 8},
 		Heavy: true,
 	},
 	"gtav": {
@@ -1386,14 +1386,20 @@ func calcGPUPowerScore(name string, integrated bool, vramGB float64) float64 {
 		score = 68
 	case strings.Contains(n, "3060"):
 		score = 60
-	case strings.Contains(n, "2060 super"):
-		score = 72
-	case strings.Contains(n, "2070 super"):
-		score = 62
+	case strings.Contains(n, "2080 ti"):
+		score = 82
+	case strings.Contains(n, "2080 super"):
+		score = 78
 	case strings.Contains(n, "2080"):
-		score = 68
+		score = 75
+	case strings.Contains(n, "2070 super"):
+		score = 73
+	case strings.Contains(n, "2070"):
+		score = 66
+	case strings.Contains(n, "2060 super"):
+		score = 71
 	case strings.Contains(n, "2060"):
-		score = 50
+		score = 56
 	case strings.Contains(n, "1660"):
 		score = 42
 	case strings.Contains(n, "1650"):

@@ -255,7 +255,7 @@ import {
   driveLetter as diskDriveLetter,
 } from './disks/renderDisks.js'
 
-const MIT_LICENSE = `PulseCore v1.1.0
+const MIT_LICENSE = `PulseCore v1.0.1
 
 MIT License
 
@@ -982,6 +982,60 @@ async function changeLanguage(next) {
   refreshPeripherals()
 }
 
+function renderDevMetrics(m) {
+  if (!m) return
+  const setTxt = (id, v) => { const el = $(id); if (el) el.textContent = v }
+  const hw = m.hardware || {}
+  const gpu = hw.gpu || {}
+  const ram = hw.ram || {}
+
+  const cpuTemp = (m.temperatureAvailable && Number(m.temperatureC) > 0)
+    ? `${fmt(m.temperatureC, 0)} °C (${m.temperatureSourceLabelRu || m.temperatureSource || 'HW'})`
+    : 'N/A'
+  setTxt('dev-cpu-temp', cpuTemp)
+
+  const gpuTemp = (m.gpuTemperatureAvailable && Number(m.gpuTemperatureC) > 0) ? `${fmt(m.gpuTemperatureC, 0)} °C` : 'N/A'
+  const gpuPower = (m.gpuPowerAvailable && Number(m.gpuPowerW) > 0) ? ` · ${fmt(m.gpuPowerW, 0)} W` : ''
+  setTxt('dev-gpu-temp', `${gpuTemp}${gpuPower}`)
+
+  const vramUsed = Number(m.vramUsedMB) || 0
+  const vramTotal = Number(m.vramTotalMB) || Number(gpu.dedicatedMB) || 0
+  const vramLine = vramTotal > 0 ? `${formatVRAM(vramUsed)} / ${formatVRAM(vramTotal)}` : 'N/A'
+  setTxt('dev-vram', vramLine)
+
+  const ramSpeed = ram.speedMHz ? `${ram.speedMHz} MHz` : ''
+  const ramChan = ram.channelMode || (ram.slotsUsed > 1 ? 'Dual Channel' : 'Single Channel')
+  setTxt('dev-ram', `${ramChan} ${ramSpeed ? '· ' + ramSpeed : ''}`)
+
+  const rawEl = $('dev-raw-json')
+  if (rawEl && !rawEl.dataset.paused) {
+    try {
+      rawEl.textContent = JSON.stringify(m, null, 2)
+    } catch (_) {}
+  }
+}
+
+function toggleDevMode(enabled) {
+  const isEnabled = enabled !== undefined ? enabled : !window.__devMode
+  window.__devMode = isEnabled
+  try { localStorage.setItem('pulsecore_dev_mode', isEnabled ? 'true' : 'false') } catch (_) {}
+  const navDev = $('nav-dev')
+  if (navDev) navDev.classList.toggle('hidden', !isEnabled)
+  const opt = $('opt-dev-mode')
+  if (opt) opt.checked = isEnabled
+  const msg = isEnabled ? t('devModeEnabled') : t('devModeDisabled')
+  showToast(msg, true)
+  if (isEnabled) {
+    setActiveTab('dev')
+    if (lastMetrics) renderDevMetrics(lastMetrics)
+  } else {
+    const devTab = $('tab-dev')
+    if (devTab?.classList.contains('active')) {
+      setActiveTab('home')
+    }
+  }
+}
+
 function setActiveTab(name) {
   let target = String(name || 'home')
   if (target === 'gamepulse') target = 'games'
@@ -993,6 +1047,9 @@ function setActiveTab(name) {
     const on = tab.id === `tab-${target}`
     tab.classList.toggle('active', on)
   })
+  if (target === 'dev') {
+    if (lastMetrics) renderDevMetrics(lastMetrics)
+  }
   // Collectors: home needs overview+hardware metrics
   const backendTab = target === 'home' ? 'overview' : target
   if (target === 'home') {
@@ -1191,7 +1248,7 @@ async function renderHome() {
         <div class="problem-actions home-prepare-actions">${prep}</div>
       </div>`
     } else {
-      // Update Eco/power pills only — keep indeterminate prepare progress intact.
+      // Update Eco/power pills only - keep indeterminate prepare progress intact.
       const ecoHost = findings.querySelector('.home-eco-status')
       if (ecoHost) {
         ecoHost.dataset.ecoCount = String(ecoN)
@@ -1941,7 +1998,7 @@ function renderOverview(m) {
   const gpuTemp = (m.gpuTemperatureAvailable && Number(m.gpuTemperatureC) > 0)
     ? `${fmt(m.gpuTemperatureC, 0)}°C`
     : ''
-  setTxt('ov-gpu-sum', joinSummary([`${fmt(m.gpuPercent)}%`, vramLine, gpuTemp]))
+  setTxt('ov-gpu-sum', joinSummary([`${fmt(m.gpuPercent)}%`, gpuTemp, vramLine]))
   setTxt('ov-gpu-sub', m.gpuName || '')
   setW('ov-gpu-bar', m.gpuPercent)
 
@@ -1957,6 +2014,11 @@ function renderOverview(m) {
   const modeKey = { silent: silentModeKey(), balanced: 'modeBalanced', turbo: 'modeTurbo' }
   const modeLabel = t(modeKey[m.powerMode] || 'modeBalanced')
   const bat = m.battery || {}
+  const hasBattery = !!(bat.available || hw.power?.hasBattery)
+  const pwrTile = $('tile-power')
+  if (pwrTile) {
+    pwrTile.classList.toggle('hidden', !hasBattery)
+  }
   setTxt('ov-bat-sum', modeLabel)
   if (bat.available) {
     setTxt('ov-bat', `${fmt(bat.percent, 0)}%`)
@@ -1966,6 +2028,9 @@ function renderOverview(m) {
     setTxt('ov-bat', modeLabel)
     setTxt('ov-bat-sub', bat.wearLabel || t('desktopPC'))
     setW('ov-bat-bar', 100)
+  }
+  if (window.__devMode) {
+    try { renderDevMetrics(m) } catch (_) {}
   }
 
   const chip = $('temp-chip')
@@ -2216,7 +2281,7 @@ async function renderLagIncidents() {
       const culprit = top?.culprit === 'many_processes' ? t('manyProcesses') : (top?.culprit || t('unknownProc'))
       liveCard.className = 'lag-live-card warn'
       liveCard.innerHTML = `
-        <div class="lag-live-title">${escapeHtml(top?.time || '')} — ${escapeHtml(top?.verdictText || t('lagMicrofreeze'))}</div>
+        <div class="lag-live-title">${escapeHtml(top?.time || '')} - ${escapeHtml(top?.verdictText || t('lagMicrofreeze'))}</div>
         <div class="lag-live-meta">${t('culprit')}: ${escapeHtml(culprit)}</div>`
     }
   }
@@ -2296,7 +2361,7 @@ async function openMonitorsModal(preselectDevice = '', preferHz = 0) {
       const on = Number(hz) === Number(selectedHz)
       const cur = Number(hz) === Number(d.currentHz)
       return `<button type="button" class="hz-chip ${on ? 'active' : ''} ${cur ? 'current' : ''}" data-hz="${hz}">${hz} ${t('unitsHz')}</button>`
-    }).join('') || `<span class="meta">${d.currentHz || '—'} ${t('unitsHz')}</span>`
+    }).join('') || `<span class="meta">${d.currentHz || '-'} ${t('unitsHz')}</span>`
     const warn = d.needsAttention
       ? `<div class="mon-warn">${t('monitorsUnderclocked', { cur: d.currentHz, max: d.maxHz || d.maxSupportedHz })}</div>`
       : ''
@@ -2306,7 +2371,7 @@ async function openMonitorsModal(preselectDevice = '', preferHz = 0) {
           <div class="mon-name">${escapeHtml(name)}</div>
           <div class="mon-role">${escapeHtml(role)}</div>
         </div>
-        <div class="mon-meta">${d.currentWidth || d.width || '?'}×${d.currentHeight || d.height || '?'} · ${d.currentHz || '—'} ${t('unitsHz')}</div>
+        <div class="mon-meta">${d.currentWidth || d.width || '?'}×${d.currentHeight || d.height || '?'} · ${d.currentHz || '-'} ${t('unitsHz')}</div>
         ${warn}
         <div class="hz-chip-row">${chips}</div>
         <button type="button" class="btn primary compact mon-test-btn">${t('monitorsTestHz')}</button>
@@ -4556,7 +4621,7 @@ function renderGameGrid() {
   }
   const ids = list.map((g) => g?.id).filter(Boolean)
   const sig = `${ids.join('|')}::${gameSort}|${gameGenre}|${gameReqFit}|${q}`
-  // Same catalog membership: update selection classes only — never rebuild posters mid-scroll.
+  // Same catalog membership: update selection classes only - never rebuild posters mid-scroll.
   if (host.dataset.gridSig === sig && host.querySelector('.game-card')) {
     const want = String(selectedGameId || '')
     host.querySelectorAll('.game-card').forEach((card) => {
@@ -4653,7 +4718,7 @@ function getGameInitials(rawTitle) {
   const clean = String(rawTitle || '')
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
-    .replace(/[:\-–—_]/g, ' ')
+    .replace(/[:\-_]/g, ' ')
     .trim()
   const stopWords = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'for', 'to', 'on', 'at'])
   const words = clean.split(/\s+/).filter((w) => w && !stopWords.has(w.toLowerCase()))
@@ -4785,7 +4850,7 @@ async function selectGame(gameId) {
   }
   gamePanelLastFocus = document.activeElement
   selectedGameId = id
-  // Selection is class-only — never rebuild the catalog grid.
+  // Selection is class-only - never rebuild the catalog grid.
   document.querySelectorAll('.game-card').forEach((card) => {
     const on = card.dataset.game === id
     card.classList.toggle('selected', on)
@@ -5110,6 +5175,28 @@ async function predictSelectedGame() {
           <button type="button" class="btn compact btn-game-panel-close" id="btn-game-panel-close" aria-label="${t('gameClosePanel')}">✕</button>
         </div>
       </div>
+      <div class="fps-grid">
+        <div class="fps-tile ${p.recommend === 'low' ? 'rec' : ''}">
+          <div class="q">${t('presetLow')}</div>
+          <div class="v">${escapeHtml(p.lowRange || String(p.lowAvg || '-'))}</div>
+          <div class="u">FPS</div>
+        </div>
+        <div class="fps-tile ${p.recommend === 'med' ? 'rec' : ''}">
+          <div class="q">${t('presetMed')}</div>
+          <div class="v">${escapeHtml(p.medRange || String(p.medAvg || '-'))}</div>
+          <div class="u">FPS</div>
+        </div>
+        <div class="fps-tile ${p.recommend === 'high' ? 'rec' : ''}">
+          <div class="q">${t('presetHigh')}</div>
+          <div class="v">${escapeHtml(p.highRange || String(p.highAvg || '-'))}</div>
+          <div class="u">FPS</div>
+        </div>
+        <div class="fps-tile ${p.recommend === 'ultra' ? 'rec' : ''}">
+          <div class="q">${t('presetUltra')}</div>
+          <div class="v">${escapeHtml(p.ultraRange || String(p.ultraAvg || '-'))}</div>
+          <div class="u">FPS</div>
+        </div>
+      </div>
     `
     $('btn-game-panel-close')?.addEventListener('click', () => {
       selectedGameId = null
@@ -5153,7 +5240,7 @@ function closeAbout() {
 }
 
 function showToast(text, ok = false, opts = {}) {
-  // Toasts belong to the main shell only — never over Mini-HUD / game overlay.
+  // Toasts belong to the main shell only - never over Mini-HUD / game overlay.
   if (hudEnabled || gameOverlayOn || document.body.classList.contains('mini-hud-active') || document.body.classList.contains('game-overlay-active')) {
     return
   }
@@ -5438,7 +5525,7 @@ async function renderDiskCleanBody() {
 }
 
 function formatAppSize(bytes, label) {
-  if (label && label !== '—') return label
+  if (label && label !== '-') return label
   return formatCleanupSize(bytes)
 }
 
@@ -5466,7 +5553,7 @@ function bindDiskCleanAppActions(body) {
       const pathHint = app?.installLocation || ''
       const ok = await glassConfirm({
         title: t('diskCleanDeleteTitle', { name }),
-        body: t('diskCleanDeleteBody', { size: sizeLabel, path: pathHint || '—' }),
+        body: t('diskCleanDeleteBody', { size: sizeLabel, path: pathHint || '-' }),
         confirmLabel: t('confirmDeleteForever'),
         danger: true,
       })
@@ -6426,7 +6513,7 @@ async function applySmartFixFromUI() {
   let res
   try {
     // If cleanup cats chosen, call ApplyDiskCleanup path through ApplySmartFix with step id;
-    // backend uses scenario ActionArg — override by calling ApplyDiskCleanup first when only cats matter.
+    // backend uses scenario ActionArg - override by calling ApplyDiskCleanup first when only cats matter.
     if (window.__sfCleanupCats?.length && cleanupStepId) {
       // Patch: apply cleanup with selected cats, then other steps without cleanup_safe
       const otherIds = ids.filter((id) => id !== cleanupStepId)
@@ -7406,6 +7493,52 @@ function wireUI() {
     if (ev.target.id === 'about-modal') closeAbout()
   })
 
+  // Version click: single click -> About, 5 clicks within 3.5s -> Dev Mode
+  let brandClickCount = 0
+  let brandClickTimeout = null
+
+  function handleBrandVerClick() {
+    brandClickCount++
+    if (brandClickTimeout) clearTimeout(brandClickTimeout)
+
+    if (brandClickCount >= 5) {
+      brandClickCount = 0
+      closeAbout()
+      toggleDevMode(true)
+      return
+    }
+
+    brandClickTimeout = setTimeout(() => {
+      if (brandClickCount === 1) {
+        openAbout()
+      }
+      brandClickCount = 0
+    }, 350)
+  }
+
+  $('brand-ver')?.addEventListener('click', handleBrandVerClick)
+  $('about-app-name')?.addEventListener('click', handleBrandVerClick)
+  $('opt-dev-mode')?.addEventListener('change', (ev) => {
+    toggleDevMode(!!ev.target.checked)
+  })
+  $('btn-dev-copy-json')?.addEventListener('click', () => {
+    const raw = $('dev-raw-json')?.textContent || ''
+    if (raw && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(raw).then(() => {
+        showToast(t('devJsonCopied'), true)
+      }).catch(() => {})
+    }
+  })
+
+  try {
+    if (localStorage.getItem('pulsecore_dev_mode') === 'true') {
+      window.__devMode = true
+      $('nav-dev')?.classList.remove('hidden')
+      const opt = $('opt-dev-mode')
+      if (opt) opt.checked = true
+    }
+  } catch (_) {}
+
   $('btn-smart-fix')?.addEventListener('click', () => { openSmartFixPlan().catch(() => {}) })
   $('smartfix-close')?.addEventListener('click', closeSmartFixModal)
   $('diskclean-close')?.addEventListener('click', closeDiskCleanModal)
@@ -7568,7 +7701,14 @@ function wireUI() {
     }
   }).catch(() => {})
   $('ov-disks')?.addEventListener('click', async (ev) => {
-    const btn = ev.target.closest('.disk-expand-btn')
+    if (ev.target.closest('.disk-card-details')) return
+    let btn = ev.target.closest('.disk-expand-btn')
+    if (!btn) {
+      const top = ev.target.closest('.disk-card-top') || ev.target.closest('.disk-card')
+      if (top) {
+        btn = top.querySelector('.disk-expand-btn')
+      }
+    }
     if (!btn || btn.disabled) return
     const letter = btn.getAttribute('data-drive') || ''
     const details = document.querySelector(`[data-drive-details="${letter}"]`)

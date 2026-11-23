@@ -162,8 +162,8 @@ func TestApplyDiskSMARTHealthFactorLowHealth(t *testing.T) {
 			if d.ActionID != "open_smart" {
 				t.Fatalf("expected ActionID open_smart, got %s", d.ActionID)
 			}
-			if d.ActionLabelRu != "S.M.A.R.T." {
-				t.Fatalf("expected ActionLabelRu S.M.A.R.T., got %s", d.ActionLabelRu)
+			if d.ActionLabelRu != "Проверить здоровье диска" {
+				t.Fatalf("expected ActionLabelRu 'Проверить здоровье диска', got %s", d.ActionLabelRu)
 			}
 		}
 	}

@@ -1,15 +1,15 @@
-# PulseCore v2.0
+# PulseCore v1.0.1
 
 Lightweight Windows hardware intelligence desk app built with **Go + Wails v2 + Vanilla JS**.
 
 ## Features
 
-1. **Lag Spotter** — micro-freeze detection with culprit process + core ID  
-2. **Ghost Hunter** — background vampire index with soft freeze (`NtSuspendProcess`)  
-3. **Smart Turbo & Thermal Control** — Silent / Balanced / Full Throttle via `powercfg`  
-4. **VRAM & 3D Engine Inspector** — dedicated/shared VRAM without heavy SDKs  
-5. **Floating Mini-HUD** — always-on-top 240×55 overlay  
-6. **Emergency Hardware Alarm** — thermal toast + `MessageBeep`
+1. **Lag Spotter** - micro-freeze detection with culprit process + core ID  
+2. **Ghost Hunter** - background vampire index with soft freeze (`NtSuspendProcess`)  
+3. **Smart Turbo & Thermal Control** - Silent / Balanced / Full Throttle via `powercfg`  
+4. **VRAM & 3D Engine Inspector** - dedicated/shared VRAM without heavy SDKs  
+5. **Floating Mini-HUD** - always-on-top 240x55 overlay  
+6. **Emergency Hardware Alarm** - thermal toast + `MessageBeep`
 
 ## Build
 

@@ -41,7 +41,7 @@
   <div id="gameoverlay" class="gameoverlay hidden">
     <div class="gameoverlay-metrics">
       <span class="ov-badge ov-fps" data-i18n-title="overlayFpsTip" title="Текущая частота кадров в секунду"><span data-i18n="overlayFps">Кадры/с</span> <span class="ov-tip-circle" data-i18n-title="overlayFpsTip" title="Текущая частота кадров в секунду">i</span> <b id="go-fps">--</b></span>
-      <span class="ov-badge ov-low" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров — показатель плавности и отсутствия микрофризов"><span data-i18n="overlayLow">1% Редкие</span> <span class="ov-tip-circle" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров — показатель плавности и отсутствия микрофризов">i</span> <b id="go-low">--</b></span>
+      <span class="ov-badge ov-low" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров - показатель плавности и отсутствия микрофризов"><span data-i18n="overlayLow">1% Редкие</span> <span class="ov-tip-circle" data-i18n-title="overlayLowTip" title="Минимальный FPS в 1% худших кадров - показатель плавности и отсутствия микрофризов">i</span> <b id="go-low">--</b></span>
       <span class="ov-badge ov-ft" data-i18n-title="overlayFtTip" title="Время отрисовки одного кадра в миллисекундах"><span data-i18n="overlayFt">Время кадра</span> <span class="ov-tip-circle" data-i18n-title="overlayFtTip" title="Время отрисовки одного кадра в миллисекундах">i</span> <b id="go-ft">--</b></span>
     </div>
     <button type="button" id="go-close" class="ov-close hud-nodrag" data-i18n-title="overlayClose" title="Закрыть">✕</button>
@@ -53,7 +53,7 @@
         <img class="brand-logo" src="./src/assets/logo.svg" alt="PulseCore" />
         <div class="brand-text">
           <div class="brand-name">PulseCore</div>
-          <div class="brand-ver">v1.1.0</div>
+          <div class="brand-ver" id="brand-ver" title="About / Dev Mode">v1.0.1</div>
         </div>
       </button>
       <nav class="nav">
@@ -61,6 +61,7 @@
         <button type="button" class="nav-item" data-tab="lag" data-i18n="tabLagShort">Лаги</button>
         <button type="button" class="nav-item" data-tab="games" data-i18n="tabGames">Игры</button>
         <button type="button" class="nav-item nav-settings" data-tab="settings" data-i18n="tabSettings">Настройки</button>
+        <button type="button" class="nav-item hidden" id="nav-dev" data-tab="dev" data-i18n="tabDev">Dev Mode</button>
       </nav>
       <div class="sidebar-foot">
         <div class="muted" id="cpu-name">CPU</div>
@@ -379,7 +380,7 @@
                     <span data-i18n="fastStartupWarnTitle">Быстрый запуск (Fast Startup) замедляет систему</span>
                     <span class="info-tip" tabindex="0" data-tooltip-key="fastStartupTip">i</span>
                   </div>
-                  <div class="banner-desc" id="fast-startup-desc">Ядро Windows не перезагружалось 3 дн. из-за «Быстрого запуска» — накопился кэш драйверов.</div>
+                  <div class="banner-desc" id="fast-startup-desc">Ядро Windows не перезагружалось 3 дн. из-за «Быстрого запуска» - накопился кэш драйверов.</div>
                 </div>
               </div>
               <div class="banner-actions">
@@ -655,11 +656,17 @@
           <button type="button" class="btn danger settings-btn" id="btn-clear-stats" data-i18n="clearStats">Очистить статистику</button>
         </div>
 
+        <div class="settings-card settings-group">
+          <div class="settings-section-title" data-i18n="devModeTitle">Режим разработчика</div>
+          <label class="settings-checkbox-row check-row"><input type="checkbox" id="opt-dev-mode" /> <span data-i18n="devModeToggle">Включить режим разработчика (Dev Mode)</span></label>
+          <p class="settings-hint" data-i18n="devModeHint">Отображает панель сенсоров, диагностику и логи в боковом меню.</p>
+        </div>
+
         <div class="settings-card settings-group" id="settings-update-group">
           <div class="settings-section-title" data-i18n="updateSectionTitle">Обновление программы</div>
           <div class="settings-status-line">
             <span data-i18n="updateVersionLabel">Текущая версия:</span>
-            <span class="adv-status">v1.1.0</span>
+            <span class="adv-status">v1.0.1</span>
           </div>
           <div id="update-status-line" class="settings-status-line">
             <span data-i18n="updateStatusLabel">Статус:</span>
@@ -673,6 +680,39 @@
             <div class="update-progress-label" id="update-progress-text"></div>
             <div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill"></div></div>
           </div>
+        </div>
+      </section>
+
+      <section id="tab-dev" class="tab tab-pane">
+        <header class="section-head">
+          <h1>Dev Mode</h1>
+          <p>Диагностика сенсоров, телеметрии и внутренних логов PulseCore</p>
+        </header>
+        <div class="panel">
+          <div class="panel-title row-between">
+            <span>Телеметрия сенсоров в реальном времени</span>
+            <button type="button" class="btn soft compact" id="btn-dev-copy-json">Скопировать JSON</button>
+          </div>
+          <div class="dev-metrics-grid" id="dev-metrics-grid">
+            <div class="dev-metric-item">
+              <span class="muted">CPU Temp &amp; Source</span>
+              <div class="hw-val" id="dev-cpu-temp">-</div>
+            </div>
+            <div class="dev-metric-item">
+              <span class="muted">GPU Temp &amp; Power</span>
+              <div class="hw-val" id="dev-gpu-temp">-</div>
+            </div>
+            <div class="dev-metric-item">
+              <span class="muted">VRAM Dedicated / Total</span>
+              <div class="hw-val" id="dev-vram">-</div>
+            </div>
+            <div class="dev-metric-item">
+              <span class="muted">RAM Mode &amp; Channels</span>
+              <div class="hw-val" id="dev-ram">-</div>
+            </div>
+          </div>
+          <div class="panel-title" style="margin-top:14px">Сырой снимок SystemMetrics (Live JSON)</div>
+          <pre class="dev-raw-json" id="dev-raw-json">{}</pre>
         </div>
       </section>
     </main>
@@ -791,7 +831,7 @@
         <button type="button" class="win-btn" id="about-close">✕</button>
       </div>
       <div class="modal-body">
-        <div class="about-line"><b id="about-app-name">PulseCore v1.1.0</b></div>
+        <div class="about-line"><b id="about-app-name">PulseCore v1.0.1</b></div>
         <div class="about-line"><span data-i18n="aboutAuthor">Автор</span>: Robert Sharafutdinov</div>
         <div class="about-line"><span data-i18n="aboutStatus">Статус</span>: Free &amp; Open Source Software</div>
         <div class="about-line" data-i18n="aboutComponents">Компоненты и лицензии</div>
@@ -802,7 +842,7 @@
         </ul>
         <div class="about-report-block">
           <div class="settings-section-title about-report-title" data-i18n="reportTitle">Диагностический отчёт</div>
-          <p class="settings-hint about-report-lead" data-i18n="reportSub">Локальный снимок состояния для поддержки — без паролей и токенов.</p>
+          <p class="settings-hint about-report-lead" data-i18n="reportSub">Локальный снимок состояния для поддержки - без паролей и токенов.</p>
           <button type="button" class="settings-debug-toggle glass-control" id="btn-about-report-toggle" aria-expanded="false">
             <span data-i18n="reportPreview">Что войдёт в отчёт</span> <span class="settings-debug-chevron" aria-hidden="true">▾</span>
           </button>

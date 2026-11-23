@@ -91,3 +91,37 @@ func TestIntegratedSingleChannelPenalty(t *testing.T) {
 		t.Fatalf("single-channel should be slower: dual=%d single=%d", a, b)
 	}
 }
+
+func TestRDR2Ryzen5_3600_RTX2060Super(t *testing.T) {
+	gpuScore := calcGPUPowerScore("NVIDIA GeForce RTX 2060 SUPER", false, 8)
+	cpuScore := calcCPUPowerScore("AMD Ryzen 5 3600 6-Core Processor", 6, 12, 3600)
+	sys := SystemPowerProfile{
+		GPUName:       "NVIDIA GeForce RTX 2060 SUPER",
+		GPUPowerScore: gpuScore,
+		CPUName:       "AMD Ryzen 5 3600 6-Core Processor",
+		CPUPowerScore: cpuScore,
+		CPUCores:      6,
+		CPUThreads:    12,
+		CPUFreqMHz:    3600,
+		IsIntegrated:  false,
+		IsDualChannel: true,
+		RAMGB:         16,
+		VRAMGB:        8,
+	}
+	req := gameRequirements["rdr2"]
+	medAvg, medRange, medWarn := estimatePreset(sys, req.Med, presetMed, 0)
+	highAvg, highRange, highWarn := estimatePreset(sys, req.High, presetHigh, 0)
+
+	if medWarn != "" {
+		t.Fatalf("unexpected VRAM warning in Medium: %q", medWarn)
+	}
+	if highWarn != "" {
+		t.Fatalf("unexpected VRAM warning in High: %q", highWarn)
+	}
+	if medAvg < 65 || medAvg > 78 {
+		t.Fatalf("RDR2 Medium FPS %d (%s), want 65-78", medAvg, medRange)
+	}
+	if highAvg < 50 || highAvg > 60 {
+		t.Fatalf("RDR2 High FPS %d (%s), want 50-60", highAvg, highRange)
+	}
+}

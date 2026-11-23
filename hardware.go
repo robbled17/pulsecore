@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -323,6 +324,14 @@ func knownDiscreteVRAMBytes(name string) uint64 {
 	switch {
 	case strings.Contains(n, "2060 super"):
 		return 8 * gib
+	case strings.Contains(n, "2070 super") || strings.Contains(n, "2080 super") || strings.Contains(n, "2080"):
+		return 8 * gib
+	case strings.Contains(n, "3070"):
+		return 8 * gib
+	case strings.Contains(n, "3060 ti"):
+		return 8 * gib
+	case strings.Contains(n, "3060"):
+		return 12 * gib
 	default:
 		return 0
 	}
@@ -380,8 +389,15 @@ func readRegistryVRAM(matchName string) (string, uint64) {
 		desc, _, _ := sk.GetStringValue("DriverDesc")
 		mem, _, memErr := sk.GetIntegerValue("HardwareInformation.qwMemorySize")
 		if memErr != nil || mem == 0 {
+			if val, _, bErr := sk.GetBinaryValue("HardwareInformation.qwMemorySize"); bErr == nil && len(val) >= 8 {
+				mem = binary.LittleEndian.Uint64(val[:8])
+			}
+		}
+		if mem == 0 {
 			if v, _, e2 := sk.GetIntegerValue("HardwareInformation.MemorySize"); e2 == nil && v > mem {
 				mem = v
+			} else if val, _, bErr := sk.GetBinaryValue("HardwareInformation.MemorySize"); bErr == nil && len(val) >= 4 {
+				mem = uint64(binary.LittleEndian.Uint32(val[:4]))
 			}
 		}
 		sk.Close()
@@ -427,14 +443,14 @@ func comRelease(obj uintptr) {
 	if obj == 0 {
 		return
 	}
-	vtbl := *(*uintptr)(unsafe.Pointer(obj))
-	release := *(*uintptr)(unsafe.Pointer(vtbl + 2*unsafe.Sizeof(uintptr(0))))
+	vtbl := *(**[3]uintptr)(unsafe.Pointer(obj))
+	release := vtbl[2]
 	_, _, _ = syscall.SyscallN(release, obj)
 }
 
 func vtblFunc(obj uintptr, index uintptr) uintptr {
-	vtbl := *(*uintptr)(unsafe.Pointer(obj))
-	return *(*uintptr)(unsafe.Pointer(vtbl + index*unsafe.Sizeof(uintptr(0))))
+	vtbl := *(**[64]uintptr)(unsafe.Pointer(obj))
+	return vtbl[index]
 }
 
 // readDXGIVRAM reads DXGI_ADAPTER_DESC.DedicatedVideoMemory (full 64-bit, not the 4 GB WMI cap).

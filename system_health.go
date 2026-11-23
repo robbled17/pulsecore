@@ -896,7 +896,7 @@ func deductionAction(key string) (actionID, labelRu, labelEn string) {
 	case "recent_lags":
 		return "open_lag", "Лаги", "Stutters"
 	case "disk_smart":
-		return "open_smart", "S.M.A.R.T.", "S.M.A.R.T."
+		return "open_smart", "Проверить здоровье диска", "Check drive health"
 	default:
 		return "", "", ""
 	}
