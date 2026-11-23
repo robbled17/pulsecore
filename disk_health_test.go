@@ -30,8 +30,8 @@ func TestFinalizeDiskHealthHealthyWithoutWear(t *testing.T) {
 	if got.WearRemaining != -1 || got.HealthPercent != -1 {
 		t.Fatalf("healthy without wear must not invent percent, got wear=%v health=%v", got.WearRemaining, got.HealthPercent)
 	}
-	if got.Verdict != "OK" {
-		t.Fatalf("expected OK verdict, got %q", got.Verdict)
+	if got.Verdict != "Исправен" && got.Verdict != "OK" {
+		t.Fatalf("expected Исправен verdict, got %q", got.Verdict)
 	}
 	if !got.OK {
 		t.Fatal("Healthy without wear must set OK=true")

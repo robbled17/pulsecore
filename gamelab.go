@@ -127,11 +127,11 @@ var gameRequirements = map[string]gameReqSet{
 		Heavy: true,
 	},
 	"rdr2": {
-		// Ryzen 5 3600 + RTX 2060 Super 8GB → Medium (incl. upscale to 2K) ~65-80 FPS.
-		Low:   gameReq{58, 48, 36, 3},
-		Med:   gameReq{60, 50, 40, 4},
-		High:  gameReq{52, 64, 50, 6},
-		Ultra: gameReq{45, 78, 60, 8},
+		// Ryzen 5 3600 + RTX 2060 Super 8GB -> Medium ~65-80 FPS.
+		Low:   gameReq{75, 48, 40, 3},
+		Med:   gameReq{68, 55, 45, 4},
+		High:  gameReq{60, 68, 52, 6},
+		Ultra: gameReq{50, 80, 60, 8},
 		Heavy: true,
 	},
 	"witcher3": {
@@ -142,16 +142,18 @@ var gameRequirements = map[string]gameReqSet{
 		Heavy: true,
 	},
 	"gtav": {
-		Low:   gameReq{60, 28, 30, 1},
-		Med:   gameReq{58, 38, 36, 2},
-		High:  gameReq{55, 48, 42, 3},
-		Ultra: gameReq{50, 58, 48, 4},
+		// 2015 classic title: RTX 2060 Super reaches 120-150 FPS on High/Ultra.
+		Low:   gameReq{140, 25, 25, 1},
+		Med:   gameReq{130, 35, 30, 2},
+		High:  gameReq{115, 45, 38, 3},
+		Ultra: gameReq{100, 55, 45, 4},
 	},
 	"cs2": {
-		Low:   gameReq{90, 30, 40, 1},
-		Med:   gameReq{80, 40, 48, 2},
-		High:  gameReq{70, 52, 55, 3},
-		Ultra: gameReq{60, 62, 60, 4},
+		// Competitive shooter: RTX 2060 Super reaches 180-240 FPS on Med/High.
+		Low:   gameReq{240, 35, 40, 1.5},
+		Med:   gameReq{210, 45, 48, 2},
+		High:  gameReq{180, 55, 55, 3},
+		Ultra: gameReq{150, 65, 60, 4},
 	},
 	"dota2": {
 		Low:   gameReq{100, 22, 32, 1},
@@ -812,6 +814,11 @@ func (a *App) buildSystemPowerProfile() SystemPowerProfile {
 		vramGB = 0
 	} else if vramGB <= 0 && hw.GPU.DedicatedMB > 0 {
 		vramGB = hw.GPU.DedicatedMB / 1024.0
+	}
+	if !integrated && vramGB <= 0 {
+		if knownBytes := knownDiscreteVRAMBytes(gpuName); knownBytes > 0 {
+			vramGB = float64(knownBytes) / (1024 * 1024 * 1024)
+		}
 	}
 
 	gpu := scoreGPU(gpuName, integrated, vramGB)

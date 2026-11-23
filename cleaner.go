@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,24 @@ type DiskCleanResult struct {
 	DryRun       bool     `json:"dryRun"`
 }
 
+// CleanCategoryInfo describes one category in the human-friendly system clean UI.
+type CleanCategoryInfo struct {
+	ID        string  `json:"id"`
+	Title     string  `json:"title"`
+	Files     int     `json:"files"`
+	Bytes     int64   `json:"bytes"`
+	SizeMB    float64 `json:"sizeMB"`
+	Reachable bool    `json:"reachable"`
+}
+
+// CleanScanSummary summarizes parallel scanning of all system clean categories.
+type CleanScanSummary struct {
+	Categories []CleanCategoryInfo `json:"categories"`
+	TotalFiles int                 `json:"totalFiles"`
+	TotalBytes int64               `json:"totalBytes"`
+	TotalMB    float64             `json:"totalMB"`
+}
+
 type cleanRootKind int
 
 const (
@@ -36,47 +55,142 @@ const (
 )
 
 type cleanRoot struct {
-	path string
-	kind cleanRootKind
-	label string
+	path     string
+	kind     cleanRootKind
+	category string // "temp", "browser", "directx"
+	label    string
 }
 
-// CleanSafeDiskCaches deletes only allowlisted temp/cache files with age guards.
-// Never removes the root folders themselves; never touches Packages or system trees.
-func (a *App) CleanSafeDiskCaches() DiskCleanResult {
-	return a.cleanSafeDiskCaches(false)
-}
-
-// PreviewSafeDiskCaches is a dry-run of CleanSafeDiskCaches (no deletes).
-func (a *App) PreviewSafeDiskCaches() DiskCleanResult {
-	return a.cleanSafeDiskCaches(true)
-}
-
-func (a *App) cleanSafeDiskCaches(dryRun bool) DiskCleanResult {
+// ScanSystemClean performs a fast parallel scan of clean categories without deleting anything.
+func (a *App) ScanSystemClean() CleanScanSummary {
 	roots := listAllowedCleanRoots()
+	type rootResult struct {
+		root cleanRoot
+		d    int
+		b    int64
+		s, e int
+	}
+
+	results := make([]rootResult, len(roots))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6) // parallel worker pool
+
+	for i, r := range roots {
+		wg.Add(1)
+		go func(idx int, cr cleanRoot) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if cr.path == "" {
+				return
+			}
+			d, b, s, e := cleanAllowedRoot(cr, true)
+			results[idx] = rootResult{root: cr, d: d, b: b, s: s, e: e}
+		}(i, r)
+	}
+	wg.Wait()
+
+	catMap := map[string]*CleanCategoryInfo{
+		"temp":    {ID: "temp", Title: "Временные файлы Windows", Reachable: true},
+		"browser": {ID: "browser", Title: "Кэш браузеров", Reachable: true},
+		"directx": {ID: "directx", Title: "Кэш шейдеров DirectX", Reachable: true},
+	}
+
+	var totalFiles int
+	var totalBytes int64
+
+	for _, res := range results {
+		cKey := res.root.category
+		if cKey == "" {
+			cKey = "temp"
+		}
+		cat, ok := catMap[cKey]
+		if !ok {
+			cat = catMap["temp"]
+		}
+		cat.Files += res.d
+		cat.Bytes += int64(res.b)
+		totalFiles += res.d
+		totalBytes += int64(res.b)
+	}
+
+	order := []string{"temp", "browser", "directx"}
+	cats := make([]CleanCategoryInfo, 0, len(order))
+	for _, id := range order {
+		cat := catMap[id]
+		cat.SizeMB = float64(cat.Bytes) / (1024 * 1024)
+		cats = append(cats, *cat)
+	}
+
+	debug.FreeOSMemory()
+	return CleanScanSummary{
+		Categories: cats,
+		TotalFiles: totalFiles,
+		TotalBytes: totalBytes,
+		TotalMB:    float64(totalBytes) / (1024 * 1024),
+	}
+}
+
+// CleanSystemCategories deletes allowlisted files only for the selected category IDs.
+func (a *App) CleanSystemCategories(selectedCategories []string) DiskCleanResult {
+	filter := make(map[string]bool)
+	for _, c := range selectedCategories {
+		filter[strings.ToLower(strings.TrimSpace(c))] = true
+	}
+	if len(filter) == 0 {
+		filter["temp"] = true
+		filter["browser"] = true
+		filter["directx"] = true
+	}
+
+	roots := listAllowedCleanRoots()
+	var selectedRoots []cleanRoot
+	for _, r := range roots {
+		if filter[r.category] {
+			selectedRoots = append(selectedRoots, r)
+		}
+	}
+
+	type rootRes struct {
+		label string
+		d     int
+		b     int64
+		s, e  int
+	}
+	results := make([]rootRes, len(selectedRoots))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6)
+
+	for i, r := range selectedRoots {
+		wg.Add(1)
+		go func(idx int, cr cleanRoot) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if cr.path == "" {
+				return
+			}
+			d, b, s, e := cleanAllowedRoot(cr, false)
+			results[idx] = rootRes{label: cr.label, d: d, b: b, s: s, e: e}
+		}(i, r)
+	}
+	wg.Wait()
+
 	var deleted int
 	var bytes int64
 	var skipped, errs int
-	labels := make([]string, 0, len(roots))
+	labels := make([]string, 0, len(selectedRoots))
 
-	for _, root := range roots {
-		if root.path == "" {
-			continue
-		}
-		labels = append(labels, root.label)
-		d, b, s, e := cleanAllowedRoot(root, dryRun)
-		deleted += d
-		bytes += b
-		skipped += s
-		errs += e
+	for _, res := range results {
+		labels = append(labels, res.label)
+		deleted += res.d
+		bytes += int64(res.b)
+		skipped += res.s
+		errs += res.e
 	}
 
-	verb := "Удалено"
-	if dryRun {
-		verb = "К удалению"
-	}
-	msg := fmt.Sprintf("%s файлов: %d (%.1f МБ), пропущено: %d, ошибок: %d",
-		verb, deleted, float64(bytes)/(1024*1024), skipped, errs)
+	msg := fmt.Sprintf("Очищено файлов: %d (%.1f МБ), пропущено: %d, ошибок: %d",
+		deleted, float64(bytes)/(1024*1024), skipped, errs)
 	debug.FreeOSMemory()
 	return DiskCleanResult{
 		OK:           errs == 0,
@@ -86,7 +200,33 @@ func (a *App) cleanSafeDiskCaches(dryRun bool) DiskCleanResult {
 		Errors:       errs,
 		Targets:      labels,
 		Message:      msg,
-		DryRun:       dryRun,
+		DryRun:       false,
+	}
+}
+
+// CleanSafeDiskCaches deletes only allowlisted temp/cache files with age guards.
+// Never removes the root folders themselves; never touches Packages or system trees.
+func (a *App) CleanSafeDiskCaches() DiskCleanResult {
+	return a.CleanSystemCategories([]string{"temp", "browser", "directx"})
+}
+
+// PreviewSafeDiskCaches is a dry-run of CleanSafeDiskCaches (no deletes).
+func (a *App) PreviewSafeDiskCaches() DiskCleanResult {
+	scan := a.ScanSystemClean()
+	roots := listAllowedCleanRoots()
+	labels := make([]string, 0, len(roots))
+	for _, r := range roots {
+		labels = append(labels, r.label)
+	}
+	return DiskCleanResult{
+		OK:           true,
+		DeletedFiles: scan.TotalFiles,
+		DeletedBytes: scan.TotalBytes,
+		Skipped:      0,
+		Errors:       0,
+		Targets:      labels,
+		Message:      fmt.Sprintf("К удалению файлов: %d (%.1f МБ)", scan.TotalFiles, scan.TotalMB),
+		DryRun:       true,
 	}
 }
 
@@ -105,9 +245,9 @@ func listAllowedCleanRoots() []cleanRoot {
 		if isForbiddenCleanRoot(abs) {
 			return
 		}
-		out = append(out, cleanRoot{path: abs, kind: cleanKindTemp, label: label})
+		out = append(out, cleanRoot{path: abs, kind: cleanKindTemp, category: "temp", label: label})
 	}
-	addCache := func(p, label string) {
+	addCache := func(p, category, label string) {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			return
@@ -122,7 +262,7 @@ func listAllowedCleanRoots() []cleanRoot {
 		if !isAllowedD3DSCache(abs) && !isAllowedBrowserCacheDir(abs) {
 			return
 		}
-		out = append(out, cleanRoot{path: abs, kind: cleanKindCache, label: label})
+		out = append(out, cleanRoot{path: abs, kind: cleanKindCache, category: category, label: label})
 	}
 
 	if t := os.Getenv("TEMP"); t != "" {
@@ -135,13 +275,13 @@ func listAllowedCleanRoots() []cleanRoot {
 
 	local := os.Getenv("LOCALAPPDATA")
 	if local != "" {
-		addCache(filepath.Join(local, "D3DSCache"), "D3DSCache")
+		addCache(filepath.Join(local, "D3DSCache"), "directx", "D3DSCache")
 		for _, browser := range browserUserDataRoots(local) {
 			for _, profile := range listBrowserProfiles(browser) {
 				for _, leaf := range []string{"Cache", "Code Cache", "GPUCache"} {
 					p := filepath.Join(profile, leaf)
 					if st, err := os.Stat(p); err == nil && st.IsDir() {
-						addCache(p, filepath.Base(browser)+"/"+filepath.Base(profile)+"/"+leaf)
+						addCache(p, "browser", filepath.Base(browser)+"/"+filepath.Base(profile)+"/"+leaf)
 					}
 				}
 			}

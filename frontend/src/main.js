@@ -32,6 +32,17 @@ import {
   CleanSafeDiskCaches,
   PreviewSafeDiskCaches,
   OpenAppInstallFolder,
+  ScanSystemClean,
+  CleanSystemCategories,
+  GetSensorLogs,
+  ClearSensorLogs,
+  ForceRescanHardware,
+  CheckAdminStatus,
+  ResetAppCache,
+  GetDevTelemetry,
+  TitlebarDragBegin,
+  TitlebarToggleMaximise,
+  WindowMaximisedState,
   RunSelfDiagnostics,
   SetMiniHUDHotkey,
   GetMiniHUDHotkey,
@@ -39,7 +50,7 @@ import {
   RestartAsAdministrator,
   CheckForUpdates,
 } from '../wailsjs/go/main/App.js'
-import { BrowserOpenURL, EventsOn, WindowMinimise } from '../wailsjs/runtime/runtime.js'
+import { BrowserOpenURL, EventsOn, WindowMinimise, WindowSetSize, WindowToggleMaximise, WindowIsMaximised } from '../wailsjs/runtime/runtime.js'
 import { i18n } from './i18n.js'
 import {
   initDevMode,
@@ -236,6 +247,12 @@ function setActiveTab(name) {
   if (name === 'uninstall') {
     refreshInstalledApps()
     refreshTraceList()
+    if (!systemCleanScanResult) {
+      scanSystemClean()
+    }
+  }
+  if (name === 'dev') {
+    refreshDevTelemetry()
   }
 }
 
@@ -1472,6 +1489,9 @@ function netBadge(ok, key) {
   return `<span class="net-badge ${ok ? 'ok' : 'bad'}">${t(key)}</span>`
 }
 
+let externalIPHidden = true
+let lastDiagnoseLag = null
+
 async function runNetDiag() {
   const box = $('net-diag')
   box.innerHTML = `
@@ -1481,37 +1501,87 @@ async function runNetDiag() {
     </div>`
   try {
     const d = await DiagnoseLagOrigin()
-    const verdict = t(d.verdictKey || d.verdict || 'netVerdictOK')
-    box.innerHTML = `
-      <div class="verdict-card ${d.level === 'ok' ? 'ok' : 'warn'}"><div class="v-title">${verdict}</div></div>
-      <div class="net-card">
-        <div>
-          <div class="title">${t('netRouter')}</div>
-          <div class="hint">${t('netRouterHint')}</div>
-          ${netBadge(!!d.gatewayBadgeOK, d.gatewayBadge || 'netBadgeIdeal')}
-        </div>
-        <div class="net-ms">${d.gatewayMs < 0 ? '-' : fmt(d.gatewayMs, 0) + ' ms'}</div>
-      </div>
-      <div class="net-card">
-        <div>
-          <div class="title">${t('netInternet')}</div>
-          <div class="hint">${t('netInternetHint')}</div>
-          ${netBadge(!!d.publicBadgeOK, d.publicBadge || 'netBadgeFast')}
-        </div>
-        <div class="net-ms">${d.publicMs < 0 ? '-' : fmt(d.publicMs, 0) + ' ms'}</div>
-      </div>
-      <div class="net-card">
-        <div>
-          <div class="title">${t('netJitter')}</div>
-          <div class="hint">${t(d.jitterBadgeOK ? 'netJitterHintOk' : 'netJitterHintBad')}</div>
-          ${netBadge(!!d.jitterBadgeOK, d.jitterBadge || 'netBadgeStable')}
-        </div>
-        <div class="net-ms">${fmt(d.localJitterMs, 0)} ms</div>
-      </div>
-    `
+    lastDiagnoseLag = d
+    renderNetDiagUI(d)
   } catch (err) {
-    box.innerHTML = `<div class="empty">${String(err)}</div>`
+    box.innerHTML = `<div class="empty">${escapeHtml(String(err))}</div>`
   }
+}
+
+function renderNetDiagUI(d) {
+  const box = $('net-diag')
+  if (!box || !d) return
+  const verdict = t(d.verdictKey || d.verdict || 'netVerdictOK')
+  const localIP = d.localIP || '127.0.0.1'
+  const realExtIP = d.externalIP || '127.0.0.1'
+  const displayExtIP = externalIPHidden ? '••••••••••••' : realExtIP
+  const toggleText = externalIPHidden ? t('netShowIP') : t('netHideIP')
+
+  const gwRating = d.gatewayRating || (d.gatewayMs <= 30 ? 'Отлично для онлайн-игр' : d.gatewayMs <= 80 ? 'Норма' : 'Высокая задержка')
+  const pubRating = d.publicRating || (d.publicMs <= 30 ? 'Отлично для онлайн-игр' : d.publicMs <= 80 ? 'Норма' : 'Высокая задержка')
+  const stability = d.stabilityStatus || (d.localJitterMs < 2 ? 'Идеальная (скачки < 2 мс)' : d.localJitterMs < 8 ? 'Хорошая' : 'Нестабильно (скачки пакетов)')
+
+  box.innerHTML = `
+    <div class="net-ip-block">
+      <div class="net-ip-card">
+        <div>
+          <div class="net-ip-label">${t('netLocalIP')}</div>
+          <div class="net-ip-val">${escapeHtml(localIP)}</div>
+        </div>
+        <div class="net-ip-actions">
+          <button type="button" class="btn compact ghost" id="btn-copy-local-ip">${t('netCopyIP')}</button>
+        </div>
+      </div>
+      <div class="net-ip-card">
+        <div>
+          <div class="net-ip-label">${t('netExternalIP')}</div>
+          <div class="net-ip-val" id="net-ext-val">${escapeHtml(displayExtIP)}</div>
+        </div>
+        <div class="net-ip-actions">
+          <button type="button" class="btn compact ghost" id="btn-toggle-ext-ip">${toggleText}</button>
+          <button type="button" class="btn compact ghost" id="btn-copy-ext-ip">${t('netCopyIP')}</button>
+        </div>
+      </div>
+    </div>
+    <div class="verdict-card ${d.level === 'ok' ? 'ok' : 'warn'}"><div class="v-title">${verdict}</div></div>
+    <div class="net-card">
+      <div>
+        <div class="title">${t('netRouter')}</div>
+        <div class="hint">${escapeHtml(gwRating)}</div>
+        ${netBadge(!!d.gatewayBadgeOK, d.gatewayBadge || 'netBadgeIdeal')}
+      </div>
+      <div class="net-ms">${d.gatewayMs < 0 ? '-' : fmt(d.gatewayMs, 0) + ' ms'}</div>
+    </div>
+    <div class="net-card">
+      <div>
+        <div class="title">${t('netInternet')}</div>
+        <div class="hint">${escapeHtml(pubRating)}</div>
+        ${netBadge(!!d.publicBadgeOK, d.publicBadge || 'netBadgeFast')}
+      </div>
+      <div class="net-ms">${d.publicMs < 0 ? '-' : fmt(d.publicMs, 0) + ' ms'}</div>
+    </div>
+    <div class="net-card">
+      <div>
+        <div class="title">${t('netStability')}</div>
+        <div class="hint">${escapeHtml(stability)}</div>
+        ${netBadge(!!d.jitterBadgeOK, d.jitterBadge || 'netBadgeStable')}
+      </div>
+      <div class="net-ms">${fmt(d.localJitterMs, 0)} ms</div>
+    </div>
+  `
+
+  $('btn-copy-local-ip')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(localIP)
+    showToast(`${t('netLocalIP')}: ${t('netCopied')}`, true)
+  })
+  $('btn-toggle-ext-ip')?.addEventListener('click', () => {
+    externalIPHidden = !externalIPHidden
+    renderNetDiagUI(d)
+  })
+  $('btn-copy-ext-ip')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(realExtIP)
+    showToast(`${t('netExternalIP')}: ${t('netCopied')}`, true)
+  })
 }
 
 async function runSleepCheck() {
@@ -1561,6 +1631,26 @@ function applyMiniHudPrefs() {
   if (label) label.textContent = `${opacity}%`
 }
 
+function adjustWindowForMiniHUD() {
+  const el = document.querySelector('.minihud-capsule')
+  if (el) {
+    const rect = el.getBoundingClientRect()
+    const targetW = Math.max(340, Math.ceil(rect.width) + 36)
+    const targetH = Math.max(54, Math.ceil(rect.height) + 28)
+    try { WindowSetSize(targetW, targetH) } catch (_) {}
+  }
+}
+
+function adjustWindowForGameOverlay() {
+  const el = document.querySelector('.gameoverlay-capsule')
+  if (el) {
+    const rect = el.getBoundingClientRect()
+    const targetW = Math.max(340, Math.ceil(rect.width) + 36)
+    const targetH = Math.max(54, Math.ceil(rect.height) + 28)
+    try { WindowSetSize(targetW, targetH) } catch (_) {}
+  }
+}
+
 function renderMiniHUD(m) {
   $('mh-cpu').textContent = fmtPct(m.cpuPercent, 0)
   $('mh-ram').textContent = fmtPct(m.ramPercent, 0)
@@ -1575,6 +1665,9 @@ function renderMiniHUD(m) {
     }
   }
   applyMiniHudPrefs()
+  if (hudEnabled) {
+    requestAnimationFrame(adjustWindowForMiniHUD)
+  }
 }
 
 function syncSettings(m) {
@@ -1628,6 +1721,9 @@ function setHudMode(enabled) {
   if (enabled || gameOverlayOn) {
     $('shell').classList.add('hidden')
     $('titlebar').classList.add('hidden')
+    if (enabled) {
+      requestAnimationFrame(adjustWindowForMiniHUD)
+    }
   } else {
     $('shell').classList.remove('hidden')
     $('titlebar').classList.remove('hidden')
@@ -1656,6 +1752,9 @@ function setGameOverlayMode(enabled, skipBackend = false) {
   if (enabled || hudEnabled) {
     $('shell').classList.add('hidden')
     $('titlebar').classList.add('hidden')
+    if (enabled) {
+      requestAnimationFrame(adjustWindowForGameOverlay)
+    }
   } else {
     $('shell').classList.remove('hidden')
     $('titlebar').classList.remove('hidden')
@@ -1881,15 +1980,29 @@ function resolveGameArt(g) {
   return { poster, header, posterAlt }
 }
 
+window.__pcPosterFallback = function(el, name, cls) {
+  const q = (el.dataset.fb || '').split('|').filter(Boolean)
+  if (q.length) {
+    el.dataset.fb = q.slice(1).join('|')
+    el.src = q[0]
+    return
+  }
+  const initials = String(name || 'G').trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase() || 'PC'
+  const d = document.createElement('div')
+  d.className = `${cls} fallback logo-card`
+  d.innerHTML = `<span class="logo-initials">${escapeHtml(initials)}</span><span class="logo-title">${escapeHtml(name)}</span>`
+  el.replaceWith(d)
+}
+
 function imgWithFallbacks(cls, name, urls) {
-  const safeName = String(name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  const safeName = String(name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;')
   const chain = (urls || []).filter(Boolean)
   if (!chain.length) return posterFallbackHTML(name, cls)
   const src = chain[0]
   const rest = chain.slice(1)
   const fbAttr = rest.length ? rest.join('|') : ''
   const alt = String(name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  return `<img class="${cls}" src="${src}" alt="${alt}" loading="lazy" decoding="async" data-fb="${fbAttr}" onerror="(function(el){const q=(el.dataset.fb||'').split('|').filter(Boolean);if(q.length){el.dataset.fb=q.slice(1).join('|');el.src=q[0];return;}el.replaceWith(Object.assign(document.createElement('div'),{className:'${cls} fallback logo-card',innerHTML:'<span class=\\'logo-title\\'>${safeName}</span>'}));})(this)" />`
+  return `<img class="${cls}" src="${src}" alt="${alt}" loading="lazy" decoding="async" data-fb="${fbAttr}" onerror="window.__pcPosterFallback(this, '${safeName}', '${cls}')" />`
 }
 
 function gamePosterHTML(g) {
@@ -2703,6 +2816,108 @@ async function runSafeClean() {
   }
 }
 
+let systemCleanScanResult = null
+
+async function scanSystemClean() {
+  const scanBtn = $('btn-sysclean-scan')
+  const runBtn = $('btn-sysclean-run')
+  if (scanBtn) scanBtn.disabled = true
+  if (runBtn) runBtn.disabled = true
+
+  const tempSizeEl = $('clean-size-temp')
+  const browserSizeEl = $('clean-size-browser')
+  const dxSizeEl = $('clean-size-directx')
+  if (tempSizeEl) tempSizeEl.textContent = '...'
+  if (browserSizeEl) browserSizeEl.textContent = '...'
+  if (dxSizeEl) dxSizeEl.textContent = '...'
+
+  try {
+    const res = await ScanSystemClean()
+    systemCleanScanResult = res
+    if (tempSizeEl) tempSizeEl.textContent = formatCleanBytes(res?.temp?.bytes || 0)
+    if (browserSizeEl) browserSizeEl.textContent = formatCleanBytes(res?.browser?.bytes || 0)
+    if (dxSizeEl) dxSizeEl.textContent = formatCleanBytes(res?.directx?.bytes || 0)
+
+    updateSystemCleanRunButton()
+  } catch (err) {
+    showToast(String(err), false)
+  } finally {
+    if (scanBtn) scanBtn.disabled = false
+  }
+}
+
+function updateSystemCleanRunButton() {
+  const runBtn = $('btn-sysclean-run')
+  if (!runBtn) return
+  const tempChecked = $('clean-chk-temp')?.checked
+  const browserChecked = $('clean-chk-browser')?.checked
+  const dxChecked = $('clean-chk-directx')?.checked
+
+  const hasAnyChecked = tempChecked || browserChecked || dxChecked
+  runBtn.disabled = !hasAnyChecked || !systemCleanScanResult
+}
+
+async function runSystemCleanAction() {
+  const runBtn = $('btn-sysclean-run')
+  const cats = []
+  if ($('clean-chk-temp')?.checked) cats.push('temp')
+  if ($('clean-chk-browser')?.checked) cats.push('browser')
+  if ($('clean-chk-directx')?.checked) cats.push('directx')
+
+  if (!cats.length) {
+    showToast(t('cleanNoSelection'), false)
+    return
+  }
+
+  if (runBtn) runBtn.disabled = true
+  try {
+    const r = await CleanSystemCategories(cats)
+    showToast(r?.message || t('cleanDone'), !!r?.ok)
+    if (cats.includes('temp') && $('clean-size-temp')) $('clean-size-temp').textContent = '0 B'
+    if (cats.includes('browser') && $('clean-size-browser')) $('clean-size-browser').textContent = '0 B'
+    if (cats.includes('directx') && $('clean-size-directx')) $('clean-size-directx').textContent = '0 B'
+  } catch (err) {
+    showToast(String(err), false)
+  } finally {
+    updateSystemCleanRunButton()
+  }
+}
+
+async function refreshDevTelemetry() {
+  const logBox = $('dev-sensor-log')
+  const tableBox = $('dev-telemetry-table')
+  if (!logBox && !tableBox) return
+
+  try {
+    if (logBox) {
+      const logs = await GetSensorLogs()
+      if (Array.isArray(logs) && logs.length) {
+        logBox.textContent = logs.join('\n')
+        logBox.scrollTop = logBox.scrollHeight
+      } else {
+        logBox.textContent = t('noData') || 'Лог датчиков пуст'
+      }
+    }
+  } catch (err) {
+    if (logBox) logBox.textContent = String(err)
+  }
+
+  try {
+    if (tableBox) {
+      const data = await GetDevTelemetry()
+      if (data && typeof data === 'object') {
+        const rows = Object.entries(data).map(([k, v]) => {
+          const valStr = typeof v === 'object' ? JSON.stringify(v) : String(v)
+          return `<tr><td class="dev-telemetry-key">${escapeHtml(k)}</td><td class="dev-telemetry-val">${escapeHtml(valStr)}</td></tr>`
+        }).join('')
+        tableBox.innerHTML = `<table class="dev-telemetry-table"><tbody>${rows}</tbody></table>`
+      }
+    }
+  } catch (err) {
+    if (tableBox) tableBox.innerHTML = `<div class="empty">${escapeHtml(String(err))}</div>`
+  }
+}
+
 async function refreshInstalledApps() {
   try {
     installedAppsCache = await ListInstalledApps() || []
@@ -2863,6 +3078,54 @@ function wireUI() {
   $('btn-residual-delete')?.addEventListener('click', () => runResidualDelete())
   $('btn-clean-preview')?.addEventListener('click', () => refreshCleanPreview())
   $('btn-clean-run')?.addEventListener('click', () => runSafeClean())
+
+  $('btn-sysclean-scan')?.addEventListener('click', scanSystemClean)
+  $('btn-sysclean-run')?.addEventListener('click', runSystemCleanAction)
+  $('clean-chk-temp')?.addEventListener('change', updateSystemCleanRunButton)
+  $('clean-chk-browser')?.addEventListener('change', updateSystemCleanRunButton)
+  $('clean-chk-directx')?.addEventListener('change', updateSystemCleanRunButton)
+
+  $('btn-dev-rescan')?.addEventListener('click', async () => {
+    try {
+      showToast(t('checking') || 'Сканирование...', true)
+      await ForceRescanHardware()
+      showToast(t('devRescanHw') || 'Железо пересканировано', true)
+      await refreshDevTelemetry()
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+  $('btn-dev-clearcache')?.addEventListener('click', async () => {
+    try {
+      await ResetAppCache()
+      showToast(t('devClearCache') || 'Кэш сброшен', true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+  $('btn-dev-checkadmin')?.addEventListener('click', async () => {
+    try {
+      const ok = await CheckAdminStatus()
+      showToast(ok ? 'PulseCore: права Администратора активны' : 'PulseCore: обычные права (без Администратора)', ok)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+  $('btn-dev-copylog')?.addEventListener('click', () => {
+    const text = $('dev-sensor-log')?.textContent || ''
+    navigator.clipboard.writeText(text)
+    showToast(t('devLogCopied') || 'Лог датчиков скопирован', true)
+  })
+  $('btn-dev-clearlog')?.addEventListener('click', async () => {
+    try {
+      await ClearSensorLogs()
+      if ($('dev-sensor-log')) $('dev-sensor-log').textContent = ''
+      showToast(t('devClearLog') || 'Лог очищен', true)
+    } catch (err) {
+      showToast(String(err), false)
+    }
+  })
+
   $('btn-trace-start')?.addEventListener('click', async () => {
     try {
       const r = await StartTracedInstall()
@@ -2896,12 +3159,62 @@ function wireUI() {
     btn.addEventListener('click', (ev) => ev.stopPropagation())
   })
 
+  const syncMaximiseButton = (isMax) => {
+    const btn = $('btn-fs')
+    if (!btn) return
+    btn.textContent = isMax ? '❐' : '□'
+    btn.title = isMax ? 'Restore' : 'Maximize'
+    btn.setAttribute('aria-label', btn.title)
+  }
+
+  const toggleAppMaximise = async () => {
+    try {
+      const isMax = await TitlebarToggleMaximise()
+      syncMaximiseButton(isMax)
+    } catch (_) {
+      try {
+        WindowToggleMaximise()
+        const isMax = await WindowIsMaximised()
+        syncMaximiseButton(isMax)
+      } catch (_) {}
+    }
+  }
+
   $('btn-min').addEventListener('click', () => WindowMinimise())
-  $('btn-fs').addEventListener('click', async () => {
-    try { await ToggleFullscreen() } catch (_) {}
-  })
+  $('btn-fs').addEventListener('click', toggleAppMaximise)
   $('btn-close').addEventListener('click', async () => {
     try { await HideToTray() } catch (_) {}
+  })
+
+  const titlebarEl = $('titlebar')
+  if (titlebarEl) {
+    titlebarEl.addEventListener('mousedown', async (ev) => {
+      if (ev.button !== 0 || ev.target.closest('.titlebar-actions') || ev.target.closest('button')) return
+      try {
+        const isMax = await WindowMaximisedState()
+        if (isMax) {
+          await TitlebarDragBegin()
+          syncMaximiseButton(false)
+        }
+      } catch (_) {}
+    })
+    titlebarEl.addEventListener('dblclick', async (ev) => {
+      if (ev.target.closest('.titlebar-actions') || ev.target.closest('button')) return
+      await toggleAppMaximise()
+    })
+  }
+
+  window.addEventListener('resize', async () => {
+    try {
+      const isMax = await WindowMaximisedState()
+      syncMaximiseButton(isMax)
+    } catch (_) {}
+  })
+
+  $('ov-disks')?.addEventListener('click', async (ev) => {
+    const row = ev.target.closest('[data-drive]') || ev.target.closest('.disk-row')
+    const letter = row?.dataset?.drive || selectedDrive || 'C'
+    await runDiskHealth(letter, false)
   })
 
   document.addEventListener('keydown', async (ev) => {
@@ -2927,7 +3240,7 @@ function wireUI() {
     }
     if (ev.key === 'F11') {
       ev.preventDefault()
-      try { await ToggleFullscreen() } catch (_) {}
+      await toggleAppMaximise()
     }
     if (ev.key === 'F12') {
       ev.preventDefault()
@@ -3232,21 +3545,7 @@ function wireUI() {
     renderDiskTabs(latestDisks, 'disk-tabs')
     renderDiskTabs(latestDisks, 'modal-disk-tabs')
     renderOverviewDiskDetails()
-    if (!$('modal').classList.contains('hidden')) {
-      await runDiskHealth(selectedDrive, false)
-      return
-    }
-    const letter = String(selectedDrive || 'C').toUpperCase()
-    if (!cachedDiskReport[letter] && getDevState().smartEnabled !== false) {
-      try {
-        const r = await CheckDiskHealth(letter)
-        if (r) cachedDiskReport[letter] = r
-      } catch (_) {
-        cachedDiskReport[letter] = { ok: false }
-      }
-      renderDiskTabs(latestDisks)
-      renderOverviewDiskDetails()
-    }
+    await runDiskHealth(selectedDrive, false)
   }
   $('disk-tabs')?.addEventListener('click', onDiskTabClick)
   $('modal-disk-tabs')?.addEventListener('click', onDiskTabClick)

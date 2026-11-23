@@ -138,7 +138,7 @@
     "id": "sekiro",
     "name": "Sekiro: Shadows Die Twice",
     "genre": "Action",
-    "weight": 1.0,
+    "weight": 1,
     "steamAppId": 814380,
     "category": "aaa",
     "year": 2019,
@@ -301,8 +301,8 @@
     "year": 2020,
     "badge": "eSports",
     "engine": "Unreal 4",
-    "posterUrl": "https://images.contentstack.io/v3/assets/blt370612131b6e0eb3/blt02c83011417b70d6/5eb08b7397b46c1911aa50b6/play-valorant-poster.jpg",
-    "headerUrl": "https://images.contentstack.io/v3/assets/blt370612131b6e0eb3/blt02c83011417b70d6/5eb08b7397b46c1911aa50b6/play-valorant-poster.jpg"
+    "posterUrl": "https://cdn1.epicgames.com/offer/cbd5b3d3a0a54006a0e3b4460f14a600/EGS_VALORANT_RiotGames_S2_1200x1600-66b96e19c36209ef233bc0fa54001cb2",
+    "headerUrl": "https://cdn1.epicgames.com/offer/cbd5b3d3a0a54006a0e3b4460f14a600/EGS_VALORANT_RiotGames_S1_2560x1440-9152d7088b3f7823e5ab7a1c77395b11"
   },
   {
     "id": "lol",
@@ -340,8 +340,8 @@
     "year": 2006,
     "badge": "Indie",
     "engine": "Proprietary",
-    "posterUrl": "",
-    "headerUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/fa04dc907db13fc471d44f6fcfb061fb.jpg",
+    "headerUrl": "https://images.rbxcdn.com/7b3be68367a80b06798e4f50689b02bc.png"
   },
   {
     "id": "wot",
@@ -389,8 +389,8 @@
     "year": 2004,
     "badge": "MMORPG",
     "engine": "Proprietary",
-    "posterUrl": "",
-    "headerUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/25ee6b2a0f8bfdfcb7a61d1558c499db.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/4cf4e223e4404cb10e6a32b2608eaebc.jpg"
   },
   {
     "id": "overwatch2",
@@ -500,7 +500,8 @@
     "year": 1996,
     "badge": "2D Classic / Retro",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/61f2382ae086119fceb20536c0a0c641.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/33b0008ea6c750b2b8e3ea089cfafe46.jpg"
   },
   {
     "id": "hearthstone",
@@ -512,8 +513,8 @@
     "year": 2014,
     "badge": "eSports",
     "engine": "Unity",
-    "posterUrl": "",
-    "headerUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/81be0a1e0b50352efae9b244673cae1b.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/b24ee2dc35aebe2a091a1343729e7da1.jpg"
   },
   {
     "id": "tft",
@@ -525,8 +526,8 @@
     "year": 2019,
     "badge": "eSports",
     "engine": "Proprietary",
-    "posterUrl": "",
-    "headerUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/5e38bb678b879c3f4e242cf6f7614d3c.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/25f053255df98b09d3b84ff79738c8c7.jpg"
   },
   {
     "id": "rocketleague",
@@ -634,7 +635,8 @@
     "year": 2003,
     "badge": "2D Classic / Retro",
     "engine": "EAGL",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/1cf0db8cf6809ec01be00ee2ebaa80c4.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/a1772652bba770e7a83d47a06411136b.jpg"
   },
   {
     "id": "nfsug2",
@@ -646,7 +648,8 @@
     "year": 2004,
     "badge": "2D Classic / Retro",
     "engine": "EAGL",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/30c72bc6ce498ff0ef6d3d4bb9ff61ce.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/fcfae51147a4ba7ff04f32386a6358db.jpg"
   },
   {
     "id": "nfsmw",
@@ -658,7 +661,8 @@
     "year": 2005,
     "badge": "2D Classic / Retro",
     "engine": "EAGL",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/40ebcefa17b4c81f33fdf53823758b73.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/a4b12d7c5b16954a7c06ebf1f331d272.jpg"
   },
   {
     "id": "flatout",
@@ -1492,7 +1496,7 @@
     "id": "re8",
     "name": "Resident Evil Village",
     "genre": "Horror",
-    "weight": 1.0,
+    "weight": 1,
     "steamAppId": 1196590,
     "category": "aaa",
     "year": 2021,
@@ -1648,7 +1652,7 @@
     "id": "deathstranding",
     "name": "DEATH STRANDING",
     "genre": "Action",
-    "weight": 1.0,
+    "weight": 1,
     "steamAppId": 1190460,
     "category": "aaa",
     "year": 2020,
@@ -1666,7 +1670,8 @@
     "year": 2025,
     "badge": "AAA Next-Gen",
     "engine": "Decima",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/b88b22a6136d89269455325c88b2a37e.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/b88b22a6136d89269455325c88b2a37e.jpg"
   },
   {
     "id": "rdr",
@@ -1822,7 +1827,8 @@
     "year": 2004,
     "badge": "2D Classic / Retro",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/da92ef11bb470aeb0d94fb4dcf282776.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/da92ef11bb470aeb0d94fb4dcf282776.jpg"
   },
   {
     "id": "stronghold",
@@ -1858,7 +1864,8 @@
     "year": 2020,
     "badge": "Classic / Low-spec",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/d83764835e0766e4a282f9d50bdf922e.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/1dcbdf1a89bb662b29eeeb14cbe84996.jpg"
   },
   {
     "id": "starcraft",
@@ -1882,7 +1889,8 @@
     "year": 2010,
     "badge": "eSports",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/470da765e94b2a8d3da72729a4a7cf52.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/8916d1a1291ec9ec038a8ba0fa336336.jpg"
   },
   {
     "id": "cass",
@@ -1906,7 +1914,8 @@
     "year": 1998,
     "badge": "2D Classic / Retro",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/63e14c19ca42e20ff9d0c2688dc577c3.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/63e14c19ca42e20ff9d0c2688dc577c3.jpg"
   },
   {
     "id": "sims4",
@@ -1930,7 +1939,8 @@
     "year": 2020,
     "badge": "Indie",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/df3750519a7995804ca52f52fe63080c.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/df3750519a7995804ca52f52fe63080c.jpg"
   },
   {
     "id": "amongus",
@@ -2434,7 +2444,8 @@
     "year": 2017,
     "badge": "AAA",
     "engine": "Unity",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/fa8c5a4d04812328ba6c66cf1c70e281.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/5935041ffaa6b884dbb02b9f67a21f7c.jpg"
   },
   {
     "id": "hunt",
@@ -2830,7 +2841,8 @@
     "year": 2020,
     "badge": "Indie",
     "engine": "Godot",
-    "posterUrl": ""
+    "posterUrl": "https://cdn2.steamgriddb.com/thumb/4bf491f81cfbc2a688a221f7ebf8dcf6.jpg",
+    "headerUrl": "https://cdn2.steamgriddb.com/hero/4bf491f81cfbc2a688a221f7ebf8dcf6.jpg"
   },
   {
     "id": "bully",

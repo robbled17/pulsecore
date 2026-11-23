@@ -26,9 +26,9 @@ const (
 	defaultPollMS   = 1000
 	mainWindowW     = 1020
 	mainWindowH     = 680
-	miniHUDW        = 280
+	miniHUDW        = 360
 	miniHUDH        = 56
-	gameOverlayW    = 340
+	gameOverlayW    = 360
 	gameOverlayH    = 64
 	mainMinW        = 880
 	mainMinH        = 560
@@ -79,6 +79,8 @@ type App struct {
 	workerOnce   sync.Once
 	flightOnce   sync.Once
 	ecoPIDs      map[int32]bool
+	sensorLogs   []string
+	sensorLogMu  sync.Mutex
 }
 
 // SystemMetrics is a full snapshot of live hardware state.
@@ -663,8 +665,8 @@ func (a *App) ToggleMiniHUD(enable bool) {
 
 	if enable {
 		runtime.WindowUnmaximise(a.ctx)
-		runtime.WindowSetMinSize(a.ctx, miniHUDW, miniHUDH)
-		runtime.WindowSetMaxSize(a.ctx, miniHUDW, miniHUDH)
+		runtime.WindowSetMinSize(a.ctx, 220, miniHUDH)
+		runtime.WindowSetMaxSize(a.ctx, 600, 100)
 		runtime.WindowSetSize(a.ctx, miniHUDW, miniHUDH)
 		runtime.WindowSetAlwaysOnTop(a.ctx, true)
 		a.positionMiniHUD()
@@ -693,8 +695,8 @@ func (a *App) ToggleGameOverlay(enable bool) {
 
 	if enable {
 		runtime.WindowUnmaximise(a.ctx)
-		runtime.WindowSetMinSize(a.ctx, gameOverlayW, gameOverlayH)
-		runtime.WindowSetMaxSize(a.ctx, gameOverlayW, gameOverlayH)
+		runtime.WindowSetMinSize(a.ctx, 220, gameOverlayH)
+		runtime.WindowSetMaxSize(a.ctx, 600, 100)
 		runtime.WindowSetSize(a.ctx, gameOverlayW, gameOverlayH)
 		runtime.WindowSetAlwaysOnTop(a.ctx, true)
 		a.positionGameOverlay()
@@ -1225,5 +1227,126 @@ func foregroundPID() int32 {
 	var pid uint32
 	procGetWindowThreadProcId.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
 	return int32(pid)
+}
+
+// ToggleMaximise toggles native window maximize respecting taskbar work area.
+func (a *App) ToggleMaximise() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowToggleMaximise(a.ctx)
+}
+
+// IsMaximised reports whether the main window is maximised.
+func (a *App) IsMaximised() bool {
+	if a.ctx == nil {
+		return false
+	}
+	return runtime.WindowIsMaximised(a.ctx)
+}
+
+// Unmaximise restores the main window from maximised state.
+func (a *App) Unmaximise() {
+	if a.ctx == nil {
+		return
+	}
+	runtime.WindowUnmaximise(a.ctx)
+}
+
+func (a *App) addSensorLog(msg string) {
+	a.sensorLogMu.Lock()
+	defer a.sensorLogMu.Unlock()
+	entry := fmt.Sprintf("[%s] %s", time.Now().Format("15:04:05"), msg)
+	a.sensorLogs = append(a.sensorLogs, entry)
+	if len(a.sensorLogs) > 150 {
+		a.sensorLogs = a.sensorLogs[len(a.sensorLogs)-150:]
+	}
+}
+
+// GetSensorLogs returns buffered diagnostic sensor log entries for Dev Mode.
+func (a *App) GetSensorLogs() []string {
+	a.sensorLogMu.Lock()
+	defer a.sensorLogMu.Unlock()
+	if len(a.sensorLogs) == 0 {
+		return []string{"[" + time.Now().Format("15:04:05") + "] Telemetry stream initialized. No sensor errors."}
+	}
+	out := make([]string, len(a.sensorLogs))
+	copy(out, a.sensorLogs)
+	return out
+}
+
+// ClearSensorLogs clears the in-memory telemetry log.
+func (a *App) ClearSensorLogs() {
+	a.sensorLogMu.Lock()
+	defer a.sensorLogMu.Unlock()
+	a.sensorLogs = nil
+}
+
+// ForceRescanHardware clears hardware cache and re-enumerates system devices.
+func (a *App) ForceRescanHardware() map[string]interface{} {
+	a.mu.Lock()
+	a.staticHW = collectStaticHardware()
+	if a.staticHW.cpuName != "" {
+		a.cpuName = a.staticHW.cpuName
+	}
+	if a.staticHW.gpuName != "" {
+		a.gpuName = a.staticHW.gpuName
+	}
+	if a.staticHW.gpuVRAM > 0 {
+		a.gpuTotalVRAM = a.staticHW.gpuVRAM
+	}
+	a.mu.Unlock()
+	a.addSensorLog("Hardware re-enumeration completed successfully")
+	return map[string]interface{}{"ok": true, "message": "Железо успешно пересканировано"}
+}
+
+// CheckAdminStatus reports current process elevation token status.
+func (a *App) CheckAdminStatus() map[string]interface{} {
+	elevated := a.IsElevated()
+	msg := "Права администратора активны (Elevated)"
+	if !elevated {
+		msg = "Запущено без прав администратора"
+	}
+	a.addSensorLog(fmt.Sprintf("Admin rights verification: elevated=%v", elevated))
+	return map[string]interface{}{
+		"ok":       true,
+		"elevated": elevated,
+		"message":  msg,
+	}
+}
+
+// ResetAppCache clears internal handles, Win32 window caches and frees memory.
+func (a *App) ResetAppCache() map[string]interface{} {
+	invalidateMainHWNDCache()
+	debug.FreeOSMemory()
+	a.addSensorLog("Application cache cleared and OS memory released")
+	return map[string]interface{}{"ok": true, "message": "Кэш приложения сброшен"}
+}
+
+// GetDevTelemetry returns raw sensor and hardware attributes for Dev Mode table.
+func (a *App) GetDevTelemetry() map[string]interface{} {
+	m := a.GetMetrics()
+	elevated := a.IsElevated()
+	return map[string]interface{}{
+		"cpuName":        m.CPUName,
+		"cpuPercent":     m.CPUPercent,
+		"cpuPerCore":     m.CPUPerCore,
+		"temperatureC":   m.TemperatureC,
+		"tempAvailable":  m.TempAvailable,
+		"gpuName":        m.GPUName,
+		"gpuPercent":     m.GPUPercent,
+		"gpuTempC":       m.GPUTempC,
+		"gpuDriver":      m.Hardware.GPU.DriverVersion,
+		"vramDedicated":  m.Hardware.GPU.DedicatedMB,
+		"vramShared":     m.Hardware.GPU.SharedMB,
+		"vramUsed":       m.Hardware.GPU.UsedMB,
+		"ramTotalMB":     m.RAMTotalMB,
+		"ramUsedMB":      m.RAMUsedMB,
+		"ramPercent":     m.RAMPercent,
+		"disks":          m.Disks,
+		"powerMode":      m.PowerMode,
+		"pollIntervalMS": m.PollIntervalMS,
+		"isAdmin":        elevated,
+	}
 }
 

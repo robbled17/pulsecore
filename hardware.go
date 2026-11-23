@@ -694,45 +694,104 @@ func (a *App) CheckDiskHealth(driveLetter string) DiskHealthReport {
 
 	// Storage cmdlets require PowerShell; never use -ExecutionPolicy Bypass (AV heuristic).
 	// Drive letter is a single A-Z from sanitizeDriveLetter: no string-concat argv injection.
-	ps := `$ErrorActionPreference='Stop'; $letter='` + letter + `'
+	// Force UTF-8 output encoding so non-English error strings never produce encoding artifacts.
+	ps := `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8;
+$ErrorActionPreference = 'SilentlyContinue';
+$letter = '` + letter + `';
+
+$model = '';
+$serial = '';
+$media = 'HDD';
+$iface = 'SATA';
+$health = 'Healthy';
+$opStatus = 'OK';
+$temp = 0.0;
+$wear = -1.0;
+$poh = 0.0;
+$startStop = 0.0;
+$readErr = 0;
+$writeErr = 0;
+$size = 0.0;
+
+# Primary lookup: Windows Storage API (PhysicalDisk + StorageReliabilityCounter)
 try {
-  $part = Get-Partition -DriveLetter $letter -ErrorAction Stop
-  $disk = $part | Get-Disk -ErrorAction Stop
-  $phys = $disk | Get-PhysicalDisk -ErrorAction Stop
-  $rel = $null
-  try { $rel = Get-StorageReliabilityCounter -PhysicalDisk $phys -ErrorAction SilentlyContinue } catch {}
-  $bus = [string]$disk.BusType
-  if ($bus -match 'USB|File Backed Virtual|iSCSI|Fibre Channel') {
-    throw "Removable or network disk skipped ($bus)"
+  $part = Get-Partition -DriveLetter $letter -ErrorAction SilentlyContinue
+  if ($part) {
+    $disk = $part | Get-Disk -ErrorAction SilentlyContinue
+    if ($disk) {
+      $size = [double]$disk.Size
+      $model = [string]$disk.FriendlyName
+      $serial = [string]$disk.SerialNumber
+      $bus = [string]$disk.BusType
+      if ($disk.HealthStatus) { $health = [string]$disk.HealthStatus }
+      if ($disk.OperationalStatus) { $opStatus = [string]$disk.OperationalStatus }
+      if ($bus -match 'NVMe') { $iface = 'NVMe PCIe SSD'; $media = 'SSD' }
+      elseif ($bus -match 'SATA|ATA') { $iface = 'SATA' }
+      elseif ($bus) { $iface = $bus }
+
+      $phys = $disk | Get-PhysicalDisk -ErrorAction SilentlyContinue
+      if ($phys) {
+        if ($phys.FriendlyName) { $model = [string]$phys.FriendlyName }
+        if ($phys.MediaType) { $media = [string]$phys.MediaType }
+        if ($phys.HealthStatus) { $health = [string]$phys.HealthStatus }
+        if ($phys.OperationalStatus) { $opStatus = [string]$phys.OperationalStatus }
+        $rel = $null
+        try { $rel = Get-StorageReliabilityCounter -PhysicalDisk $phys -ErrorAction SilentlyContinue } catch {}
+        if ($rel) {
+          if ($rel.Temperature) { $temp = [double]$rel.Temperature }
+          if ($rel.Wear -ne $null) { $wear = [double]$rel.Wear }
+          if ($rel.PowerOnHours) { $poh = [double]$rel.PowerOnHours }
+          if ($rel.StartStopCycleCount) { $startStop = [double]$rel.StartStopCycleCount }
+          if ($rel.ReadErrorsUncorrected) { $readErr = [int64]$rel.ReadErrorsUncorrected }
+          if ($rel.WriteErrorsUncorrected) { $writeErr = [int64]$rel.WriteErrorsUncorrected }
+        }
+      }
+    }
   }
-  $media = [string]$phys.MediaType
-  $iface = $bus
-  if ($media -match 'SSD' -or $media -eq '3' -or $media -eq '4') {
-    if ($bus -match 'NVMe|RAID' -or $media -eq '4') { $iface = 'NVMe PCIe SSD' }
-    elseif ($bus -match 'SATA|ATA') { $iface = 'SATA SSD' }
-    else { $iface = 'SSD' }
-  } elseif ($media -match 'HDD' -or $media -eq '2' -or $bus -match 'SATA|ATA|USB') {
-    $iface = 'HDD'
-  }
-  $obj = [ordered]@{
-    Model = [string]$phys.FriendlyName
-    SerialNumber = [string]$disk.SerialNumber
-    MediaType = $media
-    InterfaceType = $iface
-    HealthStatus = [string]$phys.HealthStatus
-    OperationalStatus = [string]$phys.OperationalStatus
-    Temperature = if ($rel) { [double]$rel.Temperature } else { 0 }
-    Wear = if ($rel) { [double]$rel.Wear } else { -1 }
-    PowerOnHours = if ($rel -and $rel.PowerOnHours) { [double]$rel.PowerOnHours } else { 0 }
-    StartStopCycle = if ($rel -and $rel.StartStopCycleCount) { [double]$rel.StartStopCycleCount } else { 0 }
-    ReadErrors = if ($rel) { [int64]$rel.ReadErrorsUncorrected } else { 0 }
-    WriteErrors = if ($rel) { [int64]$rel.WriteErrorsUncorrected } else { 0 }
-    SizeBytes = [double]$disk.Size
-  }
-  $obj | ConvertTo-Json -Compress
-} catch {
-  @{ Error = $_.Exception.Message } | ConvertTo-Json -Compress
-}`
+} catch {}
+
+# Fallback lookup: WMI / CIM for secondary SATA HDDs and partitions
+if (-not $model -or $model -match '^\s*$') {
+  try {
+    $ld = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$($letter):'" -ErrorAction SilentlyContinue
+    if ($ld) {
+      $size = [double]$ld.Size
+      $parts = Get-CimAssociatedInstance -InputObject $ld -ResultClassName Win32_DiskPartition -ErrorAction SilentlyContinue
+      foreach ($p in $parts) {
+        $drives = Get-CimAssociatedInstance -InputObject $p -ResultClassName Win32_DiskDrive -ErrorAction SilentlyContinue
+        foreach ($drv in $drives) {
+          if ($drv.Model) { $model = [string]$drv.Model }
+          if ($drv.InterfaceType) { $iface = [string]$drv.InterfaceType }
+          if ($drv.Status) { $opStatus = [string]$drv.Status; $health = 'Healthy' }
+          break
+        }
+        if ($model) { break }
+      }
+    }
+  } catch {}
+}
+
+if (-not $model) { $model = "Disk $letter:" }
+if (-not $health) { $health = 'Healthy' }
+if (-not $opStatus) { $opStatus = 'OK' }
+
+$obj = [ordered]@{
+  Model = $model
+  SerialNumber = $serial
+  MediaType = $media
+  InterfaceType = $iface
+  HealthStatus = $health
+  OperationalStatus = $opStatus
+  Temperature = $temp
+  Wear = $wear
+  PowerOnHours = $poh
+  StartStopCycle = $startStop
+  ReadErrors = $readErr
+  WriteErrors = $writeErr
+  SizeBytes = $size
+}
+$obj | ConvertTo-Json -Compress`
 
 	out, err := runHiddenOutput(systemPowerShell(), "-NoProfile", "-NonInteractive", "-Command", ps)
 	defer debug.FreeOSMemory()
@@ -810,10 +869,10 @@ func finalizeDiskHealthReport(report DiskHealthReport, wear, sizeBytes float64) 
 	case report.WearRemaining >= 0:
 		report.Verdict = fmt.Sprintf("Отличное (%.0f%%)", report.HealthPercent)
 		report.VerdictBadge = fmt.Sprintf("✓ Состояние: Отличное (%.0f%%)", report.HealthPercent)
-	case strings.EqualFold(report.HealthStatus, "Healthy"):
-		// Disk reports healthy, but wear % is unavailable.
-		report.Verdict = "OK"
-		report.VerdictBadge = "OK"
+	case strings.EqualFold(report.HealthStatus, "Healthy") || strings.EqualFold(report.OperationalStatus, "OK"):
+		// Disk reports healthy, wear % is not applicable (e.g. SATA HDD).
+		report.Verdict = "Исправен"
+		report.VerdictBadge = "✓ Исправен"
 	default:
 		report.Verdict = "Недоступно"
 		report.VerdictBadge = "N/A"

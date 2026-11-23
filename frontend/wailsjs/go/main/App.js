@@ -225,3 +225,59 @@ export function RestartAsAdministrator() {
 export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
+
+export function TitlebarDragBegin() {
+  return window['go']['main']['App']['TitlebarDragBegin']();
+}
+
+export function TitlebarToggleMaximise() {
+  return window['go']['main']['App']['TitlebarToggleMaximise']();
+}
+
+export function WindowMaximisedState() {
+  return window['go']['main']['App']['WindowMaximisedState']();
+}
+
+export function ToggleMaximise() {
+  return window['go']['main']['App']['ToggleMaximise']();
+}
+
+export function IsMaximised() {
+  return window['go']['main']['App']['IsMaximised']();
+}
+
+export function Unmaximise() {
+  return window['go']['main']['App']['Unmaximise']();
+}
+
+export function ScanSystemClean() {
+  return window['go']['main']['App']['ScanSystemClean']();
+}
+
+export function CleanSystemCategories(arg1) {
+  return window['go']['main']['App']['CleanSystemCategories'](arg1);
+}
+
+export function GetSensorLogs() {
+  return window['go']['main']['App']['GetSensorLogs']();
+}
+
+export function ClearSensorLogs() {
+  return window['go']['main']['App']['ClearSensorLogs']();
+}
+
+export function ForceRescanHardware() {
+  return window['go']['main']['App']['ForceRescanHardware']();
+}
+
+export function CheckAdminStatus() {
+  return window['go']['main']['App']['CheckAdminStatus']();
+}
+
+export function ResetAppCache() {
+  return window['go']['main']['App']['ResetAppCache']();
+}
+
+export function GetDevTelemetry() {
+  return window['go']['main']['App']['GetDevTelemetry']();
+}

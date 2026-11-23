@@ -113,3 +113,31 @@ export function IsElevated():Promise<boolean>;
 export function RestartAsAdministrator():Promise<void>;
 
 export function CheckForUpdates():Promise<Record<string, any>>;
+
+export function TitlebarDragBegin():Promise<void>;
+
+export function TitlebarToggleMaximise():Promise<void>;
+
+export function WindowMaximisedState():Promise<boolean>;
+
+export function ToggleMaximise():Promise<void>;
+
+export function IsMaximised():Promise<boolean>;
+
+export function Unmaximise():Promise<void>;
+
+export function ScanSystemClean():Promise<Record<string, any>>;
+
+export function CleanSystemCategories(arg1:Array<string>):Promise<Record<string, any>>;
+
+export function GetSensorLogs():Promise<Array<string>>;
+
+export function ClearSensorLogs():Promise<void>;
+
+export function ForceRescanHardware():Promise<Record<string, any>>;
+
+export function CheckAdminStatus():Promise<Record<string, any>>;
+
+export function ResetAppCache():Promise<Record<string, any>>;
+
+export function GetDevTelemetry():Promise<Record<string, any>>;

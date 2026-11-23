@@ -156,13 +156,15 @@ func matchGPUDatabase(n string) (score float64, ok bool) {
 	case strings.Contains(n, "3060"):
 		return 60, true
 	case strings.Contains(n, "2060 super"):
-		return 55, true
+		return 80, true
 	case strings.Contains(n, "2070 super"):
-		return 62, true
+		return 84, true
+	case strings.Contains(n, "2070"):
+		return 80, true
 	case strings.Contains(n, "2080"):
-		return 68, true
+		return 88, true
 	case strings.Contains(n, "2060"):
-		return 50, true
+		return 70, true
 	case strings.Contains(n, "1660"):
 		return 42, true
 	case strings.Contains(n, "1650"):

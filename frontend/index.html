@@ -120,18 +120,6 @@
           <button type="button" id="insight-more" class="insight-more hidden" hidden></button>
         </div>
 
-        <div class="panel clean-panel-compact" id="clean-panel">
-          <div class="panel-title row-between">
-            <span data-i18n="cleanTitle">Очистка Temp / Cache</span>
-            <button type="button" class="btn compact" id="btn-clean-preview" data-i18n="cleanPreview">Оценить размер</button>
-          </div>
-          <p class="muted clean-sub" data-i18n="cleanSub">Безопасная очистка только белых списков: Temp, кэш браузеров, D3DSCache. Сначала оценка, потом удаление.</p>
-          <div id="clean-preview" class="clean-preview muted" data-i18n="cleanPreviewEmpty">Нажмите «Оценить размер», чтобы увидеть, что будет удалено.</div>
-          <div class="btn-row" style="margin-top:10px">
-            <button type="button" class="btn compact danger" id="btn-clean-run" data-i18n="cleanRun" disabled>Очистить</button>
-          </div>
-        </div>
-
         <div class="cards">
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
             <div class="metric-head">
@@ -322,7 +310,7 @@
         </details>
 
         <details class="panel hw-block expand-panel" data-hw="ssd" open>
-          <summary class="panel-title expand-summary" data-i18n="hwSSD">SSD / диски</summary>
+          <summary class="panel-title expand-summary" data-i18n="hwSSD">Диски (SSD / HDD)</summary>
           <div id="hw-ssd-list" class="hw-ssd-list">
             <div class="empty" data-i18n="ssdLoading">Загрузка S.M.A.R.T…</div>
           </div>
@@ -371,6 +359,41 @@
           <h1 data-i18n="uninstallTitle">Умное удаление</h1>
           <p data-i18n="uninstallSub">Процессы, остатки и трассировка установки</p>
         </header>
+
+        <div class="panel system-clean-panel" id="system-clean-panel">
+          <div class="panel-title row-between">
+            <span data-i18n="cleanTitle">Очистка системы</span>
+            <button type="button" class="btn compact" id="btn-sysclean-scan" data-i18n="cleanScanBtn">Сканировать</button>
+          </div>
+          <p class="muted clean-sub" data-i18n="cleanSub">Безопасное удаление временных файлов, кэша браузеров и шейдеров DirectX без затрагивания личных данных.</p>
+          <div class="clean-categories" id="clean-categories">
+            <label class="clean-cat-item">
+              <input type="checkbox" id="clean-chk-temp" checked data-cat="temp" />
+              <div class="clean-cat-info">
+                <span class="clean-cat-title" data-i18n="cleanCatTemp">Временные файлы Windows</span>
+                <span class="clean-cat-size metric" id="clean-size-temp">-</span>
+              </div>
+            </label>
+            <label class="clean-cat-item">
+              <input type="checkbox" id="clean-chk-browser" checked data-cat="browser" />
+              <div class="clean-cat-info">
+                <span class="clean-cat-title" data-i18n="cleanCatBrowser">Кэш браузеров</span>
+                <span class="clean-cat-size metric" id="clean-size-browser">-</span>
+              </div>
+            </label>
+            <label class="clean-cat-item">
+              <input type="checkbox" id="clean-chk-directx" checked data-cat="directx" />
+              <div class="clean-cat-info">
+                <span class="clean-cat-title" data-i18n="cleanCatDirectX">Кэш шейдеров DirectX</span>
+                <span class="clean-cat-size metric" id="clean-size-directx">-</span>
+              </div>
+            </label>
+          </div>
+          <div class="btn-row" style="margin-top:12px">
+            <button type="button" class="btn compact danger" id="btn-sysclean-run" data-i18n="cleanRun" disabled>Очистить выбранное</button>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-title row-between">
             <span data-i18n="uninstallListTitle">Установленные программы</span>
@@ -550,19 +573,35 @@
       <section id="tab-dev" class="tab">
         <header class="section-head">
           <h1 data-i18n="tabDevMode">Dev Mode</h1>
-          <p data-i18n="devModeSub">Пороги, источники метрик и демо-профили (сессия)</p>
+          <p data-i18n="devModeSub">Диагностика сенсоров, сырая телеметрия и журнал опроса</p>
         </header>
         <div class="dev-toolbar">
-          <button type="button" class="btn compact" id="btn-dev-reset" data-i18n="devResetDefaults">Сбросить Dev</button>
+          <button type="button" class="btn compact" id="btn-dev-rescan" data-i18n="devRescanHw">Пересканировать железо</button>
+          <button type="button" class="btn compact" id="btn-dev-clearcache" data-i18n="devClearCache">Сбросить кэш</button>
+          <button type="button" class="btn compact" id="btn-dev-checkadmin" data-i18n="devCheckAdmin">Проверить права админа</button>
+          <button type="button" class="btn compact" id="btn-dev-copylog" data-i18n="devCopyLog">Скопировать лог</button>
           <button type="button" class="btn compact danger" id="btn-dev-disable" data-i18n="devModeDisableBtn">Выключить Dev Mode</button>
         </div>
 
-        <details class="panel expand-panel" open>
-          <summary class="panel-title expand-summary">CPU</summary>
+        <div class="panel">
+          <div class="panel-title row-between">
+            <span data-i18n="devLogTitle">Журнал опроса датчиков и ошибок</span>
+            <button type="button" class="btn compact ghost" id="btn-dev-clearlog" data-i18n="devClearLog">Очистить лог</button>
+          </div>
+          <div id="dev-sensor-log" class="dev-log-box" spellcheck="false">Загрузка лога датчиков...</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title" data-i18n="devRawTelemetryTitle">Таблица сырых значений датчиков</div>
+          <div id="dev-telemetry-table" class="dev-telemetry-container"></div>
+        </div>
+
+        <details class="panel expand-panel">
+          <summary class="panel-title expand-summary" data-i18n="devSettingsTitle">Тонкая настройка порогов (сессия)</summary>
           <div class="dev-grid">
             <label class="dev-field"><span data-i18n="devTempSource">Источник температуры</span>
               <select id="dev-temp-source" class="lang-select lang-select-block">
-                <option value="auto">Auto (WMI → PDH → sensors)</option>
+                <option value="auto">Auto (WMI -> PDH -> sensors)</option>
                 <option value="wmi">WMI</option>
                 <option value="pdh">PDH</option>
                 <option value="sensors">Sensors</option>
@@ -574,34 +613,12 @@
             <label class="dev-field"><span data-i18n="devPeakSens">Чувствительность пиков %</span>
               <input type="number" id="dev-peak-sens" class="dev-input" min="70" max="100" step="1" />
             </label>
-            <label class="dev-field"><span data-i18n="devEcoAllow">Eco allow-list</span>
-              <input type="text" id="dev-eco-allow" class="dev-input" placeholder="chrome.exe, discord.exe" />
-            </label>
-            <label class="dev-field wide"><span data-i18n="devEcoDeny">Eco deny-list</span>
-              <input type="text" id="dev-eco-deny" class="dev-input" placeholder="csrss.exe, lsass.exe, svchost.exe" />
-            </label>
-            <label class="check-row"><input type="checkbox" id="dev-show-percore" /> <span data-i18n="devShowPerCore">Показать нагрузку по ядрам</span></label>
-          </div>
-        </details>
-
-        <details class="panel expand-panel">
-          <summary class="panel-title expand-summary">GPU</summary>
-          <div class="dev-grid">
-            <label class="dev-field wide"><span data-i18n="devForceAdapter">Force adapter</span>
-              <input type="text" id="dev-force-adapter" class="dev-input" placeholder="RTX / UHD / leave empty" />
-            </label>
             <label class="dev-field"><span data-i18n="devGpuTempWarn">GPU temp warn °C</span>
               <input type="number" id="dev-gpu-temp" class="dev-input" min="60" max="110" step="1" />
             </label>
             <label class="dev-field"><span data-i18n="devVramWarn">VRAM warn %</span>
               <input type="number" id="dev-vram-warn" class="dev-input" min="50" max="100" step="1" />
             </label>
-          </div>
-        </details>
-
-        <details class="panel expand-panel">
-          <summary class="panel-title expand-summary">RAM / Disks</summary>
-          <div class="dev-grid">
             <label class="dev-field"><span data-i18n="devRamWarn">RAM warn %</span>
               <input type="number" id="dev-ram-warn" class="dev-input" min="50" max="99" step="1" />
             </label>
@@ -609,22 +626,7 @@
               <input type="number" id="dev-disk-warn" class="dev-input" min="50" max="99" step="1" />
             </label>
             <label class="check-row"><input type="checkbox" id="dev-smart" checked /> <span data-i18n="devSmart">S.M.A.R.T. enabled</span></label>
-            <label class="check-row"><input type="checkbox" id="dev-removable" /> <span data-i18n="devRemovable">Show removable disks</span></label>
-          </div>
-        </details>
-
-        <details class="panel expand-panel">
-          <summary class="panel-title expand-summary">Network / UI</summary>
-          <div class="dev-grid">
-            <label class="dev-field"><span data-i18n="devPingGw">Ping gateway</span>
-              <input type="text" id="dev-ping-gw" class="dev-input" placeholder="auto" />
-            </label>
-            <label class="dev-field"><span data-i18n="devPingPublic">Ping public</span>
-              <input type="text" id="dev-ping-public" class="dev-input" placeholder="8.8.8.8" />
-            </label>
-            <label class="dev-field"><span data-i18n="devPollMs">Poll ms</span>
-              <input type="number" id="dev-poll-ms" class="dev-input" min="250" max="5000" step="50" />
-            </label>
+            <label class="check-row"><input type="checkbox" id="dev-show-percore" /> <span data-i18n="devShowPerCore">Показать нагрузку по ядрам</span></label>
             <div class="dev-field">
               <span data-i18n="devMockProfile">Mock A/B/C</span>
               <div class="dev-mock-row" id="dev-mock-row">

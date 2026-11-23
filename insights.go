@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -35,15 +37,20 @@ type MonthlyAppReport struct {
 type LagDiagnosis struct {
 	GatewayHost      string  `json:"gatewayHost"`
 	GatewayMs        float64 `json:"gatewayMs"`
-	GatewayBadge     string  `json:"gatewayBadge"`     // i18n key
+	GatewayBadge     string  `json:"gatewayBadge"` // i18n key
 	GatewayBadgeOK   bool    `json:"gatewayBadgeOK"`
+	GatewayRating    string  `json:"gatewayRating"`
 	PublicHost       string  `json:"publicHost"`
 	PublicMs         float64 `json:"publicMs"`
 	PublicBadge      string  `json:"publicBadge"`
 	PublicBadgeOK    bool    `json:"publicBadgeOK"`
+	PublicRating     string  `json:"publicRating"`
 	LocalJitterMs    float64 `json:"localJitterMs"`
 	JitterBadge      string  `json:"jitterBadge"`
 	JitterBadgeOK    bool    `json:"jitterBadgeOK"`
+	StabilityStatus  string  `json:"stabilityStatus"`
+	LocalIP          string  `json:"localIP"`
+	ExternalIP       string  `json:"externalIP"`
 	Verdict          string  `json:"verdict"`
 	VerdictKey       string  `json:"verdictKey"`
 	Level            string  `json:"level"` // wifi | provider | pc | ok
@@ -193,7 +200,7 @@ func parseGenericEnergyApps(raw string) []AppUsageEntry {
 	return out
 }
 
-// DiagnoseLagOrigin compares Wi-Fi gateway, ISP DNS and local scheduler jitter.
+// DiagnoseLagOrigin compares Wi-Fi gateway, ISP DNS, local scheduler jitter, and IP addresses.
 func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	diag := LagDiagnosis{
 		PublicHost: "8.8.8.8",
@@ -204,9 +211,11 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 		gw = "192.168.1.1"
 	}
 	diag.GatewayHost = gw
+	diag.LocalIP = getLocalIPv4()
+	diag.ExternalIP = getExternalIPv4()
 
 	// Native Go TCP/UDP latency (locale-agnostic). Never parse ping.exe text
-	// (English time= / Russian время= breaks on other Windows locales).
+	// (English time= / Russian time= breaks on other Windows locales).
 	diag.GatewayMs = measureHostLatencyMs(gw, 2)
 	dnsA := measureHostLatencyMs("8.8.8.8", 2)
 	dnsB := measureHostLatencyMs("1.1.1.1", 2)
@@ -220,6 +229,33 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	diag.GatewayBadgeOK = diag.GatewayMs >= 0 && diag.GatewayMs <= 15
 	diag.PublicBadgeOK = diag.PublicMs >= 0 && diag.PublicMs <= 40
 	diag.JitterBadgeOK = diag.LocalJitterMs >= 0 && diag.LocalJitterMs <= 20
+
+	if diag.GatewayMs >= 0 && diag.GatewayMs <= 2 {
+		diag.GatewayRating = "Отлично для онлайн-игр"
+	} else if diag.GatewayMs >= 0 && diag.GatewayMs <= 15 {
+		diag.GatewayRating = "Норма"
+	} else if diag.GatewayMs > 15 {
+		diag.GatewayRating = "Высокая задержка"
+	} else {
+		diag.GatewayRating = "Недоступен"
+	}
+
+	if diag.PublicMs >= 0 && diag.PublicMs <= 35 {
+		diag.PublicRating = "Отлично для онлайн-игр"
+	} else if diag.PublicMs >= 0 && diag.PublicMs <= 70 {
+		diag.PublicRating = "Норма"
+	} else if diag.PublicMs > 70 {
+		diag.PublicRating = "Высокая задержка"
+	} else {
+		diag.PublicRating = "Недоступен"
+	}
+
+	if diag.LocalJitterMs <= 15 {
+		diag.StabilityStatus = "Стабильно, потерь пакетов нет"
+	} else {
+		diag.StabilityStatus = "Возможны задержки в играх"
+	}
+
 	if diag.GatewayBadgeOK {
 		diag.GatewayBadge = "netBadgeIdeal"
 	} else if diag.GatewayMs < 0 {
@@ -259,6 +295,46 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 		diag.Verdict = diag.VerdictKey
 	}
 	return diag
+}
+
+func getLocalIPv4() string {
+	conn, err := net.DialTimeout("udp", "8.8.8.8:80", 400*time.Millisecond)
+	if err == nil {
+		defer conn.Close()
+		if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+			return addr.IP.String()
+		}
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err == nil {
+		for _, a := range addrs {
+			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
+}
+
+func getExternalIPv4() string {
+	client := &http.Client{Timeout: 1200 * time.Millisecond}
+	endpoints := []string{
+		"https://api.ipify.org",
+		"https://icanhazip.com",
+		"https://checkip.amazonaws.com",
+	}
+	for _, ep := range endpoints {
+		resp, err := client.Get(ep)
+		if err == nil {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 64))
+			resp.Body.Close()
+			ip := strings.TrimSpace(string(body))
+			if net.ParseIP(ip) != nil {
+				return ip
+			}
+		}
+	}
+	return ""
 }
 
 func minPositiveLatency(a, b float64) float64 {

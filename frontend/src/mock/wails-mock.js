@@ -1000,6 +1000,66 @@ const App = {
       downloadURL: 'https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe',
     }
   },
+  TitlebarDragBegin: async () => {},
+  TitlebarToggleMaximise: async () => {},
+  WindowMaximisedState: async () => false,
+  ToggleMaximise: async () => {},
+  IsMaximised: async () => false,
+  Unmaximise: async () => {},
+  ScanSystemClean: async () => ({
+    categories: [
+      { id: 'temp', title: 'Временные файлы Windows', files: 142, bytes: 48 * 1024 * 1024, sizeMB: 48.0, reachable: true },
+      { id: 'browser', title: 'Кэш браузеров', files: 890, bytes: 185 * 1024 * 1024, sizeMB: 185.0, reachable: true },
+      { id: 'directx', title: 'Кэш шейдеров DirectX', files: 24, bytes: 32 * 1024 * 1024, sizeMB: 32.0, reachable: true }
+    ],
+    totalFiles: 1056,
+    totalBytes: 265 * 1024 * 1024,
+    totalMB: 265.0
+  }),
+  CleanSystemCategories: async (cats) => ({
+    ok: true,
+    deletedFiles: 1056,
+    deletedBytes: 265 * 1024 * 1024,
+    skipped: 0,
+    errors: 0,
+    targets: ['%TEMP%', 'Cache', 'D3DSCache'],
+    message: 'Очищено файлов: 1056 (265.0 МБ), пропущено: 0, ошибок: 0'
+  }),
+  GetSensorLogs: async () => [
+    '[12:00:00] Initialized sensor subsystem (WMI / NVML / Storage)',
+    '[12:00:01] CPU temp polled: 48°C (latency 12ms)',
+    '[12:00:01] GPU NVML polled: RTX 2060 Super, 33°C, 8192 MB (latency 4ms)',
+    '[12:00:01] S.M.A.R.T. polled for C: (Healthy, 100%)',
+    '[12:00:01] S.M.A.R.T. polled for E: (Healthy, SATA HDD)'
+  ],
+  ClearSensorLogs: async () => {},
+  ForceRescanHardware: async () => ({ ok: true, message: 'Железо успешно пересканировано' }),
+  CheckAdminStatus: async () => ({ ok: true, elevated: false, message: 'Запущено в режиме пользователя' }),
+  ResetAppCache: async () => ({ ok: true, message: 'Кэш приложения сброшен' }),
+  GetDevTelemetry: async () => ({
+    cpuName: 'AMD Ryzen 5 3600',
+    cpuPercent: 24.5,
+    cpuPerCore: [22, 28, 19, 31, 24, 23],
+    temperatureC: 48.0,
+    tempAvailable: true,
+    gpuName: 'NVIDIA GeForce RTX 2060 Super',
+    gpuPercent: 18.0,
+    gpuTempC: 33.0,
+    gpuDriver: '560.94',
+    vramDedicated: 8192,
+    vramShared: 8192,
+    vramUsed: 1420,
+    ramTotalMB: 16384,
+    ramUsedMB: 7120,
+    ramPercent: 43.5,
+    disks: [
+      { mount: 'C:', totalGB: 512, usedGB: 455, freeGB: 57, percent: 89, readMBps: 1.2, writeMBps: 0.8 },
+      { mount: 'E:', totalGB: 1000, usedGB: 620, freeGB: 380, percent: 62, readMBps: 0.0, writeMBps: 0.0 }
+    ],
+    powerMode: 'balanced',
+    pollIntervalMS: 1000,
+    isAdmin: false
+  }),
   /** Demo-only helper: not present on live Wails App. */
   SetMockProfile: async (id) => setMockProfile(id),
   GetMockProfile: async () => state.profile,
@@ -1021,6 +1081,8 @@ window.runtime = {
   WindowMinimise() {},
   WindowMaximise() {},
   WindowUnmaximise() {},
+  WindowToggleMaximise() {},
+  WindowSetSize() {},
   WindowIsMaximised() { return false },
   WindowFullscreen() { state.fullscreen = true },
   WindowUnfullscreen() { state.fullscreen = false },
