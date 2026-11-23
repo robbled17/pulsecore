@@ -15,8 +15,8 @@ func TestFinalizeDiskHealthNeverInventsWear(t *testing.T) {
 	if got.Verdict != "Недоступно" && got.VerdictBadge != "N/A" {
 		t.Fatalf("expected unavailable verdict, got %q / %q", got.Verdict, got.VerdictBadge)
 	}
-	if !got.OK {
-		t.Fatal("model present: OK should stay true")
+	if got.OK {
+		t.Fatal("unavailable SMART verdict must not set OK=true")
 	}
 }
 
@@ -33,6 +33,9 @@ func TestFinalizeDiskHealthHealthyWithoutWear(t *testing.T) {
 	if got.Verdict != "OK" {
 		t.Fatalf("expected OK verdict, got %q", got.Verdict)
 	}
+	if !got.OK {
+		t.Fatal("Healthy without wear must set OK=true")
+	}
 }
 
 func TestFinalizeDiskHealthRealWear(t *testing.T) {
@@ -47,5 +50,8 @@ func TestFinalizeDiskHealthRealWear(t *testing.T) {
 	}
 	if got.TBWGB <= 0 {
 		t.Fatal("expected TBW estimate from size*wear")
+	}
+	if !got.OK {
+		t.Fatal("wear report must set OK=true")
 	}
 }

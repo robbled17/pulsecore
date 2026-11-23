@@ -10,6 +10,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -151,46 +152,34 @@ func readNVIDIASMI() (tempC, utilPct, usedMB, totalMB float64) {
 	if smi == "" {
 		return 0, 0, 0, 0
 	}
-	ctxDone := time.After(4 * time.Second)
-	type result struct {
-		out []byte
-		err error
-	}
-	ch := make(chan result, 1)
-	go func() {
-		cmd := exec.Command(smi,
-			"--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total",
-			"--format=csv,noheader,nounits")
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-		out, err := cmd.Output()
-		ch <- result{out, err}
-	}()
-	select {
-	case <-ctxDone:
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, smi,
+		"--query-gpu=temperature.gpu,utilization.gpu,memory.used,memory.total",
+		"--format=csv,noheader,nounits")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	out, err := cmd.Output()
+	if err != nil {
 		return 0, 0, 0, 0
-	case r := <-ch:
-		if r.err != nil {
-			return 0, 0, 0, 0
-		}
-		line := strings.TrimSpace(string(r.out))
-		if line == "" {
-			return 0, 0, 0, 0
-		}
-		// Multi-GPU: take first discrete row (first line).
-		if i := strings.IndexByte(line, '\n'); i >= 0 {
-			line = strings.TrimSpace(line[:i])
-		}
-		parts := strings.Split(line, ",")
-		if len(parts) < 4 {
-			return 0, 0, 0, 0
-		}
-		tempC, _ = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
-		utilPct, _ = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		usedMB, _ = strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
-		totalMB, _ = strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
-		if tempC < 10 || tempC > 125 {
-			tempC = 0
-		}
-		return tempC, utilPct, usedMB, totalMB
 	}
+	line := strings.TrimSpace(string(out))
+	if line == "" {
+		return 0, 0, 0, 0
+	}
+	// Multi-GPU: take first discrete row (first line).
+	if i := strings.IndexByte(line, '\n'); i >= 0 {
+		line = strings.TrimSpace(line[:i])
+	}
+	parts := strings.Split(line, ",")
+	if len(parts) < 4 {
+		return 0, 0, 0, 0
+	}
+	tempC, _ = strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	utilPct, _ = strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	usedMB, _ = strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
+	totalMB, _ = strconv.ParseFloat(strings.TrimSpace(parts[3]), 64)
+	if tempC < 10 || tempC > 125 {
+		tempC = 0
+	}
+	return tempC, utilPct, usedMB, totalMB
 }

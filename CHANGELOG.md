@@ -15,6 +15,10 @@
 ### Fixed (silent audit)
 - Production builds ignore `setActiveTab('dev')` and clear any Dev Mode active state at boot
 - Release workflow sets `overwrite_files` / `make_latest` so a force-moved `v1.0.0` tag replaces assets cleanly
+- Disk health: `OK` is false when SMART verdict is unavailable (no false SMARTOK in diagnostics)
+- CPU temp path no longer substitutes GPU package temperature
+- Sensor helper kills nvidia-smi on timeout (`CommandContext`)
+- Elevated relaunch forwards CLI args via `runas`
 
 
 ## 1.6.5
