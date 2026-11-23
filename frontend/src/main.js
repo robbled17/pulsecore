@@ -213,6 +213,8 @@ async function changeLanguage(next) {
 }
 
 function setActiveTab(name) {
+  // Production builds never expose Dev Mode; ignore any stray navigation.
+  if (name === 'dev' && !DEV_MODE_ENABLED) return
   document.querySelectorAll('.nav-item').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === name)
   })
@@ -3268,7 +3270,8 @@ function boot() {
   } else {
     $('dev-mode-badge')?.classList.add('hidden')
     document.querySelectorAll('.dev-mode-nav').forEach((n) => n.classList.add('hidden'))
-    $('tab-dev')?.classList.add('hidden')
+    // Keep the panel out of the active stack; .tab CSS already hides inactive tabs.
+    $('tab-dev')?.classList.remove('active')
   }
   $('btn-restart-admin')?.addEventListener('click', () => { restartAsAdmin() })
   $('hw-temp-tip-btn')?.addEventListener('click', () => {

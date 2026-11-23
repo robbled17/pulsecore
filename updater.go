@@ -189,7 +189,7 @@ func parseSemverPart(s string) int {
 	if s == "" {
 		return 0
 	}
-	// Strip pre-release / build metadata for numeric compare (1.6.4-rc1 -> 1.6.4)
+	// Strip pre-release / build metadata for numeric compare (1.0.0-rc1 -> 1.0.0)
 	for i, r := range s {
 		if r < '0' || r > '9' {
 			s = s[:i]
@@ -206,7 +206,7 @@ func parseSemverPart(s string) int {
 	return n
 }
 
-// FormatAppVersionLabel returns a display tag like "v1.6.4".
+// FormatAppVersionLabel returns a display tag like "v1.0.0".
 func FormatAppVersionLabel() string {
 	return fmt.Sprintf("v%s", appVersion)
 }

@@ -696,7 +696,8 @@ func finalizeDiskHealthReport(report DiskHealthReport, wear, sizeBytes float64) 
 		report.Verdict = "Недоступно"
 		report.VerdictBadge = "N/A"
 	}
-	report.OK = true
+	// OK means we have a usable health verdict, not merely that a model string came back.
+	report.OK = report.Verdict != "Недоступно" && report.VerdictBadge != "N/A"
 	return report
 }
 

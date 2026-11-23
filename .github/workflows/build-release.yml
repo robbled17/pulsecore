@@ -257,6 +257,9 @@ jobs:
           name: PulseCore ${{ env.RELEASE_TAG }}
           body_path: release-notes.md
           draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag == '' }}
+          # Silent retag (same vX.Y.Z) must replace existing assets on the release.
+          overwrite_files: true
+          make_latest: true
           files: |
             dist/pulsecore.exe
             dist/pulsecore.exe.sha256

@@ -148,10 +148,7 @@ func readCPUTemperatureCached() (tempC float64, needsAdmin bool) {
 		if helper.CPUTempC > 0 {
 			return helper.CPUTempC, false
 		}
-		if helper.GPUTempC > 0 {
-			// Prefer any real package sensor over inventing ACPI values.
-			return helper.GPUTempC, false
-		}
+		// Do not substitute GPU package temp as CPU - UI labels it as CPU.
 		needsAdmin = helper.NeedsAdmin
 	}
 	acpi := readCPUTemperatureACPI()

@@ -68,12 +68,31 @@ func relaunchElevated() error {
 	if err != nil {
 		return err
 	}
+	params := ""
+	if len(os.Args) > 1 {
+		quoted := make([]string, 0, len(os.Args)-1)
+		for _, a := range os.Args[1:] {
+			if strings.ContainsAny(a, " \t\"") {
+				quoted = append(quoted, `"`+strings.ReplaceAll(a, `"`, `\"`)+`"`)
+			} else {
+				quoted = append(quoted, a)
+			}
+		}
+		params = strings.Join(quoted, " ")
+	}
+	var paramsPtr *uint16
+	if params != "" {
+		paramsPtr, err = windows.UTF16PtrFromString(params)
+		if err != nil {
+			return err
+		}
+	}
 	// SW_SHOWNORMAL = 1
 	r, _, callErr := procShellExecuteW.Call(
 		0,
 		uintptr(unsafe.Pointer(verb)),
 		uintptr(unsafe.Pointer(file)),
-		0,
+		uintptr(unsafe.Pointer(paramsPtr)),
 		uintptr(unsafe.Pointer(dir)),
 		1,
 	)

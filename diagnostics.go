@@ -188,18 +188,20 @@ func collectDiagSnapshot(a *App) diagSnapshot {
 			letter := sanitizeDriveLetter(p.Mountpoint)
 			if letter != "" && a != nil && (letter == "C" || len(snap.Drives) == 0) {
 				rep := a.CheckDiskHealth(letter)
-				if rep.OK {
+				note := strings.TrimSpace(rep.Verdict)
+				unavailable := !rep.OK || note == "Недоступно" || strings.EqualFold(rep.VerdictBadge, "N/A")
+				if !unavailable {
 					d.SMARTOK = true
 					snap.SMARTAvailable = true
 					if rep.TemperatureC > 0 {
 						d.TempC = rep.TemperatureC
 						d.TempOK = true
 					}
-					d.SMARTNote = strings.TrimSpace(rep.Verdict)
+					d.SMARTNote = note
 				} else {
 					d.SMARTNote = strings.TrimSpace(rep.ErrorMessage)
 					if d.SMARTNote == "" {
-						d.SMARTNote = strings.TrimSpace(rep.Verdict)
+						d.SMARTNote = note
 					}
 					low := strings.ToLower(d.SMARTNote)
 					if strings.Contains(low, "access") || strings.Contains(low, "denied") ||
