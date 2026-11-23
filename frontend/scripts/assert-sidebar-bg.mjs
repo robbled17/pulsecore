@@ -236,13 +236,21 @@ async function main() {
   console.log('\n=== ASSERTION SUMMARY ===')
   console.log(JSON.stringify(summary, null, 2))
 
-  if (!summary.allTabsMatch) {
+  const pixelOk = Boolean(pixels?.pixelMatch)
+  if (!summary.allTabsMatch || !pixelOk) {
+    console.error('FAIL painted gap pixel must match sidebar (pixelMatch=true)')
+    console.error(JSON.stringify({
+      allTabsMatch: summary.allTabsMatch,
+      pixelMatch: pixels?.pixelMatch,
+      sidebarPixel: pixels?.sidebarPixel,
+      gapPixel: pixels?.gapPixel,
+    }, null, 2))
     await browser.close()
     process.exit(1)
   }
 
   await browser.close()
-  console.log('\nPASS: sidebar backgroundColor === content backgroundColor on all tabs')
+  console.log('\nPASS: computed + painted gap pixels match sidebar on all tabs')
 }
 
 main().catch((e) => {

@@ -21,9 +21,9 @@
   --nav-active: rgba(110, 168, 255, 0.18);
   --radius: 16px;
   --radius-sm: 10px;
-  /* Compact shadow so 10px gaps stay near --window-bg (no blue bloom into gaps). */
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
-  --shadow-soft: 0 4px 10px rgba(0, 0, 0, 0.28);
+  /* Inset-only capsule edge: outer drop shadows darken 10px gaps off --window-bg. */
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-soft: none;
   --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --strip-h: 56px;
   --blur: blur(22px) saturate(165%);
@@ -47,8 +47,8 @@ html[data-theme="light"] {
   --accent-2: #6366f1;
   --accent-3: #0d9488;
   --nav-active: rgba(59, 130, 246, 0.12);
-  --shadow: 0 8px 22px rgba(30, 50, 90, 0.08), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  --shadow-soft: 0 6px 16px rgba(30, 50, 90, 0.06), 0 0 14px rgba(59, 130, 246, 0.04);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  --shadow-soft: none;
   --blur: blur(28px) saturate(140%);
 }
 
@@ -60,7 +60,10 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
   overflow-y: hidden;
-  background: linear-gradient(180deg, #080d18 0%, #05070f 52%, #04060c 100%);
+  /* Solid opaque window fill (no blue gradient underlay under card gaps). */
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
   color: var(--text);
   font-family: var(--font);
   font-size: 13.5px;
@@ -69,7 +72,9 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 html[data-theme="light"], html[data-theme="light"] body {
-  background: linear-gradient(180deg, #f7f9fc 0%, #eef2f8 55%, #e8edf5 100%);
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
 }
 
 /* Soft ambient aurora: parallax spots (blur ≥120px, muted opacity) */
@@ -245,6 +250,9 @@ html[data-theme="light"] .win-btn:hover { background: rgba(15,23,42,0.06); }
   overflow-x: hidden;
   min-width: 0;
   box-sizing: border-box;
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
 }
 .sidebar {
   border-right: 1px solid var(--line);
@@ -2203,8 +2211,10 @@ html[data-theme="light"] .gameoverlay-capsule {
 }
 body.mini-hud-active, body.game-overlay-active {
   overflow: hidden;
-  /* Keep dark base; ambient spots still provide soft aurora behind HUD */
-  background: linear-gradient(180deg, #080d18 0%, #05070f 100%);
+  /* Solid window fill; ambient spots still provide soft aurora behind HUD */
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
 }
 body.mini-hud-active .titlebar, body.mini-hud-active .shell,
 body.game-overlay-active .titlebar, body.game-overlay-active .shell { display: none !important; }
@@ -2462,7 +2472,9 @@ html[data-theme="light"] .modal-card {
 }
 html[data-theme="light"] body.mini-hud-active,
 html[data-theme="light"] body.game-overlay-active {
-  background: linear-gradient(180deg, #f7f9fc 0%, #eef2f8 100%);
+  background: var(--window-bg);
+  background-color: var(--window-bg);
+  background-image: none;
 }
 
 @keyframes fadeIn {
