@@ -1,0 +1,3891 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0f19" />
+  <meta name="color-scheme" content="dark" />
+  <title>PulseCore v1.0.1: лёгкий системный монитор для Windows</title>
+  <meta name="description" content="Лёгкая программа для Windows: контроль ПК, меньше фризов, без лишней нагрузки на систему." />
+  <meta property="og:title" content="PulseCore v1.0.1" />
+  <meta property="og:description" content="Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы" />
+  <meta property="og:image" content="screenshots/overview.webp" />
+  <link rel="icon" href="assets/appicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #05070f;
+      --ink: #080d18;
+      --card: rgba(18, 24, 42, 0.58);
+      --card-solid: #111625;
+      --glass: rgba(255, 255, 255, 0.055);
+      --line: rgba(160, 190, 255, 0.14);
+      --line-soft: rgba(180, 210, 255, 0.28);
+      --text: #f7f9ff;
+      --muted: #b7c0d4;
+      --accent: #6ea8ff;
+      --accent-2: #9b7bff;
+      --accent-3: #3de7c8;
+      --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      --radius: 18px;
+      --blur: blur(22px) saturate(165%);
+      --mouse-x: 0;
+      --mouse-y: 0;
+      --cta-grad: linear-gradient(135deg, rgba(110,168,255,0.95), rgba(61,231,200,0.75));
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(140, 180, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+      max-width: 100%;
+      background-color: #0b0f19;
+      color-scheme: dark;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      max-width: 100%;
+      color: var(--text);
+      font-family: var(--font);
+      background-color: #0b0f19;
+      background-image: linear-gradient(180deg, #0b0f19 0%, #080d18 40%, #05070f 72%, #04060c 100%);
+      letter-spacing: -0.015em;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      color-scheme: dark;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    .ambient {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .ambient-spot {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(140px);
+      opacity: 0.42;
+      transform: translate3d(
+        calc(var(--mouse-x) * 18px),
+        calc(var(--mouse-y) * 14px),
+        0
+      );
+      transition: transform 0.35s ease-out;
+      will-change: transform;
+    }
+    .spot-a {
+      width: min(52vw, 720px); height: min(52vw, 720px);
+      left: -8%; top: -12%;
+      background: radial-gradient(circle, rgba(110, 168, 255, 0.55), transparent 68%);
+    }
+    .spot-b {
+      width: min(44vw, 620px); height: min(44vw, 620px);
+      right: -10%; top: 18%;
+      background: radial-gradient(circle, rgba(61, 231, 200, 0.35), transparent 70%);
+      opacity: 0.36;
+    }
+    .spot-c {
+      width: min(40vw, 560px); height: min(40vw, 560px);
+      left: 28%; bottom: -18%;
+      background: radial-gradient(circle, rgba(155, 123, 255, 0.28), transparent 70%);
+      opacity: 0.32;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(1320px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 0 8px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 750;
+      font-size: 15px;
+      letter-spacing: -0.03em;
+    }
+    .brand img {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: #0b101b;
+      box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.2), 0 0 24px rgba(110, 168, 255, 0.25);
+    }
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .nav-links a {
+      font-size: 13px;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 999px;
+      transition: color .2s, background .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+
+    .hero {
+      padding: 48px 0 28px;
+      text-align: center;
+    }
+    .hero-logo {
+      width: 72px; height: 72px;
+      border-radius: 18px;
+      margin: 0 auto 22px;
+      display: block;
+      background: #0b101b;
+      box-shadow: 0 0 0 1px rgba(160, 190, 255, 0.25), 0 12px 40px rgba(0,0,0,0.45), 0 0 48px rgba(110, 168, 255, 0.28);
+      animation: floatIn .7s ease both;
+    }
+    .hero-ver {
+      display: inline-block;
+      margin: 0 auto 12px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(160, 190, 255, 0.22);
+      background: rgba(110, 168, 255, 0.1);
+      color: #c9d7ff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 7.2vw, 64px);
+      font-weight: 800;
+      letter-spacing: -0.045em;
+      line-height: 1.05;
+      margin-bottom: 10px;
+      max-width: 100%;
+      background: linear-gradient(180deg, #ffffff 20%, #c9d7ff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: floatIn .75s .05s ease both;
+    }
+    .hero p {
+      max-width: 560px;
+      margin: 0 auto 28px;
+      color: var(--muted);
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.55;
+      animation: floatIn .75s .1s ease both;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      animation: floatIn .75s .15s ease both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 650;
+      border: 1px solid transparent;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary,
+    .btn-primary:link,
+    .btn-primary:visited,
+    .btn-primary:hover,
+    .btn-primary:active,
+    .btn-primary:focus,
+    .btn-primary:focus-visible {
+      background: var(--cta-grad);
+      background-color: #6ea8ff;
+      color: #051018;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 10px 32px rgba(110, 168, 255, 0.28), 0 0 0 1px rgba(255,255,255,0.12) inset;
+    }
+    .btn-primary:hover,
+    .btn-primary:focus,
+    .btn-primary:focus-visible {
+      box-shadow: 0 14px 40px rgba(110, 168, 255, 0.38), 0 0 0 1px rgba(255,255,255,0.16) inset;
+    }
+    .btn-primary:active {
+      background: var(--cta-grad);
+      background-color: #6ea8ff;
+      color: #051018;
+      transform: translateY(0);
+      box-shadow: 0 6px 20px rgba(110, 168, 255, 0.22), 0 0 0 1px rgba(255,255,255,0.1) inset;
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,0.04);
+      border-color: var(--line-soft);
+      color: var(--text);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+    }
+    .btn-ghost:hover {
+      border-color: rgba(110, 168, 255, 0.45);
+      background: rgba(110, 168, 255, 0.1);
+    }
+
+    .section {
+      padding: 36px 0 20px;
+    }
+    .section-head {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+    .section-head h2 {
+      font-size: clamp(22px, 3.2vw, 30px);
+      font-weight: 750;
+      letter-spacing: -0.035em;
+      margin-bottom: 8px;
+    }
+    .section-head p {
+      color: var(--muted);
+      font-size: 14.5px;
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    .preview-shell {
+      max-width: 1040px;
+      margin: 0 auto;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(32, 42, 72, 0.55), rgba(16, 22, 38, 0.52));
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      overflow: hidden;
+      padding: 14px;
+    }
+    .preview-shell > .preview-tabs {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+    .preview-tabs {
+      position: relative;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 6px;
+      margin-bottom: 12px;
+      justify-content: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      scrollbar-width: none;
+      padding: 2px 12px 6px 2px;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .preview-tabs::-webkit-scrollbar { display: none; }
+    .preview-tab-pill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      border-radius: 999px;
+      background: rgba(110, 168, 255, 0.16);
+      border: 1px solid rgba(110, 168, 255, 0.35);
+      box-shadow: 0 0 20px rgba(110, 168, 255, 0.12);
+      pointer-events: none;
+      transition:
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        width 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        height 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, width, height;
+    }
+    .preview-tabs button {
+      appearance: none;
+      position: relative;
+      z-index: 1;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      scroll-snap-align: start;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s ease;
+    }
+    .preview-tabs button:hover { color: var(--text); }
+    .preview-tabs button.active {
+      color: #eaf2ff;
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+    .preview-frame {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: linear-gradient(180deg, #0a1020 0%, #05070f 100%);
+      isolation: isolate;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100%;
+    }
+    .demo-work {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-height: 420px;
+      padding: 14px 14px 16px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .demo-pane {
+      display: none;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    .demo-pane.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+      animation: demoPaneIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes demoPaneIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .demo-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-head h3 {
+      font-size: 17px;
+      font-weight: 750;
+      letter-spacing: -0.03em;
+    }
+    .demo-head p {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 0;
+    }
+    .demo-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .demo-metric {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(61, 231, 200, 0.04) 55%, rgba(255,255,255,0.03)),
+        rgba(255, 255, 255, 0.035);
+      padding: 12px 12px 10px;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .demo-metric .lab {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 4px;
+    }
+    .demo-metric .val {
+      font-size: 22px;
+      font-weight: 780;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 6px;
+      transition: color 0.4s ease, opacity 0.28s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-metric canvas {
+      display: block;
+      width: 100%;
+      height: 28px;
+    }
+    .demo-bar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .demo-bar > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-3));
+      transition: width 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-alert {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(251, 191, 36, 0.28);
+      background: rgba(251, 191, 36, 0.1);
+      margin-bottom: 12px;
+      transition: opacity 0.35s ease, transform 0.35s ease, max-height 0.35s ease;
+    }
+    .demo-alert.hidden {
+      opacity: 0;
+      transform: translateY(-6px);
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin: 0;
+      overflow: hidden;
+      border-width: 0;
+      pointer-events: none;
+    }
+    .demo-alert .txt { font-size: 12.5px; font-weight: 600; flex: 1 1 180px; }
+    .btn-eco {
+      appearance: none;
+      -webkit-appearance: none;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.2;
+      padding: 8px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(110, 168, 255, 0.35);
+      background: rgba(110, 168, 255, 0.18);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .btn-eco:hover {
+      background: rgba(110, 168, 255, 0.3);
+      border-color: rgba(110, 168, 255, 0.5);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    }
+    .demo-alert .btn-eco {
+      border: 1px solid rgba(110, 168, 255, 0.4);
+      background: rgba(110, 168, 255, 0.16);
+      color: #eaf2ff;
+      font-size: 12px;
+      padding: 7px 12px;
+      border-radius: 999px;
+    }
+    .demo-alert .btn-eco:hover { background: rgba(110, 168, 255, 0.28); }
+    #demo-kill-remove.btn-eco {
+      background: rgba(251, 113, 133, 0.18);
+      border-color: rgba(251, 113, 133, 0.42);
+      color: #fecdd3;
+    }
+    #demo-kill-remove.btn-eco:hover {
+      background: rgba(251, 113, 133, 0.3);
+      border-color: rgba(251, 113, 133, 0.55);
+    }
+    #demo-uninstall-replay.btn-eco {
+      background: rgba(26, 34, 56, 0.92);
+      border-color: rgba(160, 190, 255, 0.28);
+      color: var(--text);
+    }
+    #demo-uninstall-replay.btn-eco:hover {
+      background: rgba(110, 168, 255, 0.22);
+      border-color: rgba(110, 168, 255, 0.45);
+    }
+    .demo-chart {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.03);
+      padding: 12px;
+      margin-bottom: 4px;
+    }
+    .demo-chart .ctitle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+    .trend-legend {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 11.5px;
+      font-weight: 650;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-legend .leg {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .trend-legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px currentColor;
+    }
+    .trend-legend .dot.cpu { background: #8ec0ff; color: #8ec0ff; }
+    .trend-legend .dot.gpu { background: #5ff0d4; color: #5ff0d4; }
+    .trend-legend .dot.ram { background: #b49bff; color: #b49bff; }
+    .trend-legend b { font-weight: 750; }
+    .demo-chart-plot {
+      position: relative;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .trend-yscale {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 2px 0;
+      font-size: 10px;
+      font-weight: 650;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      user-select: none;
+    }
+    .demo-chart-canvas-wrap {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      clip-path: inset(0);
+      -webkit-clip-path: inset(0);
+      border-radius: 8px;
+    }
+    .demo-chart canvas {
+      display: block;
+      width: 100%;
+      height: 120px;
+      max-width: 100%;
+    }
+    .demo-procs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .demo-proc {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 64px auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.035);
+      min-width: 0;
+    }
+    .demo-proc .name {
+      font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .demo-proc .load {
+      font-variant-numeric: tabular-nums;
+      font-weight: 750;
+      text-align: right;
+    }
+    .demo-proc .btn-eco {
+      appearance: none;
+      border: 1px solid rgba(160, 190, 255, 0.22);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font: inherit;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+    }
+    .demo-proc .btn-eco.on {
+      background: rgba(74, 222, 128, 0.16);
+      border-color: rgba(74, 222, 128, 0.45);
+      color: #bbf7d0;
+    }
+    .demo-games {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-game {
+      appearance: none;
+      text-align: left;
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background: rgba(255,255,255,0.04);
+      color: inherit;
+      font: inherit;
+      padding: 12px;
+      cursor: pointer;
+      min-width: 0;
+      transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+    }
+    .demo-game:hover { border-color: rgba(110, 168, 255, 0.4); }
+    .demo-game.active {
+      border-color: rgba(110, 168, 255, 0.55);
+      background: rgba(110, 168, 255, 0.12);
+      box-shadow: 0 0 24px rgba(110, 168, 255, 0.12);
+    }
+    .demo-game .gname { font-weight: 750; font-size: 13px; margin-bottom: 4px; }
+    .demo-game .gsub { color: var(--muted); font-size: 11px; }
+    .demo-fps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .demo-fps .cell {
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.12);
+      background: rgba(255,255,255,0.03);
+      padding: 10px;
+      text-align: center;
+      min-width: 0;
+    }
+    .demo-fps .cell .q { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .demo-fps .cell .f {
+      font-size: 20px;
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+      transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), color 0.35s ease;
+    }
+    .demo-fps .cell .f.pop { transform: scale(1.08); color: var(--accent-3); }
+    .demo-tip {
+      font-size: 12.5px;
+      color: var(--muted);
+      min-height: 1.4em;
+      transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-tip.flash {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    .demo-hw-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .demo-hw-card {
+      border-radius: 14px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(255,255,255,0.03));
+      padding: 12px;
+      min-width: 0;
+    }
+    .demo-hw-card .lab { font-size: 11px; color: var(--muted); font-weight: 650; margin-bottom: 4px; }
+    .demo-hw-card .big {
+      font-size: 15px;
+      font-weight: 750;
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .demo-hw-card .sub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .demo-upgrade-device {
+      display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 10px;
+    }
+    .demo-device {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .demo-device.active {
+      color: var(--text);
+      border-color: rgba(94, 234, 212, 0.45);
+      background: rgba(45, 212, 191, 0.14);
+    }
+    .demo-upgrade-goals {
+      display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 12px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      max-width: 100%;
+    }
+    .demo-upgrade-goals::-webkit-scrollbar { display: none; }
+    .demo-goal {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .demo-goal.active {
+      color: var(--text);
+      border-color: rgba(110,168,255,0.45);
+      background: rgba(110,168,255,0.16);
+    }
+    .demo-upgrade-passport { margin-bottom: 12px; }
+    .demo-upgrade-recs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .demo-upgrade-rec {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,0.03);
+    }
+    .demo-upgrade-rec .rec-top {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px;
+    }
+    .demo-upgrade-rec .title { font-weight: 700; }
+    .demo-upgrade-rec .gain {
+      flex-shrink: 0;
+      font-size: 12px; font-weight: 700; color: #86efac;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.28);
+      border-radius: 8px; padding: 2px 8px; white-space: nowrap;
+    }
+    .demo-upgrade-rec .model { font-size: 15px; font-weight: 750; margin-bottom: 6px; letter-spacing: -0.02em; }
+    .demo-upgrade-rec .body { color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 8px; }
+    .demo-upgrade-rec .pit,
+    .demo-upgrade-rec .pit ul,
+    .demo-upgrade-rec .pit li {
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+      letter-spacing: inherit;
+    }
+    .demo-upgrade-rec .pit .pit-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.45;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+    .demo-upgrade-rec .pit .pit-label::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgba(110, 168, 255, 0.16);
+      flex-shrink: 0;
+    }
+    .demo-upgrade-rec .pit ul {
+      margin: 6px 0 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .demo-upgrade-rec .pit li {
+      position: relative;
+      padding-left: 16px;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+    .demo-upgrade-rec .pit li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+    .demo-uninstall-app {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.03);
+      transition:
+        max-height 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.35s ease,
+        margin 0.45s ease,
+        padding 0.45s ease,
+        border-width 0.3s ease,
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 220px;
+      overflow: hidden;
+    }
+    .demo-uninstall-app.is-collapsing {
+      max-height: 0;
+      opacity: 0;
+      margin-bottom: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-width: 0;
+      transform: scaleY(0.92);
+      pointer-events: none;
+    }
+    .demo-uninstall-app .name { font-weight: 700; margin-bottom: 4px; }
+    .demo-uninstall-app .sub { color: var(--muted); font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+    .demo-uninstall-status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--text);
+      min-height: 1.4em;
+    }
+    .demo-uninstall-status.is-on { display: flex; }
+    .demo-uninstall-spin {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(110, 168, 255, 0.25);
+      border-top-color: rgba(110, 168, 255, 0.95);
+      flex: 0 0 auto;
+      animation: demo-spin 0.7s linear infinite;
+    }
+    @keyframes demo-spin {
+      to { transform: rotate(360deg); }
+    }
+    .demo-residual {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 0.35s ease, max-height 0.45s ease, margin 0.45s ease;
+      max-height: 240px;
+      overflow: hidden;
+    }
+    .demo-residual.is-gone {
+      opacity: 0;
+      max-height: 0;
+      margin: 0;
+      pointer-events: none;
+    }
+    .demo-check {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      background: rgba(255,255,255,0.03);
+      transition: opacity 0.35s ease, border-color 0.35s ease, background 0.35s ease;
+    }
+    .demo-check .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(160, 190, 255, 0.28);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      font-size: 11px;
+      color: transparent;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+    .demo-check .lab-txt {
+      transition: color 0.3s ease, text-decoration-color 0.3s ease;
+    }
+    .demo-check.is-cleared {
+      border-color: rgba(34, 197, 94, 0.32);
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .demo-check.is-cleared .mark {
+      color: #86efac;
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.16);
+    }
+    .demo-check.is-cleared .lab-txt {
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: rgba(134, 239, 172, 0.55);
+    }
+    .demo-uninstall-done {
+      display: none;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      border-radius: 14px;
+      padding: 16px 14px;
+      background: rgba(34, 197, 94, 0.1);
+      text-align: center;
+    }
+    .demo-uninstall-done.is-on { display: block; }
+    .demo-uninstall-done .ok {
+      color: #86efac;
+      font-weight: 750;
+      font-size: 14.5px;
+      margin-bottom: 12px;
+      line-height: 1.35;
+    }
+    .demo-uninstall-done .btn-eco {
+      margin: 0 auto;
+    }
+    .demo-core-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .demo-core {
+      border-radius: 12px;
+      border: 1px solid rgba(160, 190, 255, 0.14);
+      background:
+        linear-gradient(155deg, rgba(110, 168, 255, 0.1), rgba(61, 231, 200, 0.04) 50%, rgba(255,255,255,0.03));
+      padding: 8px 9px 7px;
+      min-width: 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .demo-core .ch {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      margin-bottom: 5px;
+      font-size: 10.5px;
+    }
+    .demo-core .ch .id { color: var(--muted); font-weight: 650; }
+    .demo-core .ch .v { font-weight: 750; font-variant-numeric: tabular-nums; }
+    .demo-core .pbar {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.07);
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .demo-core .pbar > i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-3));
+      transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-core .thr {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) 28px;
+      gap: 4px;
+      align-items: center;
+      font-size: 9.5px;
+      margin-top: 3px;
+    }
+    .demo-core .thr .tid { color: var(--muted); font-weight: 650; }
+    .demo-core .thr .tbar {
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+    .demo-core .thr .tbar > i {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(110,168,255,0.85), rgba(61,231,200,0.7));
+      transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .demo-core .thr .tv { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    @media (max-width: 900px) {
+      .demo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-fps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-hw-cards { grid-template-columns: 1fr; }
+      .demo-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+      .demo-work { padding: 10px; min-height: 360px; }
+      .demo-metrics { grid-template-columns: 1fr; }
+      .demo-games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .demo-fps { grid-template-columns: 1fr 1fr; }
+      .demo-proc { grid-template-columns: minmax(0, 1fr) auto; }
+      .demo-proc .load { grid-column: 1; text-align: left; color: var(--muted); font-size: 12px; }
+      .demo-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: 1fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+    .bento > .card {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .card {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(28, 38, 68, 0.55), rgba(14, 18, 32, 0.5));
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      padding: 20px 18px 18px;
+      transition: transform .2s ease, border-color .2s, box-shadow .2s, opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(110, 168, 255, 0.35);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.4), 0 0 28px rgba(110, 168, 255, 0.1);
+    }
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition:
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+      transition-delay: var(--reveal-delay, 0ms);
+      will-change: opacity, transform;
+    }
+    .reveal.is-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .card.reveal.is-in {
+      transition: transform .2s ease, border-color .2s, box-shadow .2s;
+    }
+    .card.reveal.is-in:hover {
+      transform: translateY(-2px);
+    }
+    .card-icon {
+      width: 36px; height: 36px;
+      border-radius: 11px;
+      display: grid; place-items: center;
+      margin-bottom: 14px;
+      font-size: 16px;
+      background: rgba(110, 168, 255, 0.12);
+      border: 1px solid rgba(110, 168, 255, 0.22);
+      color: var(--accent);
+      box-shadow: 0 0 18px rgba(110, 168, 255, 0.12);
+    }
+    .card.teal .card-icon {
+      background: rgba(61, 231, 200, 0.1);
+      border-color: rgba(61, 231, 200, 0.25);
+      color: var(--accent-3);
+      box-shadow: 0 0 18px rgba(61, 231, 200, 0.12);
+    }
+    .card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      counter-reset: step;
+    }
+    .step {
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+      padding: 22px 18px;
+      position: relative;
+      transition:
+        opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+      transition-delay: var(--reveal-delay, 0ms);
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: inline-grid;
+      place-items: center;
+      width: 28px; height: 28px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      font-weight: 750;
+      color: #051018;
+      background: linear-gradient(135deg, var(--accent), var(--accent-3));
+      box-shadow: 0 0 18px rgba(110, 168, 255, 0.35);
+    }
+    .step h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .step p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    footer {
+      padding: 48px 0 36px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid rgba(160, 190, 255, 0.08);
+      margin-top: 40px;
+    }
+    footer a {
+      color: var(--accent);
+      border-bottom: 1px solid transparent;
+    }
+    footer a:hover { border-bottom-color: var(--accent); }
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      color: var(--text);
+      font-weight: 700;
+    }
+    .footer-brand img { width: 20px; height: 20px; border-radius: 6px; background: #0b101b; }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Touch / phone: no blur, no parallax, solid cards */
+    @media (hover: none), (max-width: 768px) {
+      .ambient-spot {
+        transform: none !important;
+        transition: none !important;
+        will-change: auto;
+        filter: blur(100px);
+        opacity: 0.28;
+      }
+      .card,
+      .preview-shell,
+      .btn-ghost {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+      .card,
+      .preview-shell {
+        background: var(--card-solid);
+      }
+      .btn-ghost {
+        background: #151b2c;
+      }
+      .card:hover {
+        transform: none;
+      }
+      .card.reveal.is-in:hover {
+        transform: translateY(0);
+      }
+      .btn:hover { transform: none; }
+      .btn {
+        transition: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .ambient-spot {
+        transition: none !important;
+        transform: none !important;
+      }
+      .preview-tab-pill {
+        transition: none !important;
+      }
+      .demo-pane { animation: none !important; }
+      .demo-metric .val,
+      .demo-bar > i,
+      .demo-core .pbar > i,
+      .demo-core .thr .tbar > i,
+      .demo-fps .cell .f {
+        transition: none !important;
+      }
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+      }
+      .card,
+      .step,
+      .btn {
+        transition: none !important;
+      }
+      .hero-logo,
+      .hero h1,
+      .hero p,
+      .cta-row {
+        animation: none !important;
+      }
+    }
+
+
+    /* Language switcher */
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .lang-switch {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid var(--line-soft);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12.5px;
+      font-weight: 650;
+      padding: 7px 28px 7px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      max-width: 148px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+        linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:
+        calc(100% - 14px) calc(50% - 2px),
+        calc(100% - 9px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      transition: border-color .2s, background-color .2s;
+    }
+    .lang-switch:hover { border-color: rgba(110, 168, 255, 0.45); }
+    .lang-switch:focus-visible {
+      outline: 2px solid rgba(110, 168, 255, 0.55);
+      outline-offset: 2px;
+    }
+    .lang-switch option { background: #121825; color: #f7f9ff; }
+
+    /* Hardware SSD accordion */
+    .demo-hw-cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .demo-ssd-acc {
+      grid-column: 1 / -1;
+      border-radius: 14px;
+      border: 1px solid rgba(61, 231, 200, 0.22);
+      background:
+        linear-gradient(155deg, rgba(61, 231, 200, 0.1), rgba(255,255,255,0.03));
+      overflow: hidden;
+    }
+    .demo-ssd-acc > summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      user-select: none;
+    }
+    .demo-ssd-acc > summary::-webkit-details-marker { display: none; }
+    .demo-ssd-acc .ssd-sum-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .demo-ssd-acc .lab {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .demo-ssd-acc .ssd-compact {
+      font-size: 14px;
+      font-weight: 750;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+    .demo-ssd-acc .ssd-chevron {
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid rgba(200, 214, 235, 0.7);
+      border-bottom: 2px solid rgba(200, 214, 235, 0.7);
+      transform: rotate(45deg);
+      transition: transform 0.25s ease;
+      flex: 0 0 auto;
+      margin-right: 4px;
+    }
+    .demo-ssd-acc[open] .ssd-chevron {
+      transform: rotate(-135deg);
+      margin-top: 4px;
+    }
+    .demo-ssd-details {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px 12px;
+      padding: 0 14px 14px;
+      border-top: 1px solid rgba(160, 190, 255, 0.1);
+      padding-top: 12px;
+    }
+    .demo-ssd-details .row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .demo-ssd-details .row strong {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+    }
+    @media (max-width: 640px) {
+      .demo-ssd-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* GamePulse covers: Steam header 460x215 */
+    .demo-game {
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: #0b101b;
+    }
+    .demo-game .cover-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 460 / 215;
+      background: #0b101b;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .demo-game .cover-wrap img,
+    .demo-game .cover-wrap .cover-fallback {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+    .demo-game .cover-wrap::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg,
+        rgba(5, 8, 16, 0.05) 0%,
+        rgba(5, 8, 16, 0.35) 55%,
+        rgba(5, 8, 16, 0.82) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .demo-game .gmeta {
+      position: relative;
+      z-index: 2;
+      padding: 10px 12px 12px;
+      margin-top: -28px;
+    }
+    .demo-game .gname { text-shadow: 0 1px 8px rgba(0,0,0,0.55); }
+    .demo-game .gsub { color: rgba(200, 210, 230, 0.85); }
+
+    /* Mid desktop keeps 3-col features; tighten wrap only. */
+    @media (min-width: 1025px) and (max-width: 1440px) {
+      .wrap { width: min(1120px, calc(100% - 48px)); }
+      .preview-tabs { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; }
+    }
+
+    /* Tablet: 2-col dense features grid */
+    @media (max-width: 1024px) {
+      .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .hero { padding-top: 28px; }
+    }
+
+    /* Phone: 320-480 (+ small tablets up to 640) */
+    @media (max-width: 640px) {
+      .wrap { width: min(100% - 24px, 1320px); }
+      .nav { padding-top: 16px; gap: 10px; }
+      .nav-links { display: none; }
+      .lang-switch { max-width: 122px; font-size: 12px; padding: 6px 26px 6px 10px; }
+      .demo-hw-cards { grid-template-columns: 1fr; }
+      .hero { padding: 28px 0 20px; }
+      .hero-logo { width: 56px; height: 56px; margin-bottom: 16px; }
+      .hero h1 { font-size: clamp(28px, 9vw, 40px); }
+      .hero p { font-size: clamp(14px, 3.8vw, 16px); margin-bottom: 20px; padding: 0 2px; }
+      .section-head h2 { font-size: clamp(20px, 5.5vw, 26px); }
+      .bento { grid-template-columns: 1fr; grid-auto-rows: auto; }
+      .card.span-2 { grid-column: span 1; }
+      .preview-shell { padding: 8px; border-radius: 16px; }
+      .preview-shell > .preview-tabs {
+        overflow-x: visible;
+      }
+      .preview-tabs {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 2px;
+        padding-right: 4px;
+        overflow-x: auto;
+        gap: 4px;
+      }
+      .preview-tabs button {
+        font-size: 11px;
+        padding: 6px 8px;
+      }
+      .cta-row {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+      }
+      .btn { width: 100%; min-height: 44px; }
+    }
+
+    @media (max-width: 480px) {
+      .wrap { width: calc(100% - 20px); }
+      .hero h1 { font-size: clamp(26px, 10vw, 34px); }
+      .preview-tabs {
+        flex-wrap: wrap;
+        overflow-x: visible;
+        overflow-y: visible;
+        scroll-snap-type: none;
+        gap: 4px 5px;
+        padding: 2px 2px 4px;
+        row-gap: 6px;
+      }
+      .preview-tabs button {
+        font-size: 11px;
+        padding: 6px 9px;
+        scroll-snap-align: none;
+      }
+      .preview-shell > .preview-tabs {
+        overflow-x: visible;
+      }
+    }
+
+    /* Wide / 2K / 4K: 1920-3440 */
+    @media (min-width: 1920px) {
+      .wrap { width: min(1360px, calc(100% - 80px)); }
+      .spot-a {
+        width: 42vw; height: 42vw; max-width: none; max-height: none;
+        left: -6%; top: -10%;
+      }
+      .spot-b {
+        width: 36vw; height: 36vw; max-width: none; max-height: none;
+        right: -8%; top: 12%;
+      }
+      .spot-c {
+        width: 34vw; height: 34vw; max-width: none; max-height: none;
+        left: 30%; bottom: -14%;
+      }
+      .hero h1 { font-size: clamp(52px, 3.2vw, 72px); }
+      .bento { gap: 16px; }
+    }
+
+    @media (min-width: 2560px) {
+      .wrap { width: min(1360px, calc(100% - 120px)); }
+      .ambient-spot { filter: blur(180px); }
+      .spot-a { width: 38vw; height: 38vw; }
+      .spot-b { width: 32vw; height: 32vw; }
+      .spot-c { width: 30vw; height: 30vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="ambient-spot spot-a"></div>
+    <div class="ambient-spot spot-b"></div>
+    <div class="ambient-spot spot-c"></div>
+  </div>
+
+  <div class="wrap">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <img src="assets/appicon.png" alt="" width="28" height="28" />
+        PulseCore
+      </a>
+      <div class="nav-actions">
+        <div class="nav-links">
+          <a href="#preview" data-i18n="navPreview">Интерфейс</a>
+          <a href="#features" data-i18n="navFeatures">Возможности</a>
+          <a href="#start" data-i18n="navStart">Старт</a>
+          <a href="https://github.com/robbled17/pulsecore">GitHub</a>
+        </div>
+        <label class="visually-hidden" for="lang-switch" data-i18n="langLabel">Language</label>
+        <select id="lang-switch" class="lang-switch" aria-label="Language">
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+          <option value="kk">Қазақша</option>
+          <option value="tt">Татарча</option>
+          <option value="de">Deutsch</option>
+          <option value="ja">日本語</option>
+          <option value="zh">简体中文</option>
+        </select>
+      </div>
+    </nav>
+
+    <header class="hero" id="top">
+      <img class="hero-logo" src="assets/appicon.png" alt="PulseCore" width="72" height="72" />
+      <h1>PulseCore</h1>
+      <p class="hero-ver" aria-label="Version">v1.0.1</p>
+      <p data-i18n="heroSub">Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/robbled17/pulsecore/releases/latest/download/pulsecore.exe" data-i18n="ctaDownload">
+          Скачать для Windows (.exe)
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/robbled17/pulsecore" data-i18n="ctaSource">
+          Исходный код на GitHub
+        </a>
+      </div>
+    </header>
+
+    <section class="section" id="preview">
+      <div class="section-head reveal">
+        <h2 data-i18n="previewTitle">Живой интерфейс</h2>
+        <p data-i18n="previewSub">Так выглядит программа. Переключайте вкладки</p>
+      </div>
+      <div class="preview-shell reveal" style="--reveal-delay: 100ms">
+        <div class="preview-tabs" role="tablist" aria-label="Вкладки превью">
+          <span class="preview-tab-pill" aria-hidden="true"></span>
+          <button type="button" class="active" role="tab" id="tab-overview" aria-selected="true" data-tab="overview" aria-controls="panel-overview" data-i18n="tabOverview">Обзор</button>
+          <button type="button" role="tab" id="tab-lags" aria-selected="false" data-tab="lags" aria-controls="panel-lags" data-i18n="tabLags">Лаги</button>
+          <button type="button" role="tab" id="tab-gamepulse" aria-selected="false" data-tab="gamepulse" aria-controls="panel-gamepulse">GamePulse</button>
+          <button type="button" role="tab" id="tab-hardware" aria-selected="false" data-tab="hardware" aria-controls="panel-hardware" data-i18n="tabHardware">Железо</button>
+          <button type="button" role="tab" id="tab-upgrade" aria-selected="false" data-tab="upgrade" aria-controls="panel-upgrade" data-i18n="tabUpgrade">Апгрейд</button>
+          <button type="button" role="tab" id="tab-uninstall" aria-selected="false" data-tab="uninstall" aria-controls="panel-uninstall" data-i18n="tabUninstall">Удаление</button>
+        </div>
+        <div class="preview-frame" id="demo-preview">
+          <div class="demo-work" id="demo-work">
+            <div class="demo-pane active" id="panel-overview" data-panel="overview" role="tabpanel" aria-labelledby="tab-overview">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoOverviewTitle">Обзор системы</h3>
+                  <p data-i18n="demoOverviewSub">Живые метрики CPU, GPU, RAM и температуры</p>
+                </div>
+              </div>
+              <div class="demo-alert" id="demo-alert">
+                <div class="txt" data-i18n="demoAlertPeak">Пик ядра: Браузер нагружает систему</div>
+                <button type="button" class="btn-eco" id="demo-eco-alert">Eco Mode</button>
+              </div>
+              <div class="demo-metrics" id="demo-metrics">
+                <div class="demo-metric" data-k="cpu">
+                  <div class="lab">CPU</div>
+                  <div class="val" id="demo-cpu">48%</div>
+                  <canvas id="spark-demo-cpu" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-cpu-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="gpu">
+                  <div class="lab">GPU</div>
+                  <div class="val" id="demo-gpu">68%</div>
+                  <canvas id="spark-demo-gpu" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-gpu-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="ram">
+                  <div class="lab">RAM</div>
+                  <div class="val" id="demo-ram">63%</div>
+                  <canvas id="spark-demo-ram" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-ram-bar"></i></div>
+                </div>
+                <div class="demo-metric" data-k="temp">
+                  <div class="lab">Temp</div>
+                  <div class="val" id="demo-temp">58°C</div>
+                  <canvas id="spark-demo-temp" width="160" height="36" aria-hidden="true"></canvas>
+                  <div class="demo-bar"><i id="demo-temp-bar"></i></div>
+                </div>
+              </div>
+              <div class="demo-chart">
+                <div class="ctitle">
+                  <span data-i18n="demoTrend">Динамика</span>
+                  <div class="trend-legend" id="demo-trend-legend" aria-live="polite">
+                    <span class="leg"><i class="dot cpu" aria-hidden="true"></i>CPU <b id="leg-cpu">48%</b></span>
+                    <span class="leg"><i class="dot gpu" aria-hidden="true"></i>GPU <b id="leg-gpu">68%</b></span>
+                    <span class="leg"><i class="dot ram" aria-hidden="true"></i>RAM <b id="leg-ram">63%</b></span>
+                  </div>
+                </div>
+                <div class="demo-chart-plot">
+                  <div class="trend-yscale" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>
+                  <div class="demo-chart-canvas-wrap">
+                    <canvas id="demo-trend" width="900" height="160" aria-hidden="true"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="demo-pane" id="panel-lags" data-panel="lags" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoLagsTitle">Лаги</h3>
+                  <p data-i18n="demoLagsSub">Фоновые процессы и Eco Mode</p>
+                </div>
+              </div>
+              <div class="demo-procs" id="demo-procs"></div>
+            </div>
+
+            <div class="demo-pane" id="panel-gamepulse" data-panel="gamepulse" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3>GamePulse</h3>
+                  <p data-i18n="demoGameSub">Выберите игру для прогноза FPS</p>
+                </div>
+              </div>
+              <div class="demo-games" id="demo-games"></div>
+              <div class="demo-fps" id="demo-fps"></div>
+              <div class="demo-tip" id="demo-tip" data-i18n="demoGameTip">Нажмите на игру, чтобы увидеть пресеты</div>
+            </div>
+
+            <div class="demo-pane" id="panel-hardware" data-panel="hardware" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoHwTitle">Железо</h3>
+                  <p data-i18n="demoHwSub">Физические ядра и потоки SMT</p>
+                </div>
+              </div>
+              <div class="demo-hw-cards">
+                <div class="demo-hw-card">
+                  <div class="lab">CPU</div>
+                  <div class="big">Ryzen 7 5700X</div>
+                  <div class="sub" id="demo-hw-cpu-sub">8 / 16 • 42%</div>
+                </div>
+                <div class="demo-hw-card">
+                  <div class="lab">GPU</div>
+                  <div class="big">RTX 3060</div>
+                  <div class="sub" id="demo-hw-gpu-sub">8 GB • 68%</div>
+                </div>
+                <div class="demo-hw-card">
+                  <div class="lab">RAM</div>
+                  <div class="big">16 GB DDR4</div>
+                  <div class="sub" id="demo-hw-ram-sub">Dual Channel • 63%</div>
+                </div>
+                <details class="demo-ssd-acc" id="demo-hw-ssd">
+                  <summary>
+                    <span class="ssd-sum-left">
+                      <span class="lab" data-i18n="demoSsdLab">Здоровье SSD</span>
+                      <span class="ssd-compact" id="demo-ssd-compact">Samsung 980 PRO 1TB • 98%</span>
+                    </span>
+                    <span class="ssd-chevron" aria-hidden="true"></span>
+                  </summary>
+                  <div class="demo-ssd-details" id="demo-ssd-details">
+                    <div class="row"><span data-i18n="demoSsdLife">Остаток ресурса</span><strong id="demo-ssd-health">98%</strong></div>
+                    <div class="row"><span data-i18n="demoSsdTemp">Температура</span><strong id="demo-ssd-temp">37°C</strong></div>
+                    <div class="row"><span data-i18n="demoSsdBad">Плохие сектора</span><strong id="demo-ssd-bad">0</strong></div>
+                    <div class="row"><span data-i18n="demoSsdWritten">Записано</span><strong id="demo-ssd-written">14.2 TB</strong></div>
+                    <div class="row"><span data-i18n="demoSsdPowerOn">Время работы</span><strong id="demo-ssd-power">1840 h</strong></div>
+                    <div class="row"><span data-i18n="demoSsdStatusLab">Статус</span><strong id="demo-ssd-status" data-i18n="demoSsdStatus">Отлично</strong></div>
+                  </div>
+                </details>
+              </div>
+              <div class="demo-core-grid" id="demo-core-grid"></div>
+            </div>
+
+            <div class="demo-pane" id="panel-upgrade" data-panel="upgrade" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoUpgradeTitle">Советник апгрейда</h3>
+                  <p data-i18n="demoUpgradeSub">Паспорт ПК и рекомендации под цель</p>
+                </div>
+              </div>
+              <div class="demo-upgrade-device" id="demo-upgrade-device" role="group" aria-label="Device">
+                <button type="button" class="demo-device active" data-device="pc" data-i18n="devicePC">ПК</button>
+                <button type="button" class="demo-device" data-device="laptop" data-i18n="deviceLaptop">Ноутбук</button>
+              </div>
+              <div class="demo-upgrade-goals" id="demo-upgrade-goals">
+                <button type="button" class="demo-goal active" data-goal="fps" data-i18n="goalMaxFps">Максимум FPS</button>
+                <button type="button" class="demo-goal" data-goal="quiet" data-i18n="goalQuiet">Тише и холоднее</button>
+                <button type="button" class="demo-goal" data-goal="work" data-i18n="goalWork">Работа</button>
+                <button type="button" class="demo-goal" data-goal="budget" data-i18n="goalBudget">Бюджет</button>
+              </div>
+              <div class="demo-upgrade-passport">
+                <div class="demo-hw-card">
+                  <div class="lab" data-i18n="passportTitle">Текущий ПК</div>
+                  <div class="big" id="demo-upgrade-pass-big">Ryzen 7 5700X · RTX 3060</div>
+                  <div class="sub" id="demo-upgrade-pass-sub">AM4 · B550 · 16 GB DDR4 · 2/4 слота</div>
+                </div>
+              </div>
+              <div class="demo-upgrade-recs" id="demo-upgrade-recs"></div>
+            </div>
+
+            <div class="demo-pane" id="panel-uninstall" data-panel="uninstall" role="tabpanel">
+              <div class="demo-head">
+                <div>
+                  <h3 data-i18n="demoUninstallTitle">Умное удаление</h3>
+                  <p data-i18n="demoUninstallSub">Процессы, остатки и трассировка</p>
+                </div>
+              </div>
+              <div class="demo-uninstall-app" id="demo-uninstall-card">
+                <div class="name">Chatty 1.8.0</div>
+                <div class="sub" id="demo-uninstall-warn" data-i18n="demoUninstallWarn">Найден процесс Chatty.exe. Можно завершить и удалить.</div>
+                <div class="demo-uninstall-status" id="demo-uninstall-status" aria-live="polite">
+                  <span class="demo-uninstall-spin" aria-hidden="true"></span>
+                  <span class="msg" id="demo-uninstall-status-msg"></span>
+                </div>
+                <button type="button" class="btn-eco" id="demo-kill-remove" data-i18n="uninstallKillRemove">Завершить и удалить</button>
+              </div>
+              <div class="demo-residual" id="demo-residual">
+                <div class="demo-check" data-residual="local"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">Local · Chatty</span></div>
+                <div class="demo-check" data-residual="roaming"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">Roaming · Chatty</span></div>
+                <div class="demo-check" data-residual="registry"><span class="mark" aria-hidden="true">✓</span><span class="lab-txt">HKCU\Software\Chatty</span></div>
+              </div>
+              <div class="demo-uninstall-done" id="demo-uninstall-done">
+                <div class="ok" data-i18n="uninstallDone">Программа и хвосты полностью удалены</div>
+                <button type="button" class="btn-eco" id="demo-uninstall-replay" data-i18n="uninstallReplay">Повторить демо</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-head reveal">
+        <h2 data-i18n="featTitle">Всё для контроля и плавной работы ПК</h2>
+        <p data-i18n="featSub">Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы</p>
+      </div>
+      <div class="bento">
+        <article class="card reveal" style="--reveal-delay: 0ms">
+          <div class="card-icon">⚡</div>
+          <h3 data-i18n="featEcoTitle">Микролаги + Eco</h3>
+          <p data-i18n="featEcoBody">Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия</p>
+        </article>
+        <article class="card teal reveal" style="--reveal-delay: 100ms">
+          <div class="card-icon">🎯</div>
+          <h3 data-i18n="featFpsTitle">FPS</h3>
+          <p data-i18n="featFpsBody">Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 200ms">
+          <div class="card-icon">⧉</div>
+          <h3 data-i18n="featHudTitle">Mini-HUD</h3>
+          <p data-i18n="featHudBody">Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами</p>
+        </article>
+        <article class="card teal reveal" style="--reveal-delay: 300ms">
+          <div class="card-icon">💾</div>
+          <h3 data-i18n="featSsdTitle">Здоровье SSD</h3>
+          <p data-i18n="featSsdBody">Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 400ms">
+          <div class="card-icon">🛡</div>
+          <h3 data-i18n="featAdminTitle">Без админа</h3>
+          <p data-i18n="featAdminBody">Запускается сразу после скачивания без сложных настроек и лишних разрешений системы</p>
+        </article>
+        <article class="card teal reveal" style="--reveal-delay: 500ms">
+          <div class="card-icon">🔒</div>
+          <h3 data-i18n="featPrivTitle">Приватность</h3>
+          <p data-i18n="featPrivBody">Программа работает локально на вашем компьютере и никуда не отправляет личные данные</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 600ms">
+          <div class="card-icon">💨</div>
+          <h3 data-i18n="featResTitle">Ресурсы</h3>
+          <p data-i18n="featResBody">Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга</p>
+        </article>
+        <article class="card teal reveal" style="--reveal-delay: 700ms">
+          <div class="card-icon">🔧</div>
+          <h3 data-i18n="featUpgradeTitle">Советник апгрейда</h3>
+          <p data-i18n="featUpgradeBody">Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями</p>
+        </article>
+        <article class="card reveal" style="--reveal-delay: 800ms">
+          <div class="card-icon">🧹</div>
+          <h3 data-i18n="featUninstallTitle">Умное удаление</h3>
+          <p data-i18n="featUninstallBody">Перед удалением гасит процессы программы, после ищет остатки в AppData и реестре, умеет ставить с трассировкой для точной очистки</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="start">
+      <div class="section-head reveal">
+        <h2 data-i18n="startTitle">Быстрый старт</h2>
+        <p data-i18n="startSub">Три простых шага на Windows 10 или 11</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal" style="--reveal-delay: 0ms">
+          <h3 data-i18n="step1Title">Скачайте программу</h3>
+          <p data-i18n="step1Body">Нажмите «Скачать для Windows (.exe)» - файл pulsecore.exe скачается напрямую.</p>
+        </div>
+        <div class="step reveal" style="--reveal-delay: 100ms">
+          <h3 data-i18n="step2Title">Сохраните файл</h3>
+          <p data-i18n="step2Body">Положите pulsecore.exe в удобную папку (например, Документы или Рабочий стол).</p>
+        </div>
+        <div class="step reveal" style="--reveal-delay: 200ms">
+          <h3 data-i18n="step3Title">Запустите</h3>
+          <p data-i18n="step3Body">Дважды щёлкните по pulsecore.exe. Готово.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      <div class="footer-brand">
+        <img src="assets/appicon.png" alt="" width="20" height="20" />
+        PulseCore
+      </div>
+      <div>MIT License • <a href="https://github.com/robbled17/pulsecore">github.com/robbled17/pulsecore</a></div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const LANGS = ["ru", "en", "kk", "tt", "de", "ja", "zh"];
+      const LANG_STORAGE = "zp_lang";
+      const I18N = {
+        ru: {
+          pageTitle: "PulseCore: лёгкий системный монитор для Windows",
+          pageDesc: "Лёгкая программа для Windows: контроль ПК, меньше фризов, без лишней нагрузки на систему.",
+          langLabel: "Язык",
+          navPreview: "Интерфейс",
+          navFeatures: "Возможности",
+          navStart: "Старт",
+          heroSub: "Лёгкая программа для Windows: контроль ПК и меньше фризов без лишней нагрузки",
+          ctaDownload: "Скачать для Windows (.exe)",
+          ctaSource: "Исходный код на GitHub",
+          previewTitle: "Живой интерфейс",
+          previewSub: "Так выглядит программа. Переключайте вкладки",
+          tabOverview: "Обзор",
+          tabLags: "Лаги",
+          tabHardware: "Железо",
+          demoOverviewTitle: "Обзор системы",
+          demoOverviewSub: "Живые метрики CPU, GPU, RAM и температуры",
+          demoAlertPeak: "Пик ядра: Браузер нагружает систему",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лаги",
+          demoLagsSub: "Фоновые процессы и Eco Mode",
+          demoGameSub: "Выберите игру для прогноза FPS",
+          demoGameTip: "Нажмите на игру, чтобы увидеть пресеты",
+          demoHwTitle: "Железо",
+          demoHwSub: "Физические ядра и потоки SMT",
+          demoSsdLab: "Здоровье SSD",
+          demoSsdStatus: "Отлично",
+          demoSsdStatusLab: "Статус",
+          demoSsdPowerOn: "Время работы",
+          demoSsdWritten: "Записано",
+          demoSsdLife: "Остаток ресурса",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Плохие сектора",
+          demoCore: "Ядро",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Стабильные 165+ на высоких",
+          tipGta: "Комфортные 120 на средних",
+          tipCyber: "DLSS держит 60 на высоких",
+          tipDota: "Запас FPS для турниров",
+          featTitle: "Всё для контроля и плавной работы ПК",
+          featSub: "Лёгкая программа для Windows, которая не грузит систему и помогает убрать фризы",
+          featEcoTitle: "Микролаги + Eco",
+          featEcoBody: "Находит программы, из-за которых игра начинает дёргаться, и в один клик урезает им лишний аппетит без закрытия",
+          featFpsTitle: "FPS",
+          featFpsBody: "Показывает, сколько кадров в секунду потянет ваш ПК в популярных играх на низких, средних и высоких настройках",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Компактная панель поверх окон и игр: температура процессора, загрузка видеокарты и памяти всегда перед глазами",
+          featSsdTitle: "Здоровье SSD",
+          featSsdBody: "Читает SMART: остаток ресурса в процентах, температуру и плохие сектора простыми словами, без сложных таблиц",
+          featAdminTitle: "Без админа",
+          featAdminBody: "Запускается сразу после скачивания без сложных настроек и лишних разрешений системы",
+          featPrivTitle: "Приватность",
+          featPrivBody: "Программа работает локально на вашем компьютере и никуда не отправляет личные данные",
+          featResTitle: "Ресурсы",
+          featResBody: "Занимает минимум памяти и не мешает играм, в отличие от тяжёлых программ мониторинга",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Удаление",
+          demoUpgradeTitle: "Советник апгрейда",
+          demoUpgradeSub: "Паспорт ПК и рекомендации под цель",
+          demoUpgradePitfalls: "Подводные камни",
+          demoUninstallTitle: "Умное удаление",
+          demoUninstallSub: "Процессы, остатки и трассировка",
+          demoUninstallWarn: "Найден процесс Chatty.exe. Можно завершить и удалить.",
+          goalMaxFps: "Максимум FPS",
+          goalQuiet: "Тише и холоднее",
+          goalWork: "Работа",
+          goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
+          passportTitle: "Текущий ПК",
+          passportLaptop: "Текущий ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слота",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слота · 1× NVMe",
+          uninstallKillRemove: "Завершить и удалить",
+          uninstallStepKill: "Завершение фоновых процессов...",
+          uninstallStepClean: "Очистка файлов и хвостов реестра...",
+          uninstallDone: "Программа и хвосты полностью удалены",
+          uninstallReplay: "Повторить демо",
+          featUpgradeTitle: "Советник апгрейда",
+          featUpgradeBody: "Паспорт ПК: сокет, слоты RAM, NVMe. Локальные советы под FPS, тишину, работу или бюджет, с понятными подводными камнями",
+          featUninstallTitle: "Умное удаление",
+          featUninstallBody: "Перед удалением гасит процессы программы, после ищет остатки в AppData и реестре, умеет ставить с трассировкой для точной очистки",
+          startTitle: "Быстрый старт",
+          startSub: "Три простых шага на Windows 10 или 11",
+          step1Title: "Скачайте программу",
+          step1Body: "Нажмите «Скачать для Windows (.exe)» - файл pulsecore.exe скачается напрямую.",
+          step2Title: "Сохраните файл",
+          step2Body: "Положите pulsecore.exe в удобную папку (например, Документы или Рабочий стол).",
+          step3Title: "Запустите",
+          step3Body: "Дважды щёлкните по pulsecore.exe. Готово."
+        },
+        en: {
+          pageTitle: "PulseCore: lightweight system monitor for Windows",
+          pageDesc: "A light Windows app: watch your PC, cut freezes, without extra system load.",
+          langLabel: "Language",
+          navPreview: "Interface",
+          navFeatures: "Features",
+          navStart: "Start",
+          heroSub: "A light Windows app: watch your PC and cut freezes without extra load",
+          ctaDownload: "Download for Windows (.exe)",
+          ctaSource: "Source on GitHub",
+          previewTitle: "Live interface",
+          previewSub: "This is how the app looks. Switch the tabs",
+          tabOverview: "Overview",
+          tabLags: "Lags",
+          tabHardware: "Hardware",
+          demoOverviewTitle: "System overview",
+          demoOverviewSub: "Live CPU, GPU, RAM and temperature metrics",
+          demoAlertPeak: "Core spike: Browser is loading the system",
+          demoTrend: "Dynamics",
+          demoLagsTitle: "Lags",
+          demoLagsSub: "Background processes and Eco Mode",
+          demoGameSub: "Pick a game for an FPS forecast",
+          demoGameTip: "Tap a game to see presets",
+          demoHwTitle: "Hardware",
+          demoHwSub: "Physical cores and SMT threads",
+          demoSsdLab: "SSD health",
+          demoSsdStatus: "Excellent",
+          demoSsdStatusLab: "Status",
+          demoSsdPowerOn: "Power-on hours",
+          demoSsdWritten: "Written",
+          demoSsdLife: "Remaining life",
+          demoSsdTemp: "Temperature",
+          demoSsdBad: "Bad sectors",
+          demoCore: "Core",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Stable 165+ on high",
+          tipGta: "Comfortable 120 on medium",
+          tipCyber: "DLSS holds 60 on high",
+          tipDota: "FPS headroom for tournaments",
+          featTitle: "Everything for control and smooth PC work",
+          featSub: "A light Windows app that stays out of the way and helps clear freezes",
+          featEcoTitle: "Micro-lags + Eco",
+          featEcoBody: "Finds apps that make games hitch and cuts their appetite in one click without closing them",
+          featFpsTitle: "FPS",
+          featFpsBody: "Shows how many frames your PC can hold in popular games on low, medium and high settings",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "A compact overlay for windows and games: CPU temp, GPU and memory load always in view",
+          featSsdTitle: "SSD health",
+          featSsdBody: "Reads SMART: remaining life %, temperature and bad sectors in plain language, not cryptic tables",
+          featAdminTitle: "No admin",
+          featAdminBody: "Runs right after download with no complex setup or extra system permissions",
+          featPrivTitle: "Privacy",
+          featPrivBody: "Runs locally on your PC and never sends personal data away",
+          featResTitle: "Resources",
+          featResBody: "Uses little memory and stays out of games, unlike heavy monitoring suites",
+          tabUpgrade: "Upgrade",
+          tabUninstall: "Uninstall",
+          demoUpgradeTitle: "Upgrade Advisor",
+          demoUpgradeSub: "PC passport and goal-based tips",
+          demoUpgradePitfalls: "Pitfalls",
+          demoUninstallTitle: "Smart Uninstaller",
+          demoUninstallSub: "Processes, leftovers and tracing",
+          demoUninstallWarn: "Chatty.exe is running. You can kill it and uninstall.",
+          goalMaxFps: "Max FPS",
+          goalQuiet: "Quiet and cool",
+          goalWork: "Work",
+          goalBudget: "Budget",
+          devicePC: "PC",
+          deviceLaptop: "Laptop",
+          passportTitle: "Current PC",
+          passportLaptop: "Current laptop",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 slots",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 slots · 1× NVMe",
+          uninstallKillRemove: "Kill and uninstall",
+          uninstallStepKill: "Stopping background processes...",
+          uninstallStepClean: "Cleaning files and registry leftovers...",
+          uninstallDone: "App and leftovers fully removed",
+          uninstallReplay: "Replay demo",
+          featUpgradeTitle: "Upgrade Advisor",
+          featUpgradeBody: "PC passport: socket, RAM slots, NVMe. Local tips for FPS, quiet, work or budget, with plain pitfalls",
+          featUninstallTitle: "Smart Uninstaller",
+          featUninstallBody: "Stops app processes before uninstall, then finds leftovers in AppData and the registry, with install tracing for precise cleanup",
+          startTitle: "Quick start",
+          startSub: "Three simple steps on Windows 10 or 11",
+          step1Title: "Download the app",
+          step1Body: "Click Download for Windows (.exe) - pulsecore.exe downloads directly.",
+          step2Title: "Save the file",
+          step2Body: "Put pulsecore.exe in a folder you like (Documents or Desktop).",
+          step3Title: "Launch",
+          step3Body: "Double-click pulsecore.exe. Done."
+        },
+        kk: {
+          pageTitle: "PulseCore: Windows үшін жеңіл жүйелік монитор",
+          pageDesc: "Windows үшін жеңіл бағдарлама: ПК бақылау, фриздерді азайту, артық жүктемесіз.",
+          langLabel: "Тіл",
+          navPreview: "Интерфейс",
+          navFeatures: "Мүмкіндіктер",
+          navStart: "Бастау",
+          heroSub: "Windows үшін жеңіл бағдарлама: ПК бақылау және фриздерді артық жүктемесіз азайту",
+          ctaDownload: "Windows үшін жүктеу (.exe)",
+          ctaSource: "GitHub бастапқы коды",
+          previewTitle: "Тірі интерфейс",
+          previewSub: "Бағдарлама осылай көрінеді. Қойындыларды ауыстырыңыз",
+          tabOverview: "Шолу",
+          tabLags: "Лагтар",
+          tabHardware: "Құрылғы",
+          demoOverviewTitle: "Жүйе шолуы",
+          demoOverviewSub: "CPU, GPU, RAM және температураның тірі метрикалары",
+          demoAlertPeak: "Ядро шыңы: Браузер жүйені жүктейді",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лагтар",
+          demoLagsSub: "Фондық процестер және Eco Mode",
+          demoGameSub: "FPS болжамы үшін ойынды таңдаңыз",
+          demoGameTip: "Пресеттерді көру үшін ойынды басыңыз",
+          demoHwTitle: "Құрылғы",
+          demoHwSub: "Физикалық ядролар және SMT ағындар",
+          demoSsdLab: "SSD денсаулығы",
+          demoSsdStatus: "Өте жақсы",
+          demoSsdStatusLab: "Күйі",
+          demoSsdPowerOn: "Жұмыс уақыты",
+          demoSsdWritten: "Жазылған",
+          demoSsdLife: "Қалған ресурс",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Нашар секторлар",
+          demoCore: "Ядро",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Жоғарыда тұрақты 165+",
+          tipGta: "Орташада ыңғайлы 120",
+          tipCyber: "DLSS жоғарыда 60 ұстайды",
+          tipDota: "Турнирлерге FPS қоры",
+          featTitle: "ПК бақылау және бірқалыпты жұмыс үшін",
+          featSub: "Жүйені жүктемейтін және фриздерді азайтатын жеңіл Windows бағдарламасы",
+          featEcoTitle: "Микролаг + Eco",
+          featEcoBody: "Ойынды жыбырлататын бағдарламаларды тауып, бір басумен жаппай тұтынуын шектейді",
+          featFpsTitle: "FPS",
+          featFpsBody: "Танымал ойындарда төмен, орташа және жоғары параметрлерде қанша кадр шығатынын көрсетеді",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Терезелер мен ойындар үстіндегі ықшам панель: CPU температурасы, GPU және жады жүктемесі",
+          featSsdTitle: "SSD денсаулығы",
+          featSsdBody: "SMART оқиды: қалған ресурс %, температура және нашар секторлар қарапайым тілде",
+          featAdminTitle: "Админсіз",
+          featAdminBody: "Жүктегеннен кейін бірден іске қосылады, күрделі баптаусыз",
+          featPrivTitle: "Құпиялылық",
+          featPrivBody: "Компьютеріңізде жергілікті жұмыс істейді және жеке деректерді жібермейді",
+          featResTitle: "Ресурстар",
+          featResBody: "Аз жады алады және ойындарға кедергі жасамайды",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Жою",
+          demoUpgradeTitle: "Апгрейд кеңесшісі",
+          demoUpgradeSub: "ПК паспорты және мақсатқа сай кеңестер",
+          demoUpgradePitfalls: "Тұзақтар",
+          demoUninstallTitle: "Ақылды жою",
+          demoUninstallSub: "Процестер, қалдықтар және із",
+          demoUninstallWarn: "Chatty.exe іске қосулы. Тоқтатып жоюға болады.",
+          goalMaxFps: "Макс FPS",
+          goalQuiet: "Тыныш әрі салқын",
+          goalWork: "Жұмыс",
+          goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
+          passportTitle: "Қазіргі ПК",
+          passportLaptop: "Қазіргі ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
+          uninstallKillRemove: "Тоқтатып жою",
+          uninstallStepKill: "Фондық процестерді аяқтау...",
+          uninstallStepClean: "Файлдар мен реестр қалдықтарын тазалау...",
+          uninstallDone: "Бағдарлама мен қалдықтар толық жойылды",
+          uninstallReplay: "Демоны қайталау",
+          featUpgradeTitle: "Апгрейд кеңесшісі",
+          featUpgradeBody: "ПК паспорты: сокет, RAM слоттары, NVMe. FPS, тыныштық, жұмыс не бюджетке сай жергілікті кеңестер",
+          featUninstallTitle: "Ақылды жою",
+          featUninstallBody: "Жоймас бұрын процестерді тоқтатады, сосын AppData мен тізілімде қалдық іздейді, ізбен орнату арқылы нақты тазалайды",
+          startTitle: "Жылдам бастау",
+          startSub: "Windows 10 немесе 11-те үш қарапайым қадам",
+          step1Title: "Бағдарламаны жүктеңіз",
+          step1Body: "Windows үшін жүктеу (.exe) басыңыз - pulsecore.exe тікелей жүктеледі.",
+          step2Title: "Файлды сақтаңыз",
+          step2Body: "pulsecore.exe файлын ыңғайлы бумаға қойыңыз.",
+          step3Title: "Іске қосыңыз",
+          step3Body: "pulsecore.exe-ге екі рет басыңыз. Дайын."
+        },
+        tt: {
+          pageTitle: "PulseCore: Windows өчен җиңел система мониторы",
+          pageDesc: "Windows өчен җиңел программа: ПК контроль, фризларны киметү, артык йөкләүсез.",
+          langLabel: "Тел",
+          navPreview: "Интерфейс",
+          navFeatures: "Мөмкинлекләр",
+          navStart: "Старт",
+          heroSub: "Windows өчен җиңел программа: ПК контроль һәм фризларны артык йөкләүсез киметү",
+          ctaDownload: "Windows өчен йөкләү (.exe)",
+          ctaSource: "GitHub чыганак коды",
+          previewTitle: "Тере интерфейс",
+          previewSub: "Программа шулай күренә. Табларны алмаштырыгыз",
+          tabOverview: "Күзәтү",
+          tabLags: "Лаглар",
+          tabHardware: "Тимер",
+          demoOverviewTitle: "Система күзәтүе",
+          demoOverviewSub: "CPU, GPU, RAM һәм температураның тере метрикалары",
+          demoAlertPeak: "Төш чыны: Браузер системаны йөкли",
+          demoTrend: "Динамика",
+          demoLagsTitle: "Лаглар",
+          demoLagsSub: "Фон процесслары һәм Eco Mode",
+          demoGameSub: "FPS прогнозы өчен уен сайлагыз",
+          demoGameTip: "Пресетларны күрү өчен уенга басыгыз",
+          demoHwTitle: "Тимер",
+          demoHwSub: "Физик төшләр һәм SMT җепләр",
+          demoSsdLab: "SSD сәламәтлеге",
+          demoSsdStatus: "Бик яхшы",
+          demoSsdStatusLab: "Хәл",
+          demoSsdPowerOn: "Эш вакыты",
+          demoSsdWritten: "Язылган",
+          demoSsdLife: "Калган ресурс",
+          demoSsdTemp: "Температура",
+          demoSsdBad: "Начар секторлар",
+          demoCore: "Төш",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Югарыда тотрыклы 165+",
+          tipGta: "Уртачада уңайлы 120",
+          tipCyber: "DLSS югарыда 60 тота",
+          tipDota: "Турнирларга FPS запасы",
+          featTitle: "ПК контроль һәм шома эш өчен барысы",
+          featSub: "Системаны йөкләми торган һәм фризларны киметә торган җиңел Windows программасы",
+          featEcoTitle: "Микролаг + Eco",
+          featEcoBody: "Уенны селкетеп җибәрә торган программаларны таба һәм бер басу белән аларны чикли",
+          featFpsTitle: "FPS",
+          featFpsBody: "Популяр уеннарда түбән, уртача һәм югары көйләүләрдә ничә кадр чыгуын күрсәтә",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Тәрәзәләр һәм уеннар өстендәге компакт панель: CPU температурасы, GPU һәм хәтер йөкләнеше",
+          featSsdTitle: "SSD сәламәтлеге",
+          featSsdBody: "SMART укый: калган ресурс %, температура һәм начар секторлар гади телдә",
+          featAdminTitle: "Админсыз",
+          featAdminBody: "Йөкләгәннән соң шунда ук эшли, катлаулы көйләүләрсез",
+          featPrivTitle: "Хосусыйлык",
+          featPrivBody: "Компьютерыгызда җирле эшли һәм шәхси мәгълүматны җибәрми",
+          featResTitle: "Ресурслар",
+          featResBody: "Аз хәтер ала һәм уеннарга комачауламый",
+          tabUpgrade: "Апгрейд",
+          tabUninstall: "Бетерү",
+          demoUpgradeTitle: "Апгрейд киңәшчесе",
+          demoUpgradeSub: "ПК паспорты һәм максат буенча киңәшләр",
+          demoUpgradePitfalls: "Куркынычлар",
+          demoUninstallTitle: "Акыллы бетерү",
+          demoUninstallSub: "Процесслар, калдыклар һәм эз",
+          demoUninstallWarn: "Chatty.exe эшли. Туктатып бетерергә була.",
+          goalMaxFps: "Макс FPS",
+          goalQuiet: "Тынрак һәм салкынрак",
+          goalWork: "Эш",
+          goalBudget: "Бюджет",
+          devicePC: "ПК",
+          deviceLaptop: "Ноутбук",
+          passportTitle: "Хәзерге ПК",
+          passportLaptop: "Хәзерге ноутбук",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 слот",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 слот · 1× NVMe",
+          uninstallKillRemove: "Туктатып бетерү",
+          uninstallStepKill: "Фон процессларын туктату...",
+          uninstallStepClean: "Файллар һәм реестр калдыкларын чистарту...",
+          uninstallDone: "Программа һәм калдыклар тулысынча бетерелде",
+          uninstallReplay: "Демоны кабатлау",
+          featUpgradeTitle: "Апгрейд киңәшчесе",
+          featUpgradeBody: "ПК паспорты: сокет, RAM слотлары, NVMe. FPS, тынлык, эш яки бюджет өчен җирле киңәшләр",
+          featUninstallTitle: "Акыллы бетерү",
+          featUninstallBody: "Бетергәнче процессларны туктата, аннары AppData һәм реестрда калдык эзли, эз белән урнаштыру аша төгәл чистарта",
+          startTitle: "Тиз старт",
+          startSub: "Windows 10 яки 11тә өч гади адым",
+          step1Title: "Программаны йөкләгез",
+          step1Body: "Windows өчен йөкләү (.exe) басыгыз - pulsecore.exe турыдан йөкләнә.",
+          step2Title: "Файлны саклагыз",
+          step2Body: "pulsecore.exe файлын уңайлы папкага куегыз.",
+          step3Title: "Эшләтегез",
+          step3Body: "pulsecore.exeга ике тапкыр басыгыз. Әзер."
+        },
+        de: {
+          pageTitle: "PulseCore: leichter Systemmonitor für Windows",
+          pageDesc: "Leichte Windows-App: PC im Blick, weniger Ruckler, ohne Extra-Last.",
+          langLabel: "Sprache",
+          navPreview: "Oberfläche",
+          navFeatures: "Funktionen",
+          navStart: "Start",
+          heroSub: "Leichte Windows-App: PC im Blick und weniger Ruckler ohne Extra-Last",
+          ctaDownload: "Für Windows laden (.exe)",
+          ctaSource: "Quellcode auf GitHub",
+          previewTitle: "Live-Oberfläche",
+          previewSub: "So sieht die App aus. Tabs wechseln",
+          tabOverview: "Übersicht",
+          tabLags: "Ruckler",
+          tabHardware: "Hardware",
+          demoOverviewTitle: "Systemübersicht",
+          demoOverviewSub: "Live-Metriken für CPU, GPU, RAM und Temperatur",
+          demoAlertPeak: "Kernspitze: Browser belastet das System",
+          demoTrend: "Dynamik",
+          demoLagsTitle: "Ruckler",
+          demoLagsSub: "Hintergrundprozesse und Eco Mode",
+          demoGameSub: "Spiel für FPS-Prognose wählen",
+          demoGameTip: "Spiel antippen, um Presets zu sehen",
+          demoHwTitle: "Hardware",
+          demoHwSub: "Physische Kerne und SMT-Threads",
+          demoSsdLab: "SSD-Zustand",
+          demoSsdStatus: "Ausgezeichnet",
+          demoSsdStatusLab: "Status",
+          demoSsdPowerOn: "Betriebsstunden",
+          demoSsdWritten: "Geschrieben",
+          demoSsdLife: "Restlebensdauer",
+          demoSsdTemp: "Temperatur",
+          demoSsdBad: "Bad sectors",
+          demoCore: "Kern",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "Stabile 165+ auf hoch",
+          tipGta: "Komfortable 120 auf mittel",
+          tipCyber: "DLSS hält 60 auf hoch",
+          tipDota: "FPS-Reserve für Turniere",
+          featTitle: "Alles für Kontrolle und flüssige PC-Arbeit",
+          featSub: "Leichte Windows-App, die das System schont und Ruckler mindert",
+          featEcoTitle: "Mikro-Ruckler + Eco",
+          featEcoBody: "Findet Apps, die Spiele ruckeln lassen, und drosselt sie mit einem Klick ohne Schließen",
+          featFpsTitle: "FPS",
+          featFpsBody: "Zeigt, wie viele Frames Ihr PC in populären Spielen auf niedrig, mittel und hoch schafft",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "Kompaktes Overlay für Fenster und Spiele: CPU-Temp, GPU- und Speicherlast immer im Blick",
+          featSsdTitle: "SSD-Zustand",
+          featSsdBody: "Liest SMART: Restlebensdauer %, Temperatur und Bad sectors in klarer Sprache",
+          featAdminTitle: "Ohne Admin",
+          featAdminBody: "Startet direkt nach dem Download ohne komplexe Einrichtung",
+          featPrivTitle: "Privatsphäre",
+          featPrivBody: "Läuft lokal auf Ihrem PC und sendet keine persönlichen Daten",
+          featResTitle: "Ressourcen",
+          featResBody: "Braucht wenig Speicher und stört Spiele nicht, anders als schwere Monitore",
+          tabUpgrade: "Upgrade",
+          tabUninstall: "Deinstallieren",
+          demoUpgradeTitle: "Upgrade-Berater",
+          demoUpgradeSub: "PC-Pass und Tipps nach Ziel",
+          demoUpgradePitfalls: "Fallstricke",
+          demoUninstallTitle: "Intelligente Deinstallation",
+          demoUninstallSub: "Prozesse, Reste und Tracing",
+          demoUninstallWarn: "Chatty.exe läuft. Sie können beenden und entfernen.",
+          goalMaxFps: "Max FPS",
+          goalQuiet: "Leise und kuehl",
+          goalWork: "Arbeit",
+          goalBudget: "Budget",
+          devicePC: "PC",
+          deviceLaptop: "Notebook",
+          passportTitle: "Aktueller PC",
+          passportLaptop: "Aktuelles Notebook",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 Slots",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 Slots · 1× NVMe",
+          uninstallKillRemove: "Beenden und entfernen",
+          uninstallStepKill: "Hintergrundprozesse werden beendet...",
+          uninstallStepClean: "Dateien und Registry-Reste werden bereinigt...",
+          uninstallDone: "Programm und Reste vollständig entfernt",
+          uninstallReplay: "Demo wiederholen",
+          featUpgradeTitle: "Upgrade-Berater",
+          featUpgradeBody: "PC-Pass: Sockel, RAM-Slots, NVMe. Lokale Tipps für FPS, Ruhe, Arbeit oder Budget mit klaren Fallstricken",
+          featUninstallTitle: "Intelligente Deinstallation",
+          featUninstallBody: "Stoppt Prozesse vor der Deinstallation, findet Reste in AppData und Registry, mit Tracing für präzise Reinigung",
+          startTitle: "Schnellstart",
+          startSub: "Drei einfache Schritte unter Windows 10 oder 11",
+          step1Title: "App laden",
+          step1Body: "Klicken Sie Für Windows laden (.exe) - pulsecore.exe wird direkt geladen.",
+          step2Title: "Datei speichern",
+          step2Body: "Legen Sie pulsecore.exe in einen Ordner Ihrer Wahl.",
+          step3Title: "Starten",
+          step3Body: "Doppelklick auf pulsecore.exe. Fertig."
+        },
+        ja: {
+          pageTitle: "PulseCore: Windows向け軽量システムモニタ",
+          pageDesc: "軽いWindowsアプリ。PCを見守り、フリーズを減らし、余分な負荷をかけません。",
+          langLabel: "言語",
+          navPreview: "画面",
+          navFeatures: "機能",
+          navStart: "開始",
+          heroSub: "軽いWindowsアプリ。PCを見守り、余分な負荷なくフリーズを減らします",
+          ctaDownload: "Windows用をダウンロード (.exe)",
+          ctaSource: "GitHubのソース",
+          previewTitle: "ライブ画面",
+          previewSub: "アプリはこの見た目です。タブを切り替えてください",
+          tabOverview: "概要",
+          tabLags: "ラグ",
+          tabHardware: "ハードウェア",
+          demoOverviewTitle: "システム概要",
+          demoOverviewSub: "CPU・GPU・RAM・温度のライブ指標",
+          demoAlertPeak: "コア急騰: ブラウザが負荷をかけています",
+          demoTrend: "推移",
+          demoLagsTitle: "ラグ",
+          demoLagsSub: "バックグラウンド処理と Eco Mode",
+          demoGameSub: "FPS予測するゲームを選ぶ",
+          demoGameTip: "ゲームをタップしてプリセットを表示",
+          demoHwTitle: "ハードウェア",
+          demoHwSub: "物理コアと SMT スレッド",
+          demoSsdLab: "SSDの健康",
+          demoSsdStatus: "優良",
+          demoSsdStatusLab: "状態",
+          demoSsdPowerOn: "通電時間",
+          demoSsdWritten: "書き込み量",
+          demoSsdLife: "残寿命",
+          demoSsdTemp: "温度",
+          demoSsdBad: "不良セクタ",
+          demoCore: "コア",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "高設定で安定165+",
+          tipGta: "中設定で快適120",
+          tipCyber: "高設定でDLSSが60を維持",
+          tipDota: "大会向けのFPS余裕",
+          featTitle: "制御となめらかな動作のために",
+          featSub: "システムを重くせず、フリーズ対策を助ける軽いWindowsアプリ",
+          featEcoTitle: "マイクロラグ + Eco",
+          featEcoBody: "ゲームをカクつかせるアプリを見つけ、閉じずにワンクリックで抑制",
+          featFpsTitle: "FPS",
+          featFpsBody: "人気タイトルの低・中・高設定で何フレーム出せるかを表示",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "ウィンドウやゲーム上の小型パネル。CPU温度、GPUとメモリ負荷を常に表示",
+          featSsdTitle: "SSDの健康",
+          featSsdBody: "SMARTを読み取り、残寿命%、温度、不良セクタをわかりやすい言葉で表示",
+          featAdminTitle: "管理者不要",
+          featAdminBody: "ダウンロード後すぐに起動。複雑な設定や追加権限は不要",
+          featPrivTitle: "プライバシー",
+          featPrivBody: "PC上でローカル動作し、個人データを送信しません",
+          featResTitle: "リソース",
+          featResBody: "メモリ使用が少なく、重い監視ソフトと違いゲームを妨げません",
+          tabUpgrade: "アップグレード",
+          tabUninstall: "削除",
+          demoUpgradeTitle: "アップグレード助言",
+          demoUpgradeSub: "PCパスポートと目的別の提案",
+          demoUpgradePitfalls: "注意点",
+          demoUninstallTitle: "スマートアンインストール",
+          demoUninstallSub: "プロセス、残留、追跡",
+          demoUninstallWarn: "Chatty.exe が実行中。終了して削除できます。",
+          goalMaxFps: "最大FPS",
+          goalQuiet: "静かで涼しい",
+          goalWork: "作業",
+          goalBudget: "予算",
+          devicePC: "デスクトップ",
+          deviceLaptop: "ノートPC",
+          passportTitle: "現在のPC",
+          passportLaptop: "現在のノートPC",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 スロット",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 スロット · 1× NVMe",
+          uninstallKillRemove: "終了して削除",
+          uninstallStepKill: "バックグラウンドプロセスを終了中...",
+          uninstallStepClean: "ファイルとレジストリの残留を清掃中...",
+          uninstallDone: "プログラムと残留を完全に削除しました",
+          uninstallReplay: "デモを再実行",
+          featUpgradeTitle: "アップグレード助言",
+          featUpgradeBody: "PCパスポート: ソケット、RAMスロット、NVMe。FPS・静音・作業・予算向けのローカル提案と注意点",
+          featUninstallTitle: "スマートアンインストール",
+          featUninstallBody: "削除前にプロセスを止め、AppDataとレジストリの残留を探し、トレース付きインストールで精密に掃除",
+          startTitle: "クイックスタート",
+          startSub: "Windows 10 / 11 での3ステップ",
+          step1Title: "アプリをダウンロード",
+          step1Body: "Windows用をダウンロード (.exe) をクリック - pulsecore.exe が直接保存されます。",
+          step2Title: "ファイルを保存",
+          step2Body: "pulsecore.exe を好きなフォルダに置きます。",
+          step3Title: "起動",
+          step3Body: "pulsecore.exe をダブルクリック。完了です。"
+        },
+        zh: {
+          pageTitle: "PulseCore: 轻量级 Windows 系统监控",
+          pageDesc: "轻量 Windows 应用：盯住电脑、减少卡顿，不额外拖慢系统。",
+          langLabel: "语言",
+          navPreview: "界面",
+          navFeatures: "功能",
+          navStart: "开始",
+          heroSub: "轻量 Windows 应用：盯住电脑，减少卡顿，不额外加重负担",
+          ctaDownload: "下载 Windows 版 (.exe)",
+          ctaSource: "GitHub 源码",
+          previewTitle: "实时界面",
+          previewSub: "应用就是这样。切换标签查看",
+          tabOverview: "总览",
+          tabLags: "卡顿",
+          tabHardware: "硬件",
+          demoOverviewTitle: "系统总览",
+          demoOverviewSub: "CPU、GPU、内存与温度的实时指标",
+          demoAlertPeak: "核心尖峰：浏览器正在加重系统负担",
+          demoTrend: "动态",
+          demoLagsTitle: "卡顿",
+          demoLagsSub: "后台进程与 Eco Mode",
+          demoGameSub: "选择游戏查看 FPS 预估",
+          demoGameTip: "点击游戏查看预设",
+          demoHwTitle: "硬件",
+          demoHwSub: "物理核心与 SMT 线程",
+          demoSsdLab: "SSD 健康",
+          demoSsdStatus: "优秀",
+          demoSsdStatusLab: "状态",
+          demoSsdPowerOn: "通电时间",
+          demoSsdWritten: "写入量",
+          demoSsdLife: "剩余寿命",
+          demoSsdTemp: "温度",
+          demoSsdBad: "坏道",
+          demoCore: "核心",
+          ecoMode: "Eco Mode",
+          ecoOn: "Eco ON",
+          fpsLow: "Low",
+          fpsMed: "Med",
+          fpsHigh: "High",
+          fpsUltra: "Ultra",
+          gameCs2Sub: "Competitive",
+          gameGtaSub: "Open world",
+          gameCyberSub: "RTX ready",
+          gameDotaSub: "MOBA",
+          tipCs2: "高画质稳定 165+",
+          tipGta: "中画质舒适 120",
+          tipCyber: "高画质 DLSS 稳住 60",
+          tipDota: "比赛留有 FPS 余量",
+          featTitle: "掌控电脑、流畅运行所需的一切",
+          featSub: "轻量 Windows 应用，不拖慢系统，并帮助减少卡顿",
+          featEcoTitle: "微卡顿 + Eco",
+          featEcoBody: "找出让游戏卡顿的程序，一键限制占用，无需关闭",
+          featFpsTitle: "FPS",
+          featFpsBody: "显示热门游戏在低、中、高画质下你的电脑能跑多少帧",
+          featHudTitle: "Mini-HUD",
+          featHudBody: "覆盖在窗口和游戏上的紧凑面板：CPU 温度、显卡与内存占用一目了然",
+          featSsdTitle: "SSD 健康",
+          featSsdBody: "读取 SMART：用通俗语言显示剩余寿命百分比、温度和坏道",
+          featAdminTitle: "无需管理员",
+          featAdminBody: "下载后即可运行，无需复杂设置或额外权限",
+          featPrivTitle: "隐私",
+          featPrivBody: "在本地运行，不会发送个人数据",
+          featResTitle: "资源",
+          featResBody: "占用内存很少，不像沉重的监控套件那样干扰游戏",
+          tabUpgrade: "升级",
+          tabUninstall: "卸载",
+          demoUpgradeTitle: "升级顾问",
+          demoUpgradeSub: "电脑护照与按目标的建议",
+          demoUpgradePitfalls: "坑点",
+          demoUninstallTitle: "智能卸载",
+          demoUninstallSub: "进程、残留与追踪",
+          demoUninstallWarn: "Chatty.exe 正在运行。可以结束并卸载。",
+          goalMaxFps: "最高帧率",
+          goalQuiet: "更安静更凉",
+          goalWork: "办公",
+          goalBudget: "省钱",
+          devicePC: "台式机",
+          deviceLaptop: "笔记本",
+          passportTitle: "当前电脑",
+          passportLaptop: "当前笔记本",
+          passPCSub: "AM4 · B550 · 16 GB DDR4 · 2/4 插槽",
+          passLaptopSub: "BGA · 16 GB DDR4 · 1/2 插槽 · 1× NVMe",
+          uninstallKillRemove: "结束并卸载",
+          uninstallStepKill: "正在结束后台进程...",
+          uninstallStepClean: "正在清理文件与注册表残留...",
+          uninstallDone: "程序与残留已完全删除",
+          uninstallReplay: "重播演示",
+          featUpgradeTitle: "升级顾问",
+          featUpgradeBody: "电脑护照: 插槽、内存槽、NVMe。按帧率、安静、办公或省钱给出本地建议与坑点",
+          featUninstallTitle: "智能卸载",
+          featUninstallBody: "卸载前结束进程，随后扫描 AppData 与注册表残留，并支持带追踪的安装以便精确清理",
+          startTitle: "快速开始",
+          startSub: "在 Windows 10 或 11 上三步搞定",
+          step1Title: "下载应用",
+          step1Body: "点击「下载 Windows 版 (.exe)」- 直接下载 pulsecore.exe。",
+          step2Title: "保存文件",
+          step2Body: "将 pulsecore.exe 放到方便的文件夹。",
+          step3Title: "启动",
+          step3Body: "双击 pulsecore.exe。完成。"
+        }
+      };
+
+      let lang = "ru";
+      const t = (key) => (I18N[lang] && I18N[lang][key]) || I18N.en[key] || I18N.ru[key] || key;
+
+      function detectLang() {
+        try {
+          const saved = localStorage.getItem(LANG_STORAGE);
+          if (saved && LANGS.includes(saved)) return saved;
+        } catch (_) {}
+        const nav = (navigator.language || navigator.userLanguage || "en").toLowerCase();
+        const short = nav.slice(0, 2);
+        if (LANGS.includes(short)) return short;
+        if (nav.startsWith("zh")) return "zh";
+        return "en";
+      }
+
+      function applyI18n() {
+        document.documentElement.lang = lang;
+        document.title = t("pageTitle");
+        const desc = document.querySelector('meta[name="description"]');
+        if (desc) desc.setAttribute("content", t("pageDesc"));
+        const og = document.querySelector('meta[property="og:description"]');
+        if (og) og.setAttribute("content", t("pageDesc"));
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const key = el.getAttribute("data-i18n");
+          if (!key) return;
+          el.textContent = t(key);
+        });
+        const sw = document.getElementById("lang-switch");
+        if (sw) sw.value = lang;
+        renderCores(true);
+        renderGames();
+        renderProcs();
+        const ecoAlert = document.getElementById("demo-eco-alert");
+        if (ecoAlert) ecoAlert.textContent = t("ecoMode");
+        if (typeof window.__pcRenderUpgrade === "function") window.__pcRenderUpgrade();
+        requestAnimationFrame(() => {
+          const active = document.querySelector(".preview-tabs button.active");
+          if (active && typeof window.__pcMovePill === "function") window.__pcMovePill(active, true);
+        });
+      }
+
+      function setLang(next) {
+        lang = LANGS.includes(next) ? next : "en";
+        try { localStorage.setItem(LANG_STORAGE, lang); } catch (_) {}
+        applyI18n();
+        if (typeof renderUpgradeDemo === "function") renderUpgradeDemo();
+      }
+
+      lang = detectLang();
+      const langSwitch = document.getElementById("lang-switch");
+      if (langSwitch) {
+        langSwitch.value = lang;
+        langSwitch.addEventListener("change", (e) => setLang(e.target.value));
+      }
+
+      const root = document.documentElement;
+      const coarseOrNarrow = window.matchMedia("(hover: none), (max-width: 768px)");
+      let raf = 0;
+      let mx = 0;
+      let my = 0;
+      const apply = () => {
+        raf = 0;
+        if (coarseOrNarrow.matches) {
+          root.style.setProperty("--mouse-x", "0");
+          root.style.setProperty("--mouse-y", "0");
+          return;
+        }
+        root.style.setProperty("--mouse-x", mx.toFixed(4));
+        root.style.setProperty("--mouse-y", my.toFixed(4));
+      };
+      window.addEventListener("pointermove", (e) => {
+        if (coarseOrNarrow.matches) return;
+        const w = window.innerWidth || 1;
+        const h = window.innerHeight || 1;
+        mx = (e.clientX / w) * 2 - 1;
+        my = (e.clientY / h) * 2 - 1;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }, { passive: true });
+      window.addEventListener("pointerleave", () => {
+        mx = 0; my = 0;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }, { passive: true });
+      coarseOrNarrow.addEventListener("change", apply);
+
+      const tabs = [...document.querySelectorAll(".preview-tabs button")];
+      const panes = [...document.querySelectorAll(".demo-pane")];
+      const frame = document.querySelector(".preview-frame");
+      const tablist = document.querySelector(".preview-tabs");
+      const pill = document.querySelector(".preview-tab-pill");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      const movePill = (btn, instant) => {
+        if (!pill || !tablist || !btn) return;
+        const left = btn.offsetLeft;
+        const top = btn.offsetTop;
+        if (instant) pill.style.transition = "none";
+        pill.style.width = btn.offsetWidth + "px";
+        pill.style.height = btn.offsetHeight + "px";
+        pill.style.transform = "translate(" + left + "px, " + top + "px)";
+        if (instant) {
+          void pill.offsetWidth;
+          pill.style.transition = "";
+        }
+      };
+      window.__pcMovePill = movePill;
+
+      const panelIdOf = (p) => p.dataset.panel || p.dataset.pane || (p.id || "").replace(/^panel-/, "");
+      const activate = (id) => {
+        let activeBtn = null;
+        tabs.forEach((b) => {
+          const on = b.dataset.tab === id;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+          if (on) {
+            activeBtn = b;
+            b.scrollIntoView({ inline: "center", block: "nearest", behavior: "auto" });
+          }
+        });
+        panes.forEach((p) => {
+          const on = panelIdOf(p) === id || p.id === "panel-" + id;
+          p.classList.toggle("active", on);
+          p.hidden = !on;
+          p.setAttribute("aria-hidden", on ? "false" : "true");
+        });
+        if (activeBtn) {
+          requestAnimationFrame(() => movePill(activeBtn, reduceMotion.matches));
+        }
+      };
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => activate(btn.dataset.tab));
+      });
+      // Ensure initial inactive panels are display:none + hidden
+      activate(tabs.find((b) => b.classList.contains("active"))?.dataset.tab || "overview");
+      const syncPill = () => {
+        const active = tabs.find((b) => b.classList.contains("active")) || tabs[0];
+        movePill(active, true);
+      };
+      syncPill();
+      window.addEventListener("resize", syncPill, { passive: true });
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(syncPill).catch(() => {});
+      }
+
+      if (frame) {
+        let x0 = 0;
+        let y0 = 0;
+        let tracking = false;
+        frame.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          tracking = true;
+          x0 = e.clientX;
+          y0 = e.clientY;
+        }, { passive: true });
+        frame.addEventListener("pointerup", (e) => {
+          if (!tracking) return;
+          tracking = false;
+          const dx = e.clientX - x0;
+          const dy = e.clientY - y0;
+          if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy)) return;
+          const ids = tabs.map((t) => t.dataset.tab);
+          const cur = panes.find((p) => p.classList.contains("active"));
+          const i = ids.indexOf(cur && panelIdOf(cur));
+          if (i < 0) return;
+          const next = dx < 0 ? Math.min(ids.length - 1, i + 1) : Math.max(0, i - 1);
+          if (next !== i) activate(ids[next]);
+        }, { passive: true });
+        frame.addEventListener("pointercancel", () => { tracking = false; }, { passive: true });
+      }
+
+      const reveals = [...document.querySelectorAll(".reveal")];
+      const showAllReveals = () => {
+        reveals.forEach((el) => el.classList.add("is-in"));
+      };
+      if (reduceMotion.matches || !("IntersectionObserver" in window)) {
+        showAllReveals();
+      } else {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          });
+        }, { threshold: 0.14, rootMargin: "0px 0px -6% 0px" });
+        reveals.forEach((el) => io.observe(el));
+      }
+      reduceMotion.addEventListener("change", (e) => {
+        if (e.matches) showAllReveals();
+        syncPill();
+      });
+
+      /* ---- Live interactive demo telemetry ---- */
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+      const HISTORY = 24;
+      const SERIES_LEN = HISTORY + 1;
+      const SAMPLE_MS = 900;
+      const SOFT = 0.045;
+      const LERP = 0.16;
+      const themes = {
+        cpu: { stroke: "rgba(142,192,255,0.98)", glow: "rgba(110,168,255,0.85)", top: "rgba(110,168,255,0.34)", bottom: "rgba(110,168,255,0.02)" },
+        gpu: { stroke: "rgba(95,240,212,0.95)", glow: "rgba(61,231,200,0.8)", top: "rgba(61,231,200,0.3)", bottom: "rgba(61,231,200,0.02)" },
+        ram: { stroke: "rgba(180,155,255,0.95)", glow: "rgba(155,123,255,0.8)", top: "rgba(155,123,255,0.3)", bottom: "rgba(155,123,255,0.02)" },
+        temp: { stroke: "rgba(255,209,102,0.95)", glow: "rgba(251,191,36,0.8)", top: "rgba(251,191,36,0.28)", bottom: "rgba(251,191,36,0.02)" }
+      };
+      const state = {
+        eco: false,
+        cpu: 48,
+        gpu: 68,
+        ram: 63.5,
+        temp: 58,
+        target: { cpu: 48, gpu: 68, ram: 63.5, temp: 58 },
+        series: { cpu: [], gpu: [], ram: [], temp: [] },
+        display: { cpu: 48, gpu: 68, ram: 63.5, temp: 58 },
+        scrollPhase: 0,
+        cores: Array.from({ length: 8 }, () => ({ t0: 30, t1: 28 })),
+        procs: [
+          { name: "chrome.exe", load: 38, eco: false },
+          { name: "Discord.exe", load: 22, eco: false },
+          { name: "Steam.exe", load: 14, eco: false },
+          { name: "Explorer.exe", load: 6, eco: false }
+        ],
+        gameId: "cs2",
+        ssd: { health: 98, temp: 37, bad: 0, written: "14.2 TB", powerOn: "1840 h" }
+      };
+
+      function seedSeries(key, base, wobble) {
+        const arr = [];
+        let v = base;
+        for (let i = 0; i < SERIES_LEN; i++) {
+          v = clamp(v + rnd(-wobble, wobble), 5, 96);
+          arr.push(v);
+        }
+        state.series[key] = arr;
+        state[key] = v;
+        state.target[key] = v;
+        state.display[key] = v;
+      }
+      seedSeries("cpu", 48, 3.2);
+      seedSeries("gpu", 68, 2.4);
+      seedSeries("ram", 63.5, 0.6);
+      seedSeries("temp", 58, 0.8);
+
+      const games = {
+        cs2: { name: "CS2", appId: 730, fps: [240, 210, 165, 120], tipKey: "tipCs2", subKey: "gameCs2Sub" },
+        gtav: { name: "GTA V", appId: 271590, fps: [144, 120, 90, 72], tipKey: "tipGta", subKey: "gameGtaSub" },
+        cyber: { name: "Cyberpunk", appId: 1091500, fps: [95, 72, 55, 42], tipKey: "tipCyber", subKey: "gameCyberSub" },
+        dota: { name: "Dota 2", appId: 570, fps: [200, 180, 150, 120], tipKey: "tipDota", subKey: "gameDotaSub" }
+      };
+      const steamCover = (id) => "https://cdn.cloudflare.steamstatic.com/steam/apps/" + id + "/header.jpg";
+      const coverFallback = {
+        cs2: "linear-gradient(145deg, #1a2a44 0%, #0b101b 55%, #152238 100%)",
+        gtav: "linear-gradient(145deg, #244028 0%, #0b101b 55%, #1a3020 100%)",
+        cyber: "linear-gradient(145deg, #3a1840 0%, #0b101b 55%, #241030 100%)",
+        dota: "linear-gradient(145deg, #402018 0%, #0b101b 55%, #301810 100%)"
+      };
+
+      const el = (id) => document.getElementById(id);
+      const sparkIds = {
+        cpu: "spark-demo-cpu",
+        gpu: "spark-demo-gpu",
+        ram: "spark-demo-ram",
+        temp: "spark-demo-temp"
+      };
+
+      function rollSeries(key, raw) {
+        const arr = state.series[key];
+        arr.shift();
+        arr.push(raw);
+        state[key] = raw;
+      }
+
+      function strokeSmooth(ctx, points) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i === 0 ? i : i - 1];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2] || p2;
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y
+          );
+        }
+        ctx.stroke();
+      }
+
+      function fillSmooth(ctx, points, cssH, colorTop, colorBottom) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i === 0 ? i : i - 1];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[i + 2] || p2;
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y
+          );
+        }
+        const last = points[points.length - 1];
+        const first = points[0];
+        ctx.lineTo(last.x, cssH);
+        ctx.lineTo(first.x, cssH);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, 0, 0, cssH);
+        grad.addColorStop(0, colorTop);
+        grad.addColorStop(1, colorBottom);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      function pointsFromValues(values, w, h, padX, padY, absScale, phase) {
+        const slots = Math.max(HISTORY - 1, 1);
+        const step = (w - padX * 2) / slots;
+        const ph = phase || 0;
+        const yOf = (raw) => {
+          if (absScale) {
+            const v = clamp(raw, 0, 100);
+            return padY + (h - padY * 2) - (v / 100) * (h - padY * 2);
+          }
+          return 0;
+        };
+        let min = 0;
+        let max = 100;
+        let span = 100;
+        if (!absScale) {
+          min = Math.min(...values) - 2;
+          max = Math.max(...values) + 2;
+          span = Math.max(1, max - min);
+        }
+        return values.map((raw, i) => {
+          const x = padX + (i - ph) * step;
+          const y = absScale
+            ? yOf(raw)
+            : padY + (h - padY * 2) - ((raw - min) / span) * (h - padY * 2);
+          return { x, y };
+        });
+      }
+
+      function drawSpark(canvas, values, theme) {
+        if (!canvas || !values || values.length < 2) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = canvas.clientWidth || 160;
+        const h = canvas.clientHeight || 28;
+        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+          canvas.width = Math.floor(w * dpr);
+          canvas.height = Math.floor(h * dpr);
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
+        const pts = pointsFromValues(values, w, h, 2, 3, false, state.scrollPhase);
+        fillSmooth(ctx, pts, h, theme.top, theme.bottom);
+        ctx.save();
+        ctx.lineWidth = 2.6;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.strokeStyle = theme.glow;
+        ctx.shadowColor = theme.glow;
+        ctx.shadowBlur = 10;
+        ctx.globalAlpha = 0.45;
+        strokeSmooth(ctx, pts);
+        ctx.restore();
+        ctx.lineWidth = 1.7;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.strokeStyle = theme.stroke;
+        ctx.shadowColor = theme.glow;
+        ctx.shadowBlur = 6;
+        strokeSmooth(ctx, pts);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
+      function updateTrendLegend() {
+        const map = { cpu: "leg-cpu", gpu: "leg-gpu", ram: "leg-ram" };
+        Object.keys(map).forEach((key) => {
+          const node = el(map[key]);
+          if (!node) return;
+          const v = state.display[key];
+          node.textContent = `${Math.round(Number.isFinite(v) ? v : 0)}%`;
+        });
+      }
+
+      function drawTrend(canvas) {
+        if (!canvas) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = canvas.clientWidth || 900;
+        const h = canvas.clientHeight || 120;
+        if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+          canvas.width = Math.floor(w * dpr);
+          canvas.height = Math.floor(h * dpr);
+        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        // Match sparkline path: clip to canvas so subpixel left-scroll never flashes edges.
+        ctx.beginPath();
+        ctx.rect(0, 0, w, h);
+        ctx.clip();
+        // Thin horizontal scale grid (100% / 50% / 0%).
+        ;[0, 0.5, 1].forEach((frac) => {
+          const y = 6 + (h - 12) * frac;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.strokeStyle = "rgba(160, 190, 255, 0.16)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash(frac === 0.5 ? [4, 4] : []);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+        ["cpu", "gpu", "ram"].forEach((key) => {
+          const theme = themes[key];
+          const pts = pointsFromValues(state.series[key], w, h, 4, 6, true, state.scrollPhase);
+          fillSmooth(ctx, pts, h, theme.top, theme.bottom);
+          ctx.lineWidth = 2;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.strokeStyle = theme.stroke;
+          ctx.shadowColor = theme.glow;
+          ctx.shadowBlur = 8;
+          strokeSmooth(ctx, pts);
+          ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+        updateTrendLegend();
+      }
+
+      function renderProcs() {
+        const host = el("demo-procs");
+        if (!host) return;
+        host.innerHTML = state.procs.map((p, i) => `
+          <div class="demo-proc" data-i="${i}">
+            <div class="name">${p.name}</div>
+            <div class="load">${Math.round(p.load)}%</div>
+            <button type="button" class="btn-eco${p.eco ? " on" : ""}" data-eco="${i}">${p.eco ? t("ecoOn") : t("ecoMode")}</button>
+          </div>`).join("");
+        host.querySelectorAll("[data-eco]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const i = Number(btn.getAttribute("data-eco"));
+            const p = state.procs[i];
+            if (!p) return;
+            p.eco = !p.eco;
+            if (p.eco) p.load = clamp(p.load * 0.35, 3, 12);
+            else p.load = clamp(rnd(12, 40), 8, 45);
+            renderProcs();
+          });
+        });
+      }
+
+      function renderGames() {
+        const host = el("demo-games");
+        const fpsHost = el("demo-fps");
+        const tip = el("demo-tip");
+        if (!host || !fpsHost) return;
+        const order = ["cs2", "gtav", "cyber", "dota"];
+        host.innerHTML = order.map((id) => {
+          const g = games[id];
+          return `<button type="button" class="demo-game${state.gameId === id ? " active" : ""}" data-game="${id}">
+            <div class="cover-wrap">
+              <img src="${steamCover(g.appId)}" alt="" width="460" height="215" loading="lazy" decoding="async" data-fallback="${id}" />
+            </div>
+            <div class="gmeta">
+              <div class="gname">${g.name}</div>
+              <div class="gsub">${t(g.subKey)}</div>
+            </div>
+          </button>`;
+        }).join("");
+        host.querySelectorAll(".cover-wrap img").forEach((node) => {
+          node.addEventListener("error", () => {
+            const id = node.getAttribute("data-fallback");
+            const fb = document.createElement("div");
+            fb.className = "cover-fallback";
+            fb.style.background = coverFallback[id] || "#0b101b";
+            node.replaceWith(fb);
+          }, { once: true });
+        });
+        host.querySelectorAll("[data-game]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.gameId = btn.getAttribute("data-game");
+            renderGames();
+            if (tip) {
+              tip.classList.add("flash");
+              tip.textContent = t(games[state.gameId].tipKey);
+              requestAnimationFrame(() => tip.classList.remove("flash"));
+            }
+            fpsHost.querySelectorAll(".f").forEach((n) => {
+              n.classList.remove("pop");
+              void n.offsetWidth;
+              n.classList.add("pop");
+            });
+          });
+        });
+        const g = games[state.gameId];
+        const labels = [t("fpsLow"), t("fpsMed"), t("fpsHigh"), t("fpsUltra")];
+        fpsHost.innerHTML = g.fps.map((f, i) => `
+          <div class="cell"><div class="q">${labels[i]}</div><div class="f">${f}</div></div>`).join("");
+        if (tip) tip.textContent = t(g.tipKey);
+      }
+
+      function renderCores(forceLabels) {
+        const host = el("demo-core-grid");
+        if (!host) return;
+        if (!host.childElementCount || forceLabels) {
+          host.innerHTML = state.cores.map((_, i) => `
+            <div class="demo-core" data-c="${i}">
+              <div class="ch"><span class="id">${t("demoCore")} ${i + 1}</span><span class="v">0%</span></div>
+              <div class="pbar"><i></i></div>
+              <div class="thr"><span class="tid">T0</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
+              <div class="thr"><span class="tid">T1</span><div class="tbar"><i></i></div><span class="tv">0%</span></div>
+            </div>`).join("");
+        }
+        state.cores.forEach((c, i) => {
+          const node = host.children[i];
+          if (!node) return;
+          const avg = (c.t0 + c.t1) / 2;
+          node.querySelector(".v").textContent = Math.round(avg) + "%";
+          node.querySelector(".pbar > i").style.width = clamp(avg, 0, 100) + "%";
+          const thr = node.querySelectorAll(".thr");
+          [c.t0, c.t1].forEach((load, ti) => {
+            thr[ti].querySelector(".tv").textContent = Math.round(load) + "%";
+            thr[ti].querySelector(".tbar > i").style.width = clamp(load, 0, 100) + "%";
+          });
+        });
+      }
+
+      function retargetMetrics() {
+        const cpuBand = state.eco ? [16, 26] : [40, 58];
+        state.target.cpu = clamp(state.target.cpu + rnd(-3.5, 3.5), cpuBand[0], cpuBand[1]);
+        state.target.gpu = clamp(state.target.gpu + rnd(-2.2, 2.2), 58, 78);
+        state.target.ram = clamp(state.target.ram + rnd(-0.45, 0.45), 60, 67);
+        state.target.temp = clamp(
+          state.target.temp + (state.target.cpu - state.cpu) * 0.06 + rnd(-0.5, 0.5),
+          52,
+          68
+        );
+      }
+
+      function updateAuxMetrics() {
+        state.cores.forEach((c) => {
+          const base = state.eco ? rnd(8, 22) : clamp(state.cpu + rnd(-18, 18), 10, 90);
+          c.t0 = clamp(c.t0 + (base - c.t0) * 0.4 + rnd(-4, 4), 4, 96);
+          c.t1 = clamp(c.t1 + (base - c.t1) * 0.4 + rnd(-5, 5), 4, 96);
+        });
+
+        state.procs.forEach((p) => {
+          if (p.eco) p.load = clamp(p.load + rnd(-1.0, 1.0), 2, 14);
+          else p.load = clamp(p.load + rnd(-2.2, 2.2), 5, 48);
+        });
+        const procsHost = el("demo-procs");
+        if (procsHost && procsHost.querySelector(".demo-proc")) {
+          state.procs.forEach((p, i) => {
+            const row = procsHost.children[i];
+            if (!row) return;
+            const loadEl = row.querySelector(".load");
+            if (loadEl) loadEl.textContent = Math.round(p.load) + "%";
+          });
+        }
+
+        state.ssd.temp = clamp(state.ssd.temp + rnd(-0.25, 0.25), 36, 41);
+        const avgCore = state.cores.reduce((s, c) => s + (c.t0 + c.t1) / 2, 0) / state.cores.length;
+        const hwCpu = el("demo-hw-cpu-sub");
+        const hwGpu = el("demo-hw-gpu-sub");
+        const hwRam = el("demo-hw-ram-sub");
+        if (hwCpu) hwCpu.textContent = "8 / 16 • " + Math.round(avgCore) + "%";
+        if (hwGpu) hwGpu.textContent = "8 GB • " + Math.round(state.gpu) + "%";
+        if (hwRam) hwRam.textContent = "Dual Channel • " + Math.round(state.ram) + "%";
+        const ssdTemp = el("demo-ssd-temp");
+        if (ssdTemp) ssdTemp.textContent = Math.round(state.ssd.temp) + "°C";
+        const ssdCompact = el("demo-ssd-compact");
+        if (ssdCompact) ssdCompact.textContent = "Samsung 980 PRO 1TB • " + state.ssd.health + "%";
+        const ssdHealth = el("demo-ssd-health");
+        if (ssdHealth) ssdHealth.textContent = state.ssd.health + "%";
+        const ssdWritten = el("demo-ssd-written");
+        if (ssdWritten) ssdWritten.textContent = state.ssd.written;
+        const ssdPower = el("demo-ssd-power");
+        if (ssdPower) ssdPower.textContent = state.ssd.powerOn;
+        renderCores(false);
+      }
+
+      function advanceSeries() {
+        ["cpu", "gpu", "ram", "temp"].forEach((key) => {
+          rollSeries(key, state[key]);
+        });
+        updateAuxMetrics();
+      }
+
+      function paintUI() {
+        const keys = [
+          { k: "cpu", id: "demo-cpu", bar: "demo-cpu-bar" },
+          { k: "gpu", id: "demo-gpu", bar: "demo-gpu-bar" },
+          { k: "ram", id: "demo-ram", bar: "demo-ram-bar" },
+          { k: "temp", id: "demo-temp", bar: "demo-temp-bar" }
+        ];
+        keys.forEach((item) => {
+          const target = state[item.k];
+          state.display[item.k] += (target - state.display[item.k]) * (reduceMotion.matches ? 1 : LERP);
+          const v = state.display[item.k];
+          const node = el(item.id);
+          if (node) {
+            const next = item.k === "temp" ? Math.round(v) + "°C" : Math.round(v) + "%";
+            if (node.textContent !== next) node.textContent = next;
+          }
+          const bar = el(item.bar);
+          if (bar) {
+            const w = clamp(v, 0, 100).toFixed(1) + "%";
+            if (bar.style.width !== w) bar.style.width = w;
+          }
+          // live tip of the series follows soft display value for continuous Y motion
+          const arr = state.series[item.k];
+          if (arr && arr.length) arr[arr.length - 1] = state.display[item.k];
+          drawSpark(el(sparkIds[item.k]), state.series[item.k], themes[item.k]);
+        });
+        drawTrend(el("demo-trend"));
+      }
+
+      let simTimer = 0;
+      let paintRaf = 0;
+      let lastFrameTs = 0;
+      let reducedAccum = 0;
+
+      function startSim() {
+        if (paintRaf) return;
+        retargetMetrics();
+        simTimer = window.setInterval(retargetMetrics, 900);
+        lastFrameTs = performance.now();
+        reducedAccum = 0;
+        const loop = (now) => {
+          const dt = Math.min(32, Math.max(0, now - lastFrameTs));
+          lastFrameTs = now;
+          const soft = reduceMotion.matches ? 1 : SOFT;
+          ["cpu", "gpu", "ram", "temp"].forEach((key) => {
+            state[key] += (state.target[key] - state[key]) * soft;
+          });
+          if (!reduceMotion.matches) {
+            // Continuous leftward scroll: fractional phase + at most one sample roll per frame
+            // so the dynamics card matches sparkline smoothness (no multi-step catch-up jumps).
+            state.scrollPhase += dt / SAMPLE_MS;
+            if (state.scrollPhase >= 1) {
+              state.scrollPhase -= 1;
+              advanceSeries();
+            }
+          } else {
+            state.scrollPhase = 0;
+            reducedAccum += dt;
+            if (reducedAccum >= SAMPLE_MS) {
+              reducedAccum = 0;
+              advanceSeries();
+            }
+          }
+          paintUI();
+          paintRaf = requestAnimationFrame(loop);
+        };
+        paintRaf = requestAnimationFrame(loop);
+      }
+      function stopSim() {
+        if (simTimer) {
+          clearInterval(simTimer);
+          simTimer = 0;
+        }
+        if (paintRaf) {
+          cancelAnimationFrame(paintRaf);
+          paintRaf = 0;
+        }
+      }
+
+      const alertEl = el("demo-alert");
+      const ecoAlertBtn = el("demo-eco-alert");
+      if (ecoAlertBtn) {
+        ecoAlertBtn.addEventListener("click", () => {
+          state.eco = true;
+          if (alertEl) alertEl.classList.add("hidden");
+          const browser = state.procs.find((p) => p.name === "chrome.exe");
+          if (browser) {
+            browser.eco = true;
+            browser.load = clamp(browser.load * 0.3, 3, 10);
+            renderProcs();
+          }
+        });
+      }
+
+      const upgradeState = { device: "pc", goal: "fps" };
+      const upgradeDemoDataByLang = {
+        ru: {
+        pc: {
+          big: "Ryzen 7 5700X · RTX 3060",
+          goals: {
+            fps: [
+              {
+                title: "Видеокарта",
+                model: "RTX 4070 Super",
+                gain: "+60% FPS",
+                body: "Сейчас RTX 3060. Переход на 4070 Super даёт около +60% FPS в 1080p/1440p. Главный прирост для этого ПК.",
+                pits: [
+                  "Перед покупкой GPU измерьте место в корпусе и проверьте мощность и разъёмы блока питания.",
+                  "Нужен запас по ваттам и родные разъёмы (8-pin / 12VHPWR).",
+                  "После установки поставьте свежий драйвер NVIDIA или AMD."
+                ]
+              },
+              {
+                title: "Процессор под сокет AM4",
+                model: "Ryzen 7 5700X3D / 5800X3D",
+                gain: "+10-20% 1% lows",
+                body: "Сокет AM4 ещё живой: X3D встанет без смены платы. Сейчас Ryzen 7 5700X. Снимает CPU limit в играх.",
+                pits: [
+                  "Обновите BIOS перед установкой более нового процессора.",
+                  "Проверьте VRM на плате.",
+                  "Сокет сейчас: AM4. Новый процессор должен быть для этого сокета."
+                ]
+              },
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4 dual-channel",
+                gain: "меньше статтеров",
+                body: "Свободно 2 слота. Наберите 32 ГБ DDR4 одной частоты и таймингов для стабильного FPS.",
+                pits: [
+                  "Тип памяти: DDR4. Другое поколение не подойдёт.",
+                  "Совпадайте частоту и тайминги модулей.",
+                  "В BIOS включите XMP/EXPO."
+                ]
+              }
+            ],
+            quiet: [
+              {
+                title: "Тихое охлаждение",
+                model: "Башенный кулер 120/140 мм",
+                gain: "тише на 5-15°C",
+                body: "Башенный кулер, поток воздуха и undervolt GPU/CPU часто тише смены железа.",
+                pits: ["Смените термопасту и проверьте посадку.", "Undervolt маленькими шагами.", "Воздух должен выходить из корпуса."]
+              },
+              {
+                title: "Тихая видеокарта",
+                model: "RTX 4070 Super (3-fan)",
+                gain: "тише под нагрузкой",
+                body: "Трёхвентиляторная 4070 Super с undervolt тише коротких дутышей и даёт запас FPS.",
+                pits: [
+                  "Перед покупкой GPU измерьте место в корпусе и проверьте блок питания.",
+                  "Нужны родные разъёмы питания.",
+                  "Поставьте свежий драйвер после установки."
+                ]
+              },
+              {
+                title: "CPU с умеренным TDP",
+                model: "Оставить 5700X + кулер",
+                gain: "ниже температура",
+                body: "На AM4 оставьте 5700X и поставьте хороший башенный кулер вместо шумного боксового.",
+                pits: ["Обновите BIOS при смене CPU.", "Проверьте VRM.", "Сокет AM4."]
+              }
+            ],
+            work: [
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4",
+                gain: "32-64 GB",
+                body: "Для работы целитесь в 32 или 64 ГБ DDR4. Все модули одной частоты и таймингов.",
+                pits: ["Тип: DDR4.", "Совпадайте частоту и тайминги.", "Включите XMP/EXPO."]
+              },
+              {
+                title: "Больше ядер на AM4",
+                model: "Ryzen 9 5950X / 5900X",
+                gain: "+multi-core",
+                body: "Сокет AM4: Ryzen 9 без смены платы. Больше ядер для рендера, компиляции и виртуалок.",
+                pits: ["Обновите BIOS перед новым CPU.", "Проверьте VRM.", "Только сокет AM4."]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1-2 TB",
+                gain: "быстрее проекты",
+                body: "Поставьте систему и проекты на NVMe. Свободный M.2: быстрый апгрейд без замены ПК.",
+                pits: ["Нужен свободный M.2.", "Клонируйте ОС при необходимости.", "SATA SSD медленнее NVMe."]
+              }
+            ],
+            budget: [
+              {
+                title: "Оперативная память",
+                model: "2x16 GB DDR4",
+                gain: "лучший $/эффект",
+                body: "Свободные слоты: dual-channel DDR4 одной частоты. Дешёвый и заметный шаг.",
+                pits: ["Только DDR4.", "Частота и тайминги совпадают.", "Включите XMP."]
+              },
+              {
+                title: "Бюджетная видеокарта",
+                model: "RTX 4060 Ti 16GB (б/у OK)",
+                gain: "+30-45% FPS",
+                body: "Сейчас RTX 3060. 4060 Ti (в том числе б/у) даёт прирост без смены платформы.",
+                pits: [
+                  "Перед покупкой измерьте корпус и проверьте блок питания.",
+                  "Родные разъёмы питания.",
+                  "Свежий драйвер после установки."
+                ]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1 TB",
+                gain: "быстрее загрузка",
+                body: "Бюджетный NVMe ускоряет Windows и игры без дорогой смены GPU.",
+                pits: ["Проверьте свободный M.2.", "Клонируйте систему при замене.", "Берите диск с нормальным кэшем."]
+              }
+            ]
+          }
+        },
+        laptop: {
+          big: "Ryzen 7 6800H · RTX 3060 Laptop",
+          goals: {
+            fps: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "+15-25% FPS (iGPU)",
+                body: "Вторая планка той же частоты включает dual-channel. CPU и GPU в ноутбуке обычно впаяны.",
+                pits: ["Только тот же тип памяти.", "Совпадайте частоту и тайминги.", "Проверьте сервисное руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "быстрее загрузка",
+                body: "Второй M.2 ускоряет игры и проекты. Это реальный апгрейд ноутбука без замены платы.",
+                pits: ["Проверьте второй слот в руководстве.", "Иногда нужен радиатор.", "Клонируйте ОС при замене загрузочного."]
+              },
+              {
+                title: "Охлаждение и undervolt",
+                model: "Паста + чистка + undervolt",
+                gain: "стабильнее FPS",
+                body: "Охлаждение держит частоты дольше. На ноутбуке это часто даёт больше стабильного FPS, чем попытка разогнать всё.",
+                pits: ["Не закрывайте вентиляцию.", "Undervolt маленькими шагами.", "Не покупайте мобильный CPU/GPU отдельно."]
+              }
+            ],
+            quiet: [
+              {
+                title: "Охлаждение и undervolt",
+                model: "Паста + чистка + undervolt",
+                gain: "заметно тише",
+                body: "Главный путь к тишине: чистка, паста, undervolt и тихий профиль питания. Новый GPU сюда не поставить.",
+                pits: ["Не закрывайте вентиляцию.", "Undervolt маленькими шагами.", "CPU/GPU впаяны."]
+              },
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "меньше нагрева от iGPU",
+                body: "Dual-channel снижает нагрузку на память и помогает держать частоты без лишнего шума кулера.",
+                pits: ["Тот же тип памяти.", "Частота и тайминги совпадают.", "Смотрите руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB",
+                gain: "тише при копировании",
+                body: "Быстрый NVMe меньше крутит вентиляторы при больших копиях, чем медленный диск.",
+                pits: ["Свободный M.2.", "Радиатор по необходимости.", "Клонирование ОС."]
+              }
+            ],
+            work: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "быстрее отклик",
+                body: "Вторая планка для dual-channel. Браузер, IDE и вкладки любят объём и двухканал.",
+                pits: ["Тот же тип.", "Частота и тайминги.", "Сервисное руководство."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "быстрее проекты",
+                body: "Рабочим задачам нужен быстрый NVMe: проекты, Docker, IDE.",
+                pits: ["Проверьте второй слот.", "Радиатор.", "Клонирование при замене."]
+              },
+              {
+                title: "Охлаждение",
+                model: "Паста + чистка",
+                gain: "стабильные частоты",
+                body: "Чистка и паста держат частоты на длинных задачах. Впаянный CPU менять нельзя.",
+                pits: ["Вентиляция свободна.", "Качественная паста.", "Не покупайте мобильный CPU отдельно."]
+              }
+            ],
+            budget: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 8-16 GB DDR4 (match)",
+                gain: "лучший $/эффект",
+                body: "Самый выгодный шаг на ноутбуке: вторая планка под dual-channel. Дешевле любой платы.",
+                pits: ["Тот же тип.", "Частота и тайминги.", "Руководство по слотам."]
+              },
+              {
+                title: "Второй NVMe",
+                model: "NVMe 512 GB-1 TB",
+                gain: "быстрее загрузка",
+                body: "Бюджетный NVMe во второй слот. CPU/GPU впаяны, диск реально меняется.",
+                pits: ["Свободный M.2.", "Клонирование при замене.", "Не берите USB-только как «апгрейд»."]
+              },
+              {
+                title: "Охлаждение",
+                model: "Чистка + паста",
+                gain: "тише / стабильнее",
+                body: "Обслуживание охлаждения бесплатнее новой машины и возвращает частоты.",
+                pits: ["Не закрывайте вентиляцию.", "Аккуратно с разборкой.", "CPU/GPU не меняются отдельно."]
+              }
+            ]
+          }
+        }
+      },
+        en: {
+        pc: {
+          big: "Ryzen 7 5700X · RTX 3060",
+          goals: {
+            fps: [
+              {
+                title: "Graphics card",
+                model: "RTX 4070 Super",
+                gain: "+60% FPS",
+                body: "Current GPU is RTX 3060. Moving to 4070 Super is about +60% FPS at 1080p/1440p. Biggest gain for this PC.",
+                pits: [
+                  "Measure case clearance and check PSU wattage and connectors before buying a GPU.",
+                  "Leave headroom on watts and use native 8-pin / 12VHPWR cables.",
+                  "Install a fresh NVIDIA or AMD driver after fitting."
+                ]
+              },
+              {
+                title: "CPU for AM4 socket",
+                model: "Ryzen 7 5700X3D / 5800X3D",
+                gain: "+10-20% 1% lows",
+                body: "AM4 is still alive: an X3D drops in without a new board. Current CPU is Ryzen 7 5700X. Cuts CPU limit in games.",
+                pits: [
+                  "Update BIOS before installing a newer CPU.",
+                  "Check VRM quality on the board.",
+                  "Socket now: AM4. The new CPU must match that socket."
+                ]
+              },
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4 dual-channel",
+                gain: "fewer stutters",
+                body: "2 free slots. Aim for 32 GB DDR4 of the same speed and timings for stable FPS.",
+                pits: [
+                  "Memory type: DDR4. Another generation will not fit.",
+                  "Match module frequency and timings.",
+                  "Enable XMP/EXPO in BIOS."
+                ]
+              }
+            ],
+            quiet: [
+              {
+                title: "Quiet cooling",
+                model: "120/140 mm tower cooler",
+                gain: "5-15°C quieter",
+                body: "A tower cooler, better airflow, and GPU/CPU undervolt often beats swapping parts for noise.",
+                pits: ["Replace thermal paste and check mount pressure.", "Undervolt in small steps.", "Air must exit the case."]
+              },
+              {
+                title: "Quiet graphics card",
+                model: "RTX 4070 Super (3-fan)",
+                gain: "quieter under load",
+                body: "A 3-fan 4070 Super with undervolt is quieter than short blower cards and still adds FPS headroom.",
+                pits: [
+                  "Measure case space and check the PSU first.",
+                  "Use native power connectors.",
+                  "Install a fresh driver after fitting."
+                ]
+              },
+              {
+                title: "Moderate TDP CPU",
+                model: "Keep 5700X + cooler",
+                gain: "lower temps",
+                body: "On AM4 keep the 5700X and fit a good tower cooler instead of a loud stock cooler.",
+                pits: ["Update BIOS if you change the CPU.", "Check VRM.", "Socket AM4."]
+              }
+            ],
+            work: [
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4",
+                gain: "32-64 GB",
+                body: "For work aim for 32 or 64 GB DDR4. Keep every stick on the same speed and timings.",
+                pits: ["Type: DDR4.", "Match frequency and timings.", "Enable XMP/EXPO."]
+              },
+              {
+                title: "More cores on AM4",
+                model: "Ryzen 9 5950X / 5900X",
+                gain: "+multi-core",
+                body: "AM4 socket: Ryzen 9 without a new board. More cores for render, compile, and VMs.",
+                pits: ["Update BIOS before a new CPU.", "Check VRM.", "AM4 only."]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1-2 TB",
+                gain: "faster projects",
+                body: "Put OS and projects on NVMe. Free M.2 slot: quick upgrade without replacing the PC.",
+                pits: ["Need a free M.2.", "Clone the OS if needed.", "SATA SSD is slower than NVMe."]
+              }
+            ],
+            budget: [
+              {
+                title: "System memory",
+                model: "2x16 GB DDR4",
+                gain: "best $/effect",
+                body: "Free slots: dual-channel DDR4 at one speed. Cheap and noticeable.",
+                pits: ["DDR4 only.", "Match frequency and timings.", "Enable XMP."]
+              },
+              {
+                title: "Budget graphics card",
+                model: "RTX 4060 Ti 16GB (used OK)",
+                gain: "+30-45% FPS",
+                body: "Current GPU is RTX 3060. A 4060 Ti (including used) adds FPS without a platform swap.",
+                pits: [
+                  "Measure the case and check the PSU first.",
+                  "Native power connectors.",
+                  "Fresh driver after install."
+                ]
+              },
+              {
+                title: "NVMe SSD",
+                model: "NVMe 1 TB",
+                gain: "faster boot",
+                body: "A budget NVMe speeds up Windows and games without an expensive GPU swap.",
+                pits: ["Check for a free M.2.", "Clone the system when replacing.", "Pick a drive with a real cache."]
+              }
+            ]
+          }
+        },
+        laptop: {
+          big: "Ryzen 7 6800H · RTX 3060 Laptop",
+          goals: {
+            fps: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "+15-25% FPS (iGPU)",
+                body: "A second stick at the same speed enables dual-channel. Laptop CPU/GPU are usually soldered.",
+                pits: ["Same memory type only.", "Match frequency and timings.", "Check the service manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "faster load",
+                body: "A second M.2 speeds games and projects. Real laptop upgrade without a new board.",
+                pits: ["Confirm the second slot in the manual.", "A heatsink may be required.", "Clone the OS when replacing the boot drive."]
+              },
+              {
+                title: "Cooling and undervolt",
+                model: "Paste + clean + undervolt",
+                gain: "steadier FPS",
+                body: "Cooling keeps clocks longer. On a laptop that often beats trying to overclock everything.",
+                pits: ["Do not block vents.", "Undervolt in small steps.", "Do not buy mobile CPU/GPU as spare parts."]
+              }
+            ],
+            quiet: [
+              {
+                title: "Cooling and undervolt",
+                model: "Paste + clean + undervolt",
+                gain: "noticeably quieter",
+                body: "Main quiet path: clean, paste, undervolt, and a quiet power plan. You cannot drop in a new GPU.",
+                pits: ["Do not block vents.", "Undervolt in small steps.", "CPU/GPU are soldered."]
+              },
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "less iGPU heat",
+                body: "Dual-channel lowers memory pressure and helps hold clocks without extra fan noise.",
+                pits: ["Same memory type.", "Match frequency and timings.", "Read the manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB",
+                gain: "quieter copies",
+                body: "A fast NVMe spins fans less on large copies than a slow disk.",
+                pits: ["Free M.2.", "Heatsink if needed.", "OS clone."]
+              }
+            ],
+            work: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 16 GB DDR4 (match)",
+                gain: "snappier UI",
+                body: "Second stick for dual-channel. Browsers, IDEs, and tabs love capacity and two channels.",
+                pits: ["Same type.", "Frequency and timings.", "Service manual."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 1 TB (2nd M.2)",
+                gain: "faster projects",
+                body: "Work needs a fast NVMe: projects, Docker, IDE.",
+                pits: ["Confirm second slot.", "Heatsink.", "Clone when replacing."]
+              },
+              {
+                title: "Cooling",
+                model: "Paste + clean",
+                gain: "stable clocks",
+                body: "Cleaning and paste hold clocks on long tasks. Soldered CPU cannot be swapped.",
+                pits: ["Keep vents clear.", "Quality paste.", "Do not buy a mobile CPU separately."]
+              }
+            ],
+            budget: [
+              {
+                title: "RAM: dual-channel",
+                model: "1x 8-16 GB DDR4 (match)",
+                gain: "best $/effect",
+                body: "Best value on a laptop: a second stick for dual-channel. Cheaper than any board.",
+                pits: ["Same type.", "Frequency and timings.", "Slot guide."]
+              },
+              {
+                title: "Second NVMe",
+                model: "NVMe 512 GB-1 TB",
+                gain: "faster boot",
+                body: "Budget NVMe in the second slot. CPU/GPU are soldered; the disk actually changes.",
+                pits: ["Free M.2.", "Clone when replacing.", "USB-only is not a real upgrade."]
+              },
+              {
+                title: "Cooling",
+                model: "Clean + paste",
+                gain: "quieter / steadier",
+                body: "Cooling service costs less than a new machine and restores clocks.",
+                pits: ["Do not block vents.", "Be careful with teardown.", "CPU/GPU are not separate upgrades."]
+              }
+            ]
+          }
+        }
+      }
+      };
+      function upgradeDemoData() {
+        const lang = (document.documentElement.lang || localStorage.getItem("pc_lang") || "ru").slice(0, 2);
+        return upgradeDemoDataByLang[lang] || upgradeDemoDataByLang.en;
+      }
+
+      function renderUpgradeDemo() {
+        const device = upgradeState.device;
+        const goal = upgradeState.goal;
+        const table = upgradeDemoData();
+        const pack = table[device] || table.pc;
+        const list = (pack.goals && pack.goals[goal]) || pack.goals.fps;
+        const big = el("demo-upgrade-pass-big");
+        const sub = el("demo-upgrade-pass-sub");
+        const lab = document.querySelector(".demo-upgrade-passport .lab");
+        if (big) big.textContent = pack.big;
+        if (sub) sub.textContent = t(device === "laptop" ? "passLaptopSub" : "passPCSub");
+        if (lab) lab.textContent = t(device === "laptop" ? "passportLaptop" : "passportTitle");
+        const host = el("demo-upgrade-recs");
+        if (!host) return;
+        const pitLabel = t("demoUpgradePitfalls");
+        host.innerHTML = list.map((r) => `
+          <article class="demo-upgrade-rec">
+            <div class="rec-top">
+              <div class="title">${r.title}</div>
+              <span class="gain">${r.gain}</span>
+            </div>
+            <div class="model">${r.model}</div>
+            <div class="body">${r.body}</div>
+            <div class="pit">
+              <div class="pit-label">${pitLabel}</div>
+              <ul>${r.pits.map((p) => `<li>${p}</li>`).join("")}</ul>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      document.querySelectorAll(".demo-device").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          upgradeState.device = btn.dataset.device || "pc";
+          document.querySelectorAll(".demo-device").forEach((b) => b.classList.toggle("active", b === btn));
+          renderUpgradeDemo();
+        });
+      });
+      document.querySelectorAll(".demo-goal").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          upgradeState.goal = btn.dataset.goal || "fps";
+          document.querySelectorAll(".demo-goal").forEach((b) => b.classList.toggle("active", b === btn));
+          renderUpgradeDemo();
+        });
+      });
+      window.__pcRenderUpgrade = renderUpgradeDemo;
+      renderUpgradeDemo();
+      const uninstallCard = el("demo-uninstall-card");
+      const uninstallStatus = el("demo-uninstall-status");
+      const uninstallStatusMsg = el("demo-uninstall-status-msg");
+      const uninstallWarn = el("demo-uninstall-warn");
+      const uninstallResidual = el("demo-residual");
+      const uninstallDone = el("demo-uninstall-done");
+      const killBtn = el("demo-kill-remove");
+      const replayBtn = el("demo-uninstall-replay");
+      let uninstallTimers = [];
+      let uninstallBusy = false;
+
+      function clearUninstallTimers() {
+        uninstallTimers.forEach((id) => clearTimeout(id));
+        uninstallTimers = [];
+      }
+
+      function resetUninstallDemo() {
+        clearUninstallTimers();
+        uninstallBusy = false;
+        if (uninstallCard) uninstallCard.classList.remove("is-collapsing");
+        if (uninstallResidual) {
+          uninstallResidual.classList.remove("is-gone");
+          uninstallResidual.querySelectorAll(".demo-check").forEach((row) => row.classList.remove("is-cleared"));
+        }
+        if (uninstallStatus) uninstallStatus.classList.remove("is-on");
+        if (uninstallStatusMsg) uninstallStatusMsg.textContent = "";
+        if (uninstallDone) uninstallDone.classList.remove("is-on");
+        if (uninstallWarn) {
+          uninstallWarn.hidden = false;
+          uninstallWarn.textContent = t("demoUninstallWarn");
+        }
+        if (killBtn) {
+          killBtn.hidden = false;
+          killBtn.disabled = false;
+          killBtn.textContent = t("uninstallKillRemove");
+        }
+        const doneLabel = uninstallDone && uninstallDone.querySelector(".ok");
+        if (doneLabel) doneLabel.textContent = t("uninstallDone");
+        if (replayBtn) replayBtn.textContent = t("uninstallReplay");
+      }
+
+      function runUninstallDemo() {
+        if (uninstallBusy || !killBtn) return;
+        uninstallBusy = true;
+        clearUninstallTimers();
+        if (uninstallDone) uninstallDone.classList.remove("is-on");
+        if (uninstallCard) uninstallCard.classList.remove("is-collapsing");
+        if (uninstallResidual) {
+          uninstallResidual.classList.remove("is-gone");
+          uninstallResidual.querySelectorAll(".demo-check").forEach((row) => row.classList.remove("is-cleared"));
+        }
+        if (uninstallWarn) uninstallWarn.hidden = true;
+        killBtn.hidden = true;
+        killBtn.disabled = true;
+        if (uninstallStatus) uninstallStatus.classList.add("is-on");
+        if (uninstallStatusMsg) uninstallStatusMsg.textContent = t("uninstallStepKill");
+
+        // ~2.2s total sequence
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallStatusMsg) uninstallStatusMsg.textContent = t("uninstallStepClean");
+          const rows = uninstallResidual ? [...uninstallResidual.querySelectorAll(".demo-check")] : [];
+          rows.forEach((row, i) => {
+            uninstallTimers.push(setTimeout(() => row.classList.add("is-cleared"), 120 + i * 160));
+          });
+        }, 750));
+
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallStatus) uninstallStatus.classList.remove("is-on");
+          if (uninstallCard) uninstallCard.classList.add("is-collapsing");
+          if (uninstallResidual) uninstallResidual.classList.add("is-gone");
+        }, 1750));
+
+        uninstallTimers.push(setTimeout(() => {
+          if (uninstallDone) uninstallDone.classList.add("is-on");
+          uninstallBusy = false;
+        }, 2200));
+      }
+
+      if (killBtn) killBtn.addEventListener("click", runUninstallDemo);
+      if (replayBtn) replayBtn.addEventListener("click", resetUninstallDemo);
+
+      applyI18n();
+      resetUninstallDemo();
+      renderProcs();
+      renderGames();
+      renderCores(true);
+      retargetMetrics();
+      paintUI();
+
+      const previewShell = document.querySelector(".preview-shell") || frame;
+      if (previewShell && "IntersectionObserver" in window) {
+        const simIo = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) startSim();
+            else stopSim();
+          });
+        }, { threshold: 0.12 });
+        simIo.observe(previewShell);
+      } else {
+        startSim();
+      }
+
+      window.addEventListener("resize", () => {
+        paintUI();
+        drawTrend(el("demo-trend"));
+      }, { passive: true });
+    })();
+  </script>
+
+</body>
+</html>
