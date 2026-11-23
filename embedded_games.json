@@ -93,7 +93,8 @@
     "year": 2019,
     "badge": "AAA Next-Gen",
     "engine": "RAGE",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1174180/library_600x900.jpg"
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1174180/library_600x900.jpg",
+    "headerUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1174180/header.jpg"
   },
   {
     "id": "cyberpunk",
@@ -105,7 +106,8 @@
     "year": 2020,
     "badge": "AAA Next-Gen",
     "engine": "REDengine",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1091500/library_600x900.jpg"
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1091500/library_600x900.jpg",
+    "headerUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1091500/header.jpg"
   },
   {
     "id": "witcher3",
@@ -117,7 +119,8 @@
     "year": 2015,
     "badge": "AAA",
     "engine": "REDengine",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/292030/library_600x900.jpg"
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/292030/library_600x900.jpg",
+    "headerUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/292030/header.jpg"
   },
   {
     "id": "eldenring",
@@ -337,8 +340,8 @@
     "year": 2006,
     "badge": "Indie",
     "engine": "Proprietary",
-    "posterUrl": "https://images.rbxcdn.com/928198f465737402636a048a123f858a.jpg",
-    "headerUrl": "https://images.rbxcdn.com/928198f465737402636a048a123f858a.jpg"
+    "posterUrl": "",
+    "headerUrl": ""
   },
   {
     "id": "wot",
@@ -384,9 +387,10 @@
     "steamAppId": 0,
     "category": "aaa",
     "year": 2004,
-    "badge": "AAA",
+    "badge": "MMORPG",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "",
+    "headerUrl": ""
   },
   {
     "id": "overwatch2",
@@ -446,7 +450,8 @@
     "year": 2013,
     "badge": "AAA",
     "engine": "Proprietary",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/238960/library_600x900.jpg"
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/238960/library_600x900.jpg",
+    "headerUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/238960/header.jpg"
   },
   {
     "id": "poe2",
@@ -458,7 +463,8 @@
     "year": 2024,
     "badge": "AAA Next-Gen",
     "engine": "Proprietary",
-    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2694490/library_600x900.jpg"
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2694490/library_600x900.jpg",
+    "headerUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2694490/header.jpg"
   },
   {
     "id": "diablo4",
@@ -506,7 +512,8 @@
     "year": 2014,
     "badge": "eSports",
     "engine": "Unity",
-    "posterUrl": ""
+    "posterUrl": "",
+    "headerUrl": ""
   },
   {
     "id": "tft",
@@ -518,7 +525,8 @@
     "year": 2019,
     "badge": "eSports",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "",
+    "headerUrl": ""
   },
   {
     "id": "rocketleague",
@@ -1689,12 +1697,12 @@
     "name": "Mafia",
     "genre": "Action",
     "weight": 0.35,
-    "steamAppId": 0,
+    "steamAppId": 40990,
     "category": "classic",
     "year": 2002,
     "badge": "2D Classic / Retro",
     "engine": "LS3D",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/40990/library_600x900.jpg"
   },
   {
     "id": "mafia2",
@@ -1773,12 +1781,12 @@
     "name": "Heroes of Might & Magic III",
     "genre": "Strategy",
     "weight": 0.2,
-    "steamAppId": 0,
+    "steamAppId": 1671230,
     "category": "classic",
     "year": 1999,
     "badge": "2D Classic / Retro",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1671230/library_600x900.jpg"
   },
   {
     "id": "heroes5",
@@ -1833,12 +1841,12 @@
     "name": "Age of Empires",
     "genre": "Strategy",
     "weight": 0.22,
-    "steamAppId": 0,
+    "steamAppId": 1017900,
     "category": "classic",
     "year": 1997,
     "badge": "2D Classic / Retro",
     "engine": "Genie",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1017900/library_600x900.jpg"
   },
   {
     "id": "warcraft3",
@@ -1857,12 +1865,12 @@
     "name": "StarCraft",
     "genre": "Strategy",
     "weight": 0.22,
-    "steamAppId": 0,
+    "steamAppId": 960080,
     "category": "classic",
     "year": 1998,
     "badge": "2D Classic / Retro",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/960080/library_600x900.jpg"
   },
   {
     "id": "starcraft2",
@@ -2325,12 +2333,12 @@
     "name": "Call of Duty: Warzone",
     "genre": "Battle Royale",
     "weight": 1.1,
-    "steamAppId": 0,
+    "steamAppId": 1962663,
     "category": "aaa",
     "year": 2020,
     "badge": "AAA",
     "engine": "IW",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/1962663/library_600x900.jpg"
   },
   {
     "id": "cod_bo6",
@@ -2409,12 +2417,12 @@
     "name": "iRacing",
     "genre": "Racing",
     "weight": 0.8,
-    "steamAppId": 0,
+    "steamAppId": 266410,
     "category": "sim",
     "year": 2008,
     "badge": "Sim",
     "engine": "Proprietary",
-    "posterUrl": ""
+    "posterUrl": "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/266410/library_600x900.jpg"
   },
   {
     "id": "escape_from_tarkov",

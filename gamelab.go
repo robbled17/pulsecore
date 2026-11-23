@@ -119,17 +119,26 @@ var steamCacheMu sync.RWMutex
 // Per-game requirement tables: BaseFPS is expected FPS when GPUPowerScore == ReqGPUScore.
 var gameRequirements = map[string]gameReqSet{
 	"cyberpunk": {
+		// Med calibrated for 1080p / FSR-friendly 1440p on mid GPUs (e.g. RTX 2060 Super 8GB).
 		Low:   gameReq{55, 55, 38, 3},
-		Med:   gameReq{55, 70, 48, 6},
-		High:  gameReq{60, 68, 58, 8},
-		Ultra: gameReq{58, 78, 70, 10},
+		Med:   gameReq{62, 52, 42, 4},
+		High:  gameReq{55, 65, 52, 6},
+		Ultra: gameReq{48, 78, 62, 8},
 		Heavy: true,
 	},
 	"rdr2": {
-		Low:   gameReq{50, 48, 36, 3},
-		Med:   gameReq{50, 62, 46, 5},
-		High:  gameReq{55, 72, 55, 8},
-		Ultra: gameReq{52, 85, 65, 10},
+		// Ryzen 5 3600 + RTX 2060 Super 8GB → Medium (incl. upscale to 2K) ~65-80 FPS.
+		Low:   gameReq{58, 48, 36, 3},
+		Med:   gameReq{60, 50, 40, 4},
+		High:  gameReq{52, 64, 50, 6},
+		Ultra: gameReq{45, 78, 60, 8},
+		Heavy: true,
+	},
+	"witcher3": {
+		Low:   gameReq{70, 40, 32, 2},
+		Med:   gameReq{68, 46, 36, 3},
+		High:  gameReq{58, 56, 44, 4},
+		Ultra: gameReq{50, 70, 52, 6},
 		Heavy: true,
 	},
 	"gtav": {
@@ -1010,8 +1019,11 @@ func estimatePreset(sys SystemPowerProfile, req gameReq, preset qualityPreset, c
 				warn = "fpsWarnVRAM"
 			}
 		}
-	} else if req.ReqVRAMGB > 0 && effectiveVRAM+0.05 < req.ReqVRAMGB {
-		vramMul = 0.70
+	} else if effectiveVRAM <= 0 {
+		// Unknown dedicated VRAM (AdapterRAM 32-bit clamp): do not invent a shortage.
+	} else if req.ReqVRAMGB > 0 && effectiveVRAM+0.5 < req.ReqVRAMGB {
+		shortfall := req.ReqVRAMGB - effectiveVRAM
+		vramMul = math.Max(0.75, 1.0-shortfall*0.08)
 		warn = "fpsWarnVRAM"
 	}
 

@@ -114,6 +114,10 @@ export function PreviewSafeDiskCaches() {
   return window['go']['main']['App']['PreviewSafeDiskCaches']();
 }
 
+export function OpenAppInstallFolder(arg1) {
+  return window['go']['main']['App']['OpenAppInstallFolder'](arg1);
+}
+
 export function PreviewDeleteResiduals(arg1) {
   return window['go']['main']['App']['PreviewDeleteResiduals'](arg1);
 }

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+	"golang.org/x/sys/windows/registry"
 )
 
 // DiskHealthReport is a real SMART / Storage Reliability snapshot.
@@ -278,10 +281,14 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 		ramVar, _ := oleutil.GetProperty(item, "AdapterRAM")
 		drvVar, _ := oleutil.GetProperty(item, "DriverVersion")
 		n := strings.TrimSpace(nameVar.ToString())
-		// AdapterRAM is often a signed/unsigned 32-bit WMI value; widen carefully.
+		// AdapterRAM is a 32-bit WMI field: cards >4GB wrap to 0 / garbage.
 		ram := uint64(uint32(ramVar.Val))
 		if ramVar.Val < 0 {
 			ram = uint64(uint32(int32(ramVar.Val)))
+		}
+		// Values at the 32-bit ceiling are not trustworthy for >4GB cards.
+		if ram >= 0xFFFF0000 {
+			ram = 0
 		}
 		drv := strings.TrimSpace(drvVar.ToString())
 		item.Release()
@@ -308,7 +315,79 @@ func readGPUInfoDetailed() (name string, vram uint64, driver string) {
 			driver = drv
 		}
 	}
+
+	// Prefer 64-bit registry qwMemorySize / nvidia-smi when AdapterRAM is missing or clamped.
+	if qw := readVRAMBytesFromRegistry(name); qw > vram {
+		vram = qw
+	}
+	if _, _, totalMB, ok := readNVIDIASMICached(); ok && totalMB > 0 {
+		smiBytes := uint64(totalMB * 1024 * 1024)
+		if smiBytes > vram {
+			vram = smiBytes
+		}
+	}
 	return name, vram, driver
+}
+
+// readVRAMBytesFromRegistry reads HardwareInformation.qwMemorySize (64-bit) for display adapters.
+// This bypasses the Win32_VideoController AdapterRAM 32-bit clamp above 4GB.
+func readVRAMBytesFromRegistry(preferName string) uint64 {
+	const classPath = `SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
+	root, err := registry.OpenKey(registry.LOCAL_MACHINE, classPath, registry.ENUMERATE_SUB_KEYS|registry.QUERY_VALUE)
+	if err != nil {
+		return 0
+	}
+	defer root.Close()
+	subs, err := root.ReadSubKeyNames(64)
+	if err != nil {
+		return 0
+	}
+	prefer := strings.ToLower(strings.TrimSpace(preferName))
+	var best, matched uint64
+	for _, sub := range subs {
+		if len(sub) != 4 {
+			continue
+		}
+		// Only numbered adapter slots (0000, 0001, ...).
+		if sub[0] < '0' || sub[0] > '9' {
+			continue
+		}
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, classPath+`\`+sub, registry.QUERY_VALUE)
+		if err != nil {
+			continue
+		}
+		desc, _, _ := k.GetStringValue("DriverDesc")
+		bytes := readQwMemorySize(k)
+		k.Close()
+		if bytes < 512*1024*1024 {
+			continue
+		}
+		descL := strings.ToLower(strings.TrimSpace(desc))
+		if prefer != "" && descL != "" && (strings.Contains(descL, prefer) || strings.Contains(prefer, descL)) {
+			if bytes > matched {
+				matched = bytes
+			}
+		}
+		if bytes > best {
+			best = bytes
+		}
+	}
+	if matched > 0 {
+		return matched
+	}
+	return best
+}
+
+func readQwMemorySize(k registry.Key) uint64 {
+	// REG_QWORD
+	if v, _, err := k.GetIntegerValue("HardwareInformation.qwMemorySize"); err == nil && v > 0 {
+		return v
+	}
+	// Some drivers store it as REG_BINARY (8 bytes little-endian).
+	if raw, _, err := k.GetBinaryValue("HardwareInformation.qwMemorySize"); err == nil && len(raw) >= 8 {
+		return binary.LittleEndian.Uint64(raw[:8])
+	}
+	return 0
 }
 
 func detectIntegratedGPU(name string, dedicatedMB float64) bool {
@@ -614,6 +693,7 @@ try {
 }`
 
 	out, err := runHiddenOutput(systemPowerShell(), "-NoProfile", "-NonInteractive", "-Command", ps)
+	defer debug.FreeOSMemory()
 	report := DiskHealthReport{
 		DriveLetter: letter + ":",
 		OK:          false,

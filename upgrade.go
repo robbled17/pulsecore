@@ -645,18 +645,30 @@ func guessSocketFromCPU(name string) string {
 	}
 }
 
-func readChipsetHint(mobo, mfg string) string {
-	blob := strings.ToUpper(mobo + " " + mfg)
-	for _, chip := range []string{
-		"X870", "B850", "X670", "B650", "A620", "X570", "B550", "A520", "B450", "X470",
-		"Z890", "B860", "Z790", "B760", "H770", "Z690", "B660", "H670", "Z590", "B560", "H510",
-		"Z490", "B460", "H410",
-	} {
-		if strings.Contains(blob, chip) {
+var knownChipsets = []string{
+	"X870E", "X870", "B850", "X670E", "X670", "B650E", "B650", "A620",
+	"X570", "B550", "A520", "B450", "X470", "B350", "X370",
+	"Z890", "B860", "Z790", "B760", "H770", "Z690", "B660", "H670", "H610",
+	"Z590", "B560", "H570", "H510", "Z490", "B460", "H410",
+	"Z390", "B365", "B360", "H370", "Z370",
+}
+
+func matchChipsetToken(blob string) string {
+	up := strings.ToUpper(blob)
+	for _, chip := range knownChipsets {
+		if strings.Contains(up, chip) {
 			return chip
 		}
 	}
-	// Try Win32_IDEController / PnP for AMD/Intel chipset strings.
+	return ""
+}
+
+func readChipsetHint(mobo, mfg string) string {
+	if chip := matchChipsetToken(mobo + " " + mfg); chip != "" {
+		return chip
+	}
+	// Win32_BaseBoard already fed via mobo/mfg; also scan PnP / PCI bridge names
+	// (e.g. "AMD B550 Chipset", "Intel(R) Z690 Chipset").
 	ensureOLE()
 	defer func() { _ = recover() }()
 	locator, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
@@ -675,41 +687,49 @@ func readChipsetHint(mobo, mfg string) string {
 	}
 	service := serviceRaw.ToIDispatch()
 	defer service.Release()
-	resultRaw, err := oleutil.CallMethod(service, "ExecQuery",
-		"SELECT Name FROM Win32_PnPEntity WHERE Name LIKE '%Chipset%' OR Name LIKE '%Bridge%'")
-	if err != nil {
-		return "Unknown"
+
+	queries := []string{
+		"SELECT Name, Caption FROM Win32_PnPEntity WHERE Name LIKE '%Chipset%' OR Caption LIKE '%Chipset%' OR Name LIKE '%FCH%' OR Name LIKE '%LPC%' OR Name LIKE '%PCI Express Root%' OR Name LIKE '%Host Bridge%'",
+		"SELECT Name, Caption FROM Win32_IDEController",
+		"SELECT Name, Caption FROM Win32_PnPEntity WHERE PNPClass='System'",
 	}
-	result := resultRaw.ToIDispatch()
-	defer result.Release()
-	countVar, _ := oleutil.GetProperty(result, "Count")
-	count := int(countVar.Val)
-	limit := count
-	if limit > 40 {
-		limit = 40
-	}
-	for i := 0; i < limit; i++ {
-		itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+	for _, q := range queries {
+		resultRaw, err := oleutil.CallMethod(service, "ExecQuery", q)
 		if err != nil {
 			continue
 		}
-		item := itemRaw.ToIDispatch()
-		nameVar, _ := oleutil.GetProperty(item, "Name")
-		name := strings.TrimSpace(nameVar.ToString())
-		nameVar.Clear()
-		item.Release()
-		up := strings.ToUpper(name)
-		for _, chip := range []string{
-			"X870", "B850", "X670", "B650", "A620", "X570", "B550", "A520",
-			"Z890", "B860", "Z790", "B760", "Z690", "B660", "Z590", "B560",
-		} {
-			if strings.Contains(up, chip) {
+		result := resultRaw.ToIDispatch()
+		countVar, _ := oleutil.GetProperty(result, "Count")
+		count := int(countVar.Val)
+		limit := count
+		if limit > 80 {
+			limit = 80
+		}
+		for i := 0; i < limit; i++ {
+			itemRaw, err := oleutil.CallMethod(result, "ItemIndex", i)
+			if err != nil {
+				continue
+			}
+			item := itemRaw.ToIDispatch()
+			nameVar, _ := oleutil.GetProperty(item, "Name")
+			capVar, _ := oleutil.GetProperty(item, "Caption")
+			name := strings.TrimSpace(nameVar.ToString())
+			caption := strings.TrimSpace(capVar.ToString())
+			nameVar.Clear()
+			capVar.Clear()
+			item.Release()
+			blob := name + " " + caption
+			if chip := matchChipsetToken(blob); chip != "" {
+				result.Release()
 				return chip
 			}
+			up := strings.ToUpper(blob)
+			if strings.Contains(up, "CHIPSET") && len(name) > 0 && len(name) < 80 {
+				result.Release()
+				return name
+			}
 		}
-		if strings.Contains(up, "CHIPSET") && len(name) < 80 {
-			return name
-		}
+		result.Release()
 	}
 	return "Unknown"
 }

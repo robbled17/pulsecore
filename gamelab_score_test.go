@@ -32,9 +32,39 @@ func TestRTX2060SuperCyberpunkMed(t *testing.T) {
 		IsIntegrated: false, IsDualChannel: true, RAMGB: 16, VRAMGB: 8,
 	}
 	req := gameRequirements["cyberpunk"].Med
-	avg, _, _ := estimatePreset(sys, req, presetMed, 0)
-	if avg < 35 || avg > 70 {
-		t.Fatalf("2060 Super Cyberpunk Med got %d, want mid-tier", avg)
+	avg, _, warn := estimatePreset(sys, req, presetMed, 0)
+	if avg < 55 || avg > 95 {
+		t.Fatalf("2060 Super Cyberpunk Med got %d, want ~60-85", avg)
+	}
+	if warn == "fpsWarnVRAM" {
+		t.Fatalf("8GB must not report VRAM shortage for Cyberpunk Med")
+	}
+}
+
+func TestRTX2060SuperRDR2Med(t *testing.T) {
+	sys := SystemPowerProfile{
+		GPUPowerScore: 55, CPUPowerScore: 65, CPUCores: 6,
+		IsIntegrated: false, IsDualChannel: true, RAMGB: 16, VRAMGB: 8,
+	}
+	req := gameRequirements["rdr2"].Med
+	avg, _, warn := estimatePreset(sys, req, presetMed, 0)
+	if avg < 65 || avg > 90 {
+		t.Fatalf("2060 Super RDR2 Med got %d, want ~65-80", avg)
+	}
+	if warn == "fpsWarnVRAM" {
+		t.Fatalf("8GB must not report VRAM shortage for RDR2 Med")
+	}
+}
+
+func TestUnknownVRAMNoFalseShortage(t *testing.T) {
+	sys := SystemPowerProfile{
+		GPUPowerScore: 55, CPUPowerScore: 65, CPUCores: 6,
+		IsIntegrated: false, IsDualChannel: true, RAMGB: 16, VRAMGB: 0,
+	}
+	req := gameRequirements["rdr2"].Med
+	_, _, warn := estimatePreset(sys, req, presetMed, 0)
+	if warn == "fpsWarnVRAM" {
+		t.Fatalf("unknown discrete VRAM must not invent a shortage warning")
 	}
 }
 
