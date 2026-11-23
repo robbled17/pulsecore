@@ -31,6 +31,7 @@ import {
   CleanupFromTrace,
   CleanSafeDiskCaches,
   PreviewSafeDiskCaches,
+  OpenAppInstallFolder,
   RunSelfDiagnostics,
   SetMiniHUDHotkey,
   GetMiniHUDHotkey,
@@ -72,7 +73,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`
 
-const HISTORY_LEN = 60
+const HISTORY_LEN = 36
 const BUFFER_DELAY_MS = 650
 const LERP = 0.14
 const EMA_ALPHA = 0.22
@@ -212,15 +213,25 @@ async function changeLanguage(next) {
   refreshUpgradeAdvisor()
 }
 
+let activeTabName = 'overview'
+
 function setActiveTab(name) {
   // Production builds never expose Dev Mode; ignore any stray navigation.
   if (name === 'dev' && !DEV_MODE_ENABLED) return
+  const prev = activeTabName
+  activeTabName = name
   document.querySelectorAll('.nav-item').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === name)
   })
   document.querySelectorAll('.tab').forEach((tab) => {
     tab.classList.toggle('active', tab.id === `tab-${name}`)
   })
+  // Drop heavy GamePulse DOM while the tab is inactive (lazy posters reload on return).
+  if (prev === 'gamelab' && name !== 'gamelab') {
+    const host = $('game-grid')
+    if (host) host.innerHTML = ''
+  }
+  if (name === 'gamelab') renderGameGrid()
   if (name === 'hardware') refreshPeripherals()
   if (name === 'upgrade') refreshUpgradeAdvisor()
   if (name === 'uninstall') {
@@ -753,14 +764,33 @@ function driveLetter(mount) {
   return String(mount || 'C').replace(':\\', '').replace(':', '').toUpperCase()
 }
 
+function formatCardTemp(raw, available) {
+  if (available === false) return ''
+  const temp = validTemp(raw, available)
+  if (!Number.isFinite(temp)) return ''
+  return `${fmtTemp(temp, 0)}°C`
+}
+
 function renderOverview(m) {
   $('ov-cpu').textContent = fmtPct(m.cpuPercent)
   $('ov-cpu-sub').textContent = m.cpuName || dash()
   $('ov-cpu-bar').style.width = `${Math.min(100, safeNum(m.cpuPercent, 0))}%`
+  const cpuTempEl = $('ov-cpu-temp')
+  if (cpuTempEl) {
+    const cpuTemp = formatCardTemp(m.temperatureC, m.tempAvailable)
+    cpuTempEl.textContent = cpuTemp
+    cpuTempEl.classList.toggle('hidden', !cpuTemp)
+  }
 
   $('ov-gpu').textContent = fmtPct(m.gpuPercent)
   $('ov-gpu-sub').textContent = m.gpuName || dash()
   $('ov-gpu-bar').style.width = `${Math.min(100, safeNum(m.gpuPercent, 0))}%`
+  const gpuTempEl = $('ov-gpu-temp')
+  if (gpuTempEl) {
+    const gpuTemp = formatCardTemp(m.gpuTempC, m.gpuTempAvailable)
+    gpuTempEl.textContent = gpuTemp
+    gpuTempEl.classList.toggle('hidden', !gpuTemp)
+  }
 
   $('ov-ram').textContent = fmtPct(m.ramPercent)
   const used = safeNum(m.ramUsedMB, NaN)
@@ -794,25 +824,18 @@ function renderOverview(m) {
   latestDisks = m.disks || []
   renderDiskTabs(latestDisks)
   renderHwSSDShell(latestDisks)
-  const box = $('ov-disks')
-  const disks = latestDisks
-  if (!disks.length) {
-    box.innerHTML = `<div class="empty">${dash()}</div>`
-  } else {
-    if (!selectedDrive && disks[0]) selectedDrive = driveLetter(disks[0].mount)
-    const activeDisk = disks.find((d) => driveLetter(d.mount) === selectedDrive.toUpperCase()) || disks[0]
-    const d = activeDisk
-    box.innerHTML = `
-      <div class="row disk-row active" data-drive="${driveLetter(d.mount)}">
-        <div>
-          <div class="name">${t('diskPrefix')} ${d.mount}</div>
-          <div class="meta">${fmt(d.usedGB)} / ${fmt(d.totalGB)} GB · ${t('free')} ${fmt(d.freeGB)} GB</div>
-          <div class="meta">${t('read')} ${fmt(d.readMBps)} MB/s · ${t('write')} ${fmt(d.writeMBps)} MB/s</div>
-        </div>
-        <div class="name metric">${fmtPct(d.percent, 0)}</div>
-      </div>
-    `
-  }
+  renderOverviewDiskDetails()
+  prefetchDiskHealthBadges(latestDisks)
+}
+
+function diskHealthBadge(letter) {
+  const r = cachedDiskReport[String(letter || '').toUpperCase()]
+  if (!r) return { health: '…', temp: '' }
+  if (r.ok === false) return { health: t('ssdUnavailable'), temp: '' }
+  const health = r.verdictBadge || r.verdict || t('diskTileHealth')
+  const tt = fmtTemp(r.temperatureC, 0)
+  const temp = tt === na() ? '' : `${tt}°C`
+  return { health, temp }
 }
 
 function renderDiskTabs(disks, targetId = 'disk-tabs') {
@@ -825,13 +848,80 @@ function renderDiskTabs(disks, targetId = 'disk-tabs') {
   host.innerHTML = disks.map((d) => {
     const letter = driveLetter(d.mount)
     const active = letter === selectedDrive.toUpperCase()
+    const badge = diskHealthBadge(letter)
     return `
-      <button type="button" class="disk-tab ${active ? 'active' : ''}" data-drive="${letter}">
-        ${t('diskPrefix')} ${letter}:
+      <button type="button" class="disk-tab ${active ? 'active' : ''}" data-drive="${letter}" title="${t('ssdExpandHint')}">
+        <div class="disk-tab-top"><span class="disk-tab-letter">${letter}:</span><span class="disk-tab-pct metric">${fmtPct(d.percent, 0)}</span></div>
         <div class="fill"><i style="width:${Math.min(100, d.percent || 0)}%"></i></div>
+        <div class="disk-tab-meta">
+          <span class="disk-tab-health">${escapeHtml(badge.health)}</span>
+          <span class="disk-tab-temp">${escapeHtml(badge.temp)}</span>
+        </div>
       </button>
     `
   }).join('')
+}
+
+function renderOverviewDiskDetails() {
+  const box = $('ov-disks')
+  if (!box) return
+  const disks = latestDisks || []
+  if (!disks.length) {
+    box.innerHTML = `<div class="empty">${dash()}</div>`
+    return
+  }
+  if (!selectedDrive && disks[0]) selectedDrive = driveLetter(disks[0].mount)
+  const activeDisk = disks.find((d) => driveLetter(d.mount) === selectedDrive.toUpperCase()) || disks[0]
+  const letter = driveLetter(activeDisk.mount)
+  const r = cachedDiskReport[letter]
+  let smart = `<div class="empty">${t('ssdLoading')}</div>`
+  if (getDevState().smartEnabled === false) {
+    smart = `<div class="empty">${t('devSmartOff')}</div>`
+  } else if (r) {
+    if (r.ok === false) {
+      smart = `<div class="empty">${escapeHtml(r.errorMessage || t('ssdUnavailable'))}</div>`
+    } else {
+      const wear = ssdWearLabel(r)
+      const temp = (() => {
+        const tt = fmtTemp(r.temperatureC, 0)
+        return tt === na() ? t('noControllerTemp') : `${tt} °C`
+      })()
+      const hours = r.powerOnHours > 0 ? `${fmt(r.powerOnHours, 0)} h` : t('noData')
+      smart = `
+        <div class="row"><span>${t('wearLeft')}</span><strong>${wear}</strong></div>
+        <div class="row"><span>${t('temp')}</span><strong>${temp}</strong></div>
+        <div class="row"><span>${t('powerOn')}</span><strong>${hours}</strong></div>
+        <div class="row"><span>${t('lblStatus')}</span><strong>${escapeHtml(r.verdictBadge || r.verdict || na())}</strong></div>
+      `
+    }
+  }
+  box.innerHTML = `
+    <div class="row disk-row active" data-drive="${letter}">
+      <div>
+        <div class="name">${letter}:</div>
+        <div class="meta">${fmt(activeDisk.usedGB)} / ${fmt(activeDisk.totalGB)} GB · ${t('free')} ${fmt(activeDisk.freeGB)} GB</div>
+        <div class="meta">${t('read')} ${fmt(activeDisk.readMBps)} MB/s · ${t('write')} ${fmt(activeDisk.writeMBps)} MB/s</div>
+      </div>
+      <div class="name metric">${fmtPct(activeDisk.percent, 0)}</div>
+    </div>
+    <div class="disk-smart-expand">${smart}</div>
+  `
+}
+
+async function prefetchDiskHealthBadges(disks) {
+  const list = Array.isArray(disks) ? disks : []
+  for (const d of list.slice(0, 6)) {
+    const letter = driveLetter(d.mount)
+    if (cachedDiskReport[letter] || getDevState().smartEnabled === false) continue
+    try {
+      const r = await CheckDiskHealth(letter)
+      if (r) cachedDiskReport[letter] = r
+    } catch (_) {
+      cachedDiskReport[letter] = { ok: false }
+    }
+  }
+  renderDiskTabs(latestDisks)
+  renderOverviewDiskDetails()
 }
 
 function lagExplanation(e) {
@@ -1748,9 +1838,18 @@ async function searchGamesLive(opts = {}) {
   }
 }
 
+function hashHue(name) {
+  let h = 0
+  const s = String(name || 'Game')
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h % 360
+}
+
 function posterFallbackHTML(name, cls) {
   const safe = String(name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return `<div class="${cls} fallback">${safe}</div>`
+  const initials = String(name || 'G').trim().split(/\s+/).slice(0, 2).map((w) => w[0] || '').join('').toUpperCase() || 'PC'
+  const hue = hashHue(name)
+  return `<div class="${cls} fallback logo-card" style="--logo-hue:${hue}"><span class="logo-initials">${initials}</span><span class="logo-title">${safe}</span></div>`
 }
 
 function steamHeaderFromPoster(url) {
@@ -1762,38 +1861,42 @@ function steamHeaderFromPoster(url) {
 
 function steamCdnUrls(steamAppId) {
   const id = Number(steamAppId)
-  if (!Number.isFinite(id) || id <= 0) return { poster: '', header: '' }
+  if (!Number.isFinite(id) || id <= 0) return { poster: '', posterAlt: '', header: '' }
   return {
-    poster: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
+    poster: `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${id}/library_600x900.jpg`,
+    posterAlt: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
     header: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`,
   }
 }
 
 function resolveGameArt(g) {
   const cdn = steamCdnUrls(g?.steamAppId)
+  // Prefer catalog URLs; empty / broken ones fall through to CDN then styled logo cards.
   const poster = g?.posterUrl || cdn.poster || ''
   const header = g?.headerUrl || cdn.header || steamHeaderFromPoster(poster) || ''
-  return { poster, header }
+  const posterAlt = cdn.posterAlt && cdn.posterAlt !== poster ? cdn.posterAlt : ''
+  return { poster, header, posterAlt }
+}
+
+function imgWithFallbacks(cls, name, urls) {
+  const safeName = String(name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  const chain = (urls || []).filter(Boolean)
+  if (!chain.length) return posterFallbackHTML(name, cls)
+  const src = chain[0]
+  const rest = chain.slice(1)
+  const fbAttr = rest.length ? rest.join('|') : ''
+  const alt = String(name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return `<img class="${cls}" src="${src}" alt="${alt}" loading="lazy" decoding="async" data-fb="${fbAttr}" onerror="(function(el){const q=(el.dataset.fb||'').split('|').filter(Boolean);if(q.length){el.dataset.fb=q.slice(1).join('|');el.src=q[0];return;}el.replaceWith(Object.assign(document.createElement('div'),{className:'${cls} fallback logo-card',innerHTML:'<span class=\\'logo-title\\'>${safeName}</span>'}));})(this)" />`
 }
 
 function gamePosterHTML(g) {
-  const name = String(g.name || 'Game').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  const safeName = String(g.name || 'Game').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const { poster: primary, header: secondary } = resolveGameArt(g)
-  if (!primary && !secondary) return posterFallbackHTML(g.name, 'game-poster')
-  const src = primary || secondary
-  const fb = secondary && secondary !== src ? secondary : ''
-  return `<img class="game-poster" src="${src}" alt="${name}" loading="lazy" data-fb="${fb}" onerror="if(this.dataset.fb){const u=this.dataset.fb;this.dataset.fb='';this.src=u;}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'game-poster fallback',textContent:'${safeName}'}))}" />`
+  const { poster, header, posterAlt } = resolveGameArt(g)
+  return imgWithFallbacks('game-poster', g.name, [poster, posterAlt, header])
 }
 
 function compactCoverHTML(p) {
-  const name = String(p.gameName || 'Game')
-  const safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const { poster: primary, header: secondary } = resolveGameArt(p)
-  if (!primary && !secondary) return posterFallbackHTML(name, 'game-cover')
-  const src = primary || secondary
-  const fb = secondary && secondary !== src ? secondary : ''
-  return `<img class="game-cover" src="${src}" alt="${name.replace(/"/g, '&quot;')}" data-fb="${fb}" onerror="if(this.dataset.fb){const u=this.dataset.fb;this.dataset.fb='';this.src=u;}else{this.replaceWith(Object.assign(document.createElement('div'),{className:'game-cover fallback',textContent:'${safeName}'}))}" />`
+  const { poster, header, posterAlt } = resolveGameArt(p)
+  return imgWithFallbacks('game-cover', p.gameName, [poster, posterAlt, header])
 }
 
 function renderGameGrid() {
@@ -2562,7 +2665,7 @@ function renderCleanPreview(r) {
 
 async function refreshCleanPreview() {
   const box = $('clean-preview')
-  if (box) box.textContent = t('checking')
+  if (box) box.textContent = t('cleanChecking')
   try {
     const r = await PreviewSafeDiskCaches()
     renderCleanPreview(r)
@@ -2570,6 +2673,16 @@ async function refreshCleanPreview() {
     if (box) box.textContent = String(err)
     const runBtn = $('btn-clean-run')
     if (runBtn) runBtn.disabled = true
+  }
+}
+
+async function openSelectedAppFolder() {
+  if (!selectedUninstallApp) return
+  try {
+    const r = await OpenAppInstallFolder(selectedUninstallApp.id)
+    showToast(r?.message || t('uninstallOpenFolder'), !!r?.ok)
+  } catch (err) {
+    showToast(String(err), false)
   }
 }
 
@@ -2742,6 +2855,7 @@ function wireUI() {
   $('btn-uninstall-precheck')?.addEventListener('click', () => runUninstallPrecheck())
   $('btn-uninstall-kill')?.addEventListener('click', () => runUninstall(true))
   $('btn-uninstall-only')?.addEventListener('click', () => runUninstall(false))
+  $('btn-uninstall-open')?.addEventListener('click', () => openSelectedAppFolder())
   $('btn-residual-scan')?.addEventListener('click', () => runResidualScan())
   $('btn-residual-delete')?.addEventListener('click', () => runResidualDelete())
   $('btn-clean-preview')?.addEventListener('click', () => refreshCleanPreview())
@@ -3029,7 +3143,6 @@ function wireUI() {
   })
   applyMiniHudPrefs()
 
-  $('btn-disk-health').addEventListener('click', () => runDiskHealth(selectedDrive, false))
   $('modal-smart-refresh')?.addEventListener('click', () => runDiskHealth(selectedDrive, true))
   $('hw-ssd-list')?.addEventListener('toggle', (ev) => {
     const acc = ev.target?.closest?.('.hw-ssd-acc')
@@ -3115,10 +3228,21 @@ function wireUI() {
     selectedDrive = tab.dataset.drive
     renderDiskTabs(latestDisks, 'disk-tabs')
     renderDiskTabs(latestDisks, 'modal-disk-tabs')
+    renderOverviewDiskDetails()
     if (!$('modal').classList.contains('hidden')) {
       await runDiskHealth(selectedDrive, false)
-    } else {
-      refresh()
+      return
+    }
+    const letter = String(selectedDrive || 'C').toUpperCase()
+    if (!cachedDiskReport[letter] && getDevState().smartEnabled !== false) {
+      try {
+        const r = await CheckDiskHealth(letter)
+        if (r) cachedDiskReport[letter] = r
+      } catch (_) {
+        cachedDiskReport[letter] = { ok: false }
+      }
+      renderDiskTabs(latestDisks)
+      renderOverviewDiskDetails()
     }
   }
   $('disk-tabs')?.addEventListener('click', onDiskTabClick)

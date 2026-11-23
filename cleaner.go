@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -76,6 +77,7 @@ func (a *App) cleanSafeDiskCaches(dryRun bool) DiskCleanResult {
 	}
 	msg := fmt.Sprintf("%s файлов: %d (%.1f МБ), пропущено: %d, ошибок: %d",
 		verb, deleted, float64(bytes)/(1024*1024), skipped, errs)
+	debug.FreeOSMemory()
 	return DiskCleanResult{
 		OK:           errs == 0,
 		DeletedFiles: deleted,

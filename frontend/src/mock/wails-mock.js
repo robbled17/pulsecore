@@ -452,6 +452,8 @@ function buildMetrics() {
     temperatureC: temp,
     tempAvailable: p.tempMode !== 'broken',
     tempNeedsAdmin: p.tempMode === 'broken',
+    gpuTempC: p.tempMode === 'broken' || !(temp > 0) ? 0 : Math.max(40, Number(temp) - 4),
+    gpuTempAvailable: p.tempMode !== 'broken' && p.dedicatedMB > 0 && temp > 0,
     windowVisible: true,
     fanRPM: brokenFan,
     powerMode: state.powerMode,
@@ -886,6 +888,12 @@ const App = {
     errors: 0,
     targets: ['%TEMP%', 'D3DSCache', 'Chrome/Default/Cache'],
     message: 'Удалено файлов: 12 (48.0 МБ), пропущено: 3, ошибок: 0',
+  }),
+  OpenAppInstallFolder: async (id) => ({
+    ok: true,
+    path: 'C:\\Program Files\\MockApp',
+    message: 'C:\\Program Files\\MockApp',
+    id,
   }),
   RunSelfDiagnostics: async () => {
     const p = profile()

@@ -6,11 +6,15 @@
 - Public showcase storefront README with module screenshots and demo GIFs under `assets/showcase/`
 - Landing: dark `theme-color` / `color-scheme` to stop iOS overscroll white flash
 - Landing: continuous rAF scroll for Dynamics CPU/GPU/RAM chart (sparkline parity)
+- Overview: CPU/GPU temps on metric cards, compact Temp/Cache cleaner, drive tiles with SMART health/temp
+- Smart Uninstall: Open folder action + install-trace tip/subtitle in all 7 languages
 
 ### Changed
 - Official public product version set to **1.0.0** across Go, PE VersionInfo, Wails, frontend, and docs
 - Download CTA points at `releases/latest/download/pulsecore.exe`
 - Author attribution cleaned to Robert Sharafutdinov (`robbled17`)
+- GamePulse tiles compacted (~110-125px) with logo-card fallbacks; FPS tables recalibrated for mid GPUs
+- Soft Go memory limit (~64 MiB) + periodic FreeOSMemory; shorter chart history
 
 ### Fixed (silent audit)
 - Production builds ignore `setActiveTab('dev')` and clear any Dev Mode active state at boot
@@ -19,6 +23,13 @@
 - CPU temp path no longer substitutes GPU package temperature
 - Sensor helper kills nvidia-smi on timeout (`CommandContext`)
 - Elevated relaunch forwards CLI args via `runas`
+
+### Fixed (full audit polish)
+- Network diagnostics: native TCP/UDP latency (no locale-dependent ping.exe parsing)
+- VRAM >4GB via registry `qwMemorySize` / nvidia-smi (AdapterRAM 32-bit clamp)
+- Chipset detection via BaseBoard + PnP/PCI bridge names for Upgrade Advisor
+- No false VRAM shortage when dedicated VRAM is unknown or already 8GB
+- Uninstall Temp/Cache card removed (cleaner lives on Overview; no fake SMART hang)
 
 
 ## 1.6.5

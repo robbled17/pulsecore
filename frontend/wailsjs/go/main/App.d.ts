@@ -58,6 +58,8 @@ export function CleanSafeDiskCaches():Promise<Record<string, any>>;
 
 export function PreviewSafeDiskCaches():Promise<Record<string, any>>;
 
+export function OpenAppInstallFolder(arg1:string):Promise<Record<string, any>>;
+
 export function PreviewDeleteResiduals(arg1:Array<Record<string, any>>):Promise<Record<string, any>>;
 
 export function HideToTray():Promise<void>;

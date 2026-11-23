@@ -120,11 +120,26 @@
           <button type="button" id="insight-more" class="insight-more hidden" hidden></button>
         </div>
 
+        <div class="panel clean-panel-compact" id="clean-panel">
+          <div class="panel-title row-between">
+            <span data-i18n="cleanTitle">Очистка Temp / Cache</span>
+            <button type="button" class="btn compact" id="btn-clean-preview" data-i18n="cleanPreview">Оценить размер</button>
+          </div>
+          <p class="muted clean-sub" data-i18n="cleanSub">Безопасная очистка только белых списков: Temp, кэш браузеров, D3DSCache. Сначала оценка, потом удаление.</p>
+          <div id="clean-preview" class="clean-preview muted" data-i18n="cleanPreviewEmpty">Нажмите «Оценить размер», чтобы увидеть, что будет удалено.</div>
+          <div class="btn-row" style="margin-top:10px">
+            <button type="button" class="btn compact danger" id="btn-clean-run" data-i18n="cleanRun" disabled>Очистить</button>
+          </div>
+        </div>
+
         <div class="cards">
           <button type="button" class="metric-card chart-tab active" data-metric="cpu">
             <div class="metric-head">
               <div class="metric-label">CPU</div>
-              <div class="metric-value metric" id="ov-cpu">-</div>
+              <div class="metric-value-wrap">
+                <div class="metric-value metric" id="ov-cpu">-</div>
+                <div class="metric-temp metric" id="ov-cpu-temp"></div>
+              </div>
             </div>
             <div class="metric-sub" id="ov-cpu-sub">-</div>
             <canvas class="sparkline" id="spark-cpu" width="160" height="36" aria-hidden="true"></canvas>
@@ -133,7 +148,10 @@
           <button type="button" class="metric-card chart-tab" data-metric="gpu">
             <div class="metric-head">
               <div class="metric-label">GPU</div>
-              <div class="metric-value metric" id="ov-gpu">-</div>
+              <div class="metric-value-wrap">
+                <div class="metric-value metric" id="ov-gpu">-</div>
+                <div class="metric-temp metric" id="ov-gpu-temp"></div>
+              </div>
             </div>
             <div class="metric-sub" id="ov-gpu-sub">-</div>
             <canvas class="sparkline" id="spark-gpu" width="160" height="36" aria-hidden="true"></canvas>
@@ -176,7 +194,6 @@
         <details class="panel expand-panel" open>
           <summary class="panel-title row-between expand-summary">
             <span data-i18n="disksTitle">Диски</span>
-            <button type="button" class="btn compact" id="btn-disk-health" data-i18n="diskHealthBtn">S.M.A.R.T.</button>
           </summary>
           <div id="disk-tabs" class="disk-tabs"></div>
           <div id="ov-disks" class="disk-list dense-table"></div>
@@ -354,17 +371,6 @@
           <h1 data-i18n="uninstallTitle">Умное удаление</h1>
           <p data-i18n="uninstallSub">Процессы, остатки и трассировка установки</p>
         </header>
-        <div class="panel" id="clean-panel">
-          <div class="panel-title row-between">
-            <span data-i18n="cleanTitle">Очистка Temp / Cache</span>
-            <button type="button" class="btn compact" id="btn-clean-preview" data-i18n="cleanPreview">Оценить размер</button>
-          </div>
-          <p class="muted" data-i18n="cleanSub">Безопасная очистка только белых списков: Temp, кэш браузеров, D3DSCache. Сначала оценка, потом удаление.</p>
-          <div id="clean-preview" class="clean-preview muted" data-i18n="cleanPreviewEmpty">Нажмите «Оценить размер», чтобы увидеть, что будет удалено.</div>
-          <div class="btn-row" style="margin-top:12px">
-            <button type="button" class="btn compact danger" id="btn-clean-run" data-i18n="cleanRun" disabled>Очистить</button>
-          </div>
-        </div>
         <div class="panel">
           <div class="panel-title row-between">
             <span data-i18n="uninstallListTitle">Установленные программы</span>
@@ -372,7 +378,7 @@
           </div>
           <input id="uninstall-search" class="game-search" type="search" data-i18n-placeholder="uninstallSearchPh" placeholder="Поиск программ…" autocomplete="off" />
           <div id="uninstall-list" class="list dense-table uninstall-list">
-            <div class="empty" data-i18n="checking">…</div>
+            <div class="empty">…</div>
           </div>
         </div>
         <div class="panel" id="uninstall-detail" hidden>
@@ -382,6 +388,7 @@
             <button type="button" class="btn compact" id="btn-uninstall-precheck" data-i18n="uninstallPrecheck">Проверить процессы</button>
             <button type="button" class="btn compact danger" id="btn-uninstall-kill" data-i18n="uninstallKillRemove">Завершить и удалить</button>
             <button type="button" class="btn compact" id="btn-uninstall-only" data-i18n="uninstallOnly">Удалить</button>
+            <button type="button" class="btn compact" id="btn-uninstall-open" data-i18n="uninstallOpenFolder">Открыть папку</button>
             <button type="button" class="btn compact" id="btn-residual-scan" data-i18n="residualScan">Сканировать остатки</button>
           </div>
         </div>
@@ -395,7 +402,13 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-title" data-i18n="traceTitle">Установка с трассировкой</div>
+          <div class="panel-title row-between">
+            <span class="panel-title-left">
+              <span data-i18n="traceTitle">Установка с трассировкой</span>
+              <span class="tip" tabindex="0" data-i18n-tip="tipTrace">ⓘ</span>
+            </span>
+          </div>
+          <p class="muted trace-sub" data-i18n="traceSub">Запустите установщик под наблюдением: PulseCore запомнит файлы и ключи реестра для точного удаления позже.</p>
           <div class="btn-row">
             <button type="button" class="btn compact" id="btn-trace-start" data-i18n="traceStart">Выбрать .exe / .msi</button>
             <button type="button" class="btn compact" id="btn-trace-finish" data-i18n="traceFinish">Завершить трассировку</button>

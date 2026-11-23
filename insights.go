@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -203,10 +205,17 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	}
 	diag.GatewayHost = gw
 
-	// Short ICMP bursts only (user-initiated). No long-lived sockets / telemetry.
-	diag.GatewayMs = pingAverageMs(gw, 2)
-	diag.PublicMs = pingAverageMs(diag.PublicHost, 2)
+	// Native Go TCP/UDP latency (locale-agnostic). Never parse ping.exe text
+	// (English time= / Russian время= breaks on other Windows locales).
+	diag.GatewayMs = measureHostLatencyMs(gw, 2)
+	dnsA := measureHostLatencyMs("8.8.8.8", 2)
+	dnsB := measureHostLatencyMs("1.1.1.1", 2)
+	diag.PublicMs = minPositiveLatency(dnsA, dnsB)
+	if diag.PublicMs == dnsB && dnsB >= 0 {
+		diag.PublicHost = "1.1.1.1"
+	}
 	diag.LocalJitterMs = measureLocalJitterMs()
+	debug.FreeOSMemory()
 
 	diag.GatewayBadgeOK = diag.GatewayMs >= 0 && diag.GatewayMs <= 15
 	diag.PublicBadgeOK = diag.PublicMs >= 0 && diag.PublicMs <= 40
@@ -252,7 +261,23 @@ func (a *App) DiagnoseLagOrigin() LagDiagnosis {
 	return diag
 }
 
-func pingAverageMs(host string, count int) float64 {
+func minPositiveLatency(a, b float64) float64 {
+	switch {
+	case a < 0 && b < 0:
+		return -1
+	case a < 0:
+		return b
+	case b < 0:
+		return a
+	case a <= b:
+		return a
+	default:
+		return b
+	}
+}
+
+// measureHostLatencyMs times TCP (then UDP) dials. Locale-agnostic; no ping.exe.
+func measureHostLatencyMs(host string, count int) float64 {
 	if count < 1 {
 		count = 2
 	}
@@ -263,27 +288,64 @@ func pingAverageMs(host string, count int) float64 {
 	if host == "" || strings.ContainsAny(host, " \t\"'|&<>") {
 		return -1
 	}
-	out, err := runHiddenOutput(system32("ping.exe"), "-n", strconv.Itoa(count), "-w", "800", host)
-	if err != nil && len(out) == 0 {
-		return -1
-	}
-	re := regexp.MustCompile(`(?i)(?:time|время)[=<]([0-9]+)\s*ms`)
-	matches := re.FindAllStringSubmatch(string(out), -1)
-	if len(matches) == 0 {
-		// Average line: Average = 12ms / Среднее = 12ms
-		reAvg := regexp.MustCompile(`(?i)(?:Average|Среднее)\s*=\s*([0-9]+)\s*ms`)
-		if m := reAvg.FindStringSubmatch(string(out)); len(m) == 2 {
-			v, _ := strconv.ParseFloat(m[1], 64)
-			return v
+	if ip := net.ParseIP(host); ip == nil {
+		// Only allow dotted IPv4 / resolved hostnames without shell metacharacters.
+		if strings.ContainsAny(host, "/\\") {
+			return -1
 		}
+	}
+	ports := []string{"53", "443", "80"}
+	var samples []float64
+	for i := 0; i < count; i++ {
+		ms := dialLatencyMs("tcp", host, ports, 800*time.Millisecond)
+		if ms < 0 {
+			ms = dialLatencyMs("udp", host, []string{"53"}, 800*time.Millisecond)
+		}
+		if ms >= 0 {
+			samples = append(samples, ms)
+		}
+	}
+	if len(samples) == 0 {
 		return -1
 	}
 	sum := 0.0
-	for _, m := range matches {
-		v, _ := strconv.ParseFloat(m[1], 64)
+	for _, v := range samples {
 		sum += v
 	}
-	return sum / float64(len(matches))
+	return sum / float64(len(samples))
+}
+
+func dialLatencyMs(network, host string, ports []string, timeout time.Duration) float64 {
+	for _, port := range ports {
+		addr := net.JoinHostPort(host, port)
+		start := time.Now()
+		conn, err := net.DialTimeout(network, addr, timeout)
+		elapsed := float64(time.Since(start)) / float64(time.Millisecond)
+		if err != nil {
+			// For UDP, DialTimeout often succeeds locally; treat write+deadline as RTT probe.
+			if network == "udp" {
+				continue
+			}
+			// TCP connection refused still proves L3 reachability with a real RTT.
+			if ne, ok := err.(net.Error); ok && !ne.Timeout() && elapsed > 0 && elapsed < float64(timeout/time.Millisecond) {
+				if strings.Contains(strings.ToLower(err.Error()), "refused") {
+					return elapsed
+				}
+			}
+			continue
+		}
+		_ = conn.Close()
+		if elapsed < 0.1 {
+			elapsed = 0.1
+		}
+		return elapsed
+	}
+	return -1
+}
+
+// pingAverageMs kept as a thin alias for older call sites / tests.
+func pingAverageMs(host string, count int) float64 {
+	return measureHostLatencyMs(host, count)
 }
 
 func measureLocalJitterMs() float64 {

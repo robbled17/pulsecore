@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -102,6 +103,8 @@ type SystemMetrics struct {
 	Battery        BatteryMetrics     `json:"battery"`
 	Hardware       HardwareInfo       `json:"hardware"`
 	TemperatureC   float64            `json:"temperatureC"`
+	GPUTempC       float64            `json:"gpuTempC"`
+	GPUTempAvailable bool             `json:"gpuTempAvailable"`
 	TempAvailable  bool               `json:"tempAvailable"`
 	TempNeedsAdmin bool               `json:"tempNeedsAdmin"`
 	GPUAvailable   bool               `json:"gpuAvailable"`
@@ -187,6 +190,8 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Soft memory limit keeps working set near the 80-120 MB target on idle.
+	debug.SetMemoryLimit(64 << 20)
 	// Extract embedded sensor helper once (no-op when version already matches).
 	_, _ = ensureSensorHelper()
 	a.staticHW = collectStaticHardware()
@@ -200,9 +205,25 @@ func (a *App) startup(ctx context.Context) {
 		a.startFlightRecorder()
 	})
 	go a.peripheralsWatchdog()
+	go a.memoryTrimmer()
 	a.startActivateListener()
 	// Global Mini-HUD hotkey (fail soft if already taken by another app).
 	_ = a.SetMiniHUDHotkey(defaultMiniHUDHotkey)
+}
+
+func (a *App) memoryTrimmer() {
+	ticker := time.NewTicker(45 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-a.stopWorker:
+			return
+		case <-a.ctx.Done():
+			return
+		case <-ticker.C:
+			debug.FreeOSMemory()
+		}
+	}
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -294,7 +315,7 @@ func (a *App) buildSnapshot() SystemMetrics {
 
 	disks := a.collectDisks(now)
 	bat := collectBattery()
-	gpuPct, vramUsed, vramShared, vramDedicated := a.collectGPUUsage()
+	gpuPct, vramUsed, vramShared, vramDedicated, gpuTemp := a.collectGPUUsage()
 
 	temp, tempNeedsAdmin := readCPUTemperatureCached()
 
@@ -306,6 +327,10 @@ func (a *App) buildSnapshot() SystemMetrics {
 	if vramTotal <= 0 && vramDedicated > 0 {
 		vramTotal = vramDedicated
 	}
+	// Keep static VRAM in sync once a 64-bit source (smi / registry) lands.
+	if a.gpuTotalVRAM > staticHW.gpuVRAM {
+		staticHW.gpuVRAM = a.gpuTotalVRAM
+	}
 	powerMode := a.powerMode
 	pollMS := int(a.pollInterval / time.Millisecond)
 	mini := a.miniHUD
@@ -316,38 +341,48 @@ func (a *App) buildSnapshot() SystemMetrics {
 	vamps := append([]VampireProcess(nil), a.vampires...)
 	a.mu.RUnlock()
 
+	if a.gpuTotalVRAM > a.staticHW.gpuVRAM {
+		a.mu.Lock()
+		if a.gpuTotalVRAM > a.staticHW.gpuVRAM {
+			a.staticHW.gpuVRAM = a.gpuTotalVRAM
+		}
+		a.mu.Unlock()
+	}
+
 	hw := buildHardwareInfo(staticHW, cpuPct, perCore, gpuPct, vramUsed, vramShared, vramDedicated, vm, bat)
 
 	return SystemMetrics{
-		Timestamp:       now.Format(time.RFC3339),
-		CPUName:         cpuName,
-		CPUPercent:      cpuPct,
-		CPUPerCore:      perCore,
-		GPUName:         gpuName,
-		GPUPercent:      gpuPct,
-		VRAMUsedMB:      vramUsed,
-		VRAMTotalMB:     vramTotal,
-		VRAMSharedMB:    vramShared,
-		VRAMDedicatedMB: vramDedicated,
-		RAMPercent:      vm.UsedPercent,
-		RAMUsedMB:       vm.Used / (1024 * 1024),
-		RAMTotalMB:      vm.Total / (1024 * 1024),
-		SwapPercent:     sm.UsedPercent,
-		SwapUsedMB:      sm.Used / (1024 * 1024),
-		SwapTotalMB:     sm.Total / (1024 * 1024),
-		Disks:           disks,
-		Battery:         bat,
-		Hardware:        hw,
-		TemperatureC:    temp,
-		TempNeedsAdmin:  tempNeedsAdmin && temp <= 0,
-		PowerMode:       powerMode,
-		PollIntervalMS:  pollMS,
-		MiniHUD:         mini,
-		Language:        lang,
-		WindowVisible:   !hidden,
-		LagEvents:       lags,
-		StutterEvents:   stutters,
-		Vampires:        vamps,
+		Timestamp:        now.Format(time.RFC3339),
+		CPUName:          cpuName,
+		CPUPercent:       cpuPct,
+		CPUPerCore:       perCore,
+		GPUName:          gpuName,
+		GPUPercent:       gpuPct,
+		VRAMUsedMB:       vramUsed,
+		VRAMTotalMB:      vramTotal,
+		VRAMSharedMB:     vramShared,
+		VRAMDedicatedMB:  vramDedicated,
+		RAMPercent:       vm.UsedPercent,
+		RAMUsedMB:        vm.Used / (1024 * 1024),
+		RAMTotalMB:       vm.Total / (1024 * 1024),
+		SwapPercent:      sm.UsedPercent,
+		SwapUsedMB:       sm.Used / (1024 * 1024),
+		SwapTotalMB:      sm.Total / (1024 * 1024),
+		Disks:            disks,
+		Battery:          bat,
+		Hardware:         hw,
+		TemperatureC:     temp,
+		GPUTempC:         gpuTemp,
+		GPUTempAvailable: gpuTemp > 0,
+		TempNeedsAdmin:   tempNeedsAdmin && temp <= 0,
+		PowerMode:        powerMode,
+		PollIntervalMS:   pollMS,
+		MiniHUD:          mini,
+		Language:         lang,
+		WindowVisible:    !hidden,
+		LagEvents:        lags,
+		StutterEvents:    stutters,
+		Vampires:         vamps,
 	}
 }
 
@@ -959,37 +994,38 @@ func (a *App) collectDisks(now time.Time) []DiskMetrics {
 	return out
 }
 
-func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
+func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB, tempC float64) {
 	a.mu.RLock()
 	total := float64(a.gpuTotalVRAM) / (1024 * 1024)
 	a.mu.RUnlock()
 
 	// Prefer cached helper / nvidia-smi result (TTL) over spawning every poll tick.
-	if hp, hu, ht, _, ok := readGPUFromHelperCached(); ok {
+	if hp, hu, ht, gt, ok := readGPUFromHelperCached(); ok {
 		pct = hp
 		usedMB = hu
+		tempC = gt
 		if ht > 0 {
 			total = ht
 		}
-		dedicatedMB = usedMB
+		dedicatedMB = total
 		a.mu.Lock()
 		if total > 0 {
 			a.gpuTotalVRAM = uint64(total * 1024 * 1024)
 		}
 		a.mu.Unlock()
-		return pct, usedMB, sharedMB, dedicatedMB
+		return pct, usedMB, sharedMB, dedicatedMB, tempC
 	}
 
 	// Best-effort nvidia-smi with TTL cache (no PATH lookup / hijack).
 	if np, nu, nt, ok := readNVIDIASMICached(); ok {
 		pct, usedMB, total = np, nu, nt
-		dedicatedMB = usedMB
+		dedicatedMB = total
 		a.mu.Lock()
 		if total > 0 {
 			a.gpuTotalVRAM = uint64(total * 1024 * 1024)
 		}
 		a.mu.Unlock()
-		return pct, usedMB, sharedMB, dedicatedMB
+		return pct, usedMB, sharedMB, dedicatedMB, tempC
 	}
 
 	// Fallback: derive light GPU pressure proxy from top 3D-ish processes.
@@ -1012,12 +1048,12 @@ func (a *App) collectGPUUsage() (pct, usedMB, sharedMB, dedicatedMB float64) {
 		pct = sum
 	}
 
-	dedicatedMB = total * (pct / 100.0)
-	usedMB = dedicatedMB
+	dedicatedMB = total
+	usedMB = total * (pct / 100.0)
 	if vm, err := mem.VirtualMemory(); err == nil {
 		sharedMB = float64(vm.Used) / (1024 * 1024) * 0.02
 	}
-	return pct, usedMB, sharedMB, dedicatedMB
+	return pct, usedMB, sharedMB, dedicatedMB, tempC
 }
 
 func readCPUName() string {

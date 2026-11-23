@@ -229,6 +229,71 @@ func findInstalledApp(a *App, appID string) (InstalledApp, bool) {
 	return InstalledApp{}, false
 }
 
+// OpenAppInstallFolder reveals the selected app in Explorer (/select) or opens its install dir.
+func (a *App) OpenAppInstallFolder(appID string) map[string]interface{} {
+	app, ok := findInstalledApp(a, appID)
+	if !ok {
+		return map[string]interface{}{"ok": false, "message": "Приложение не найдено"}
+	}
+	target := strings.TrimSpace(app.InstallLocation)
+	selectFile := ""
+	if target == "" {
+		// Fall back to the uninstaller path when InstallLocation is empty.
+		raw := strings.TrimSpace(app.UninstallString)
+		raw = strings.Trim(raw, `"`)
+		if idx := strings.Index(strings.ToLower(raw), ".exe"); idx >= 0 {
+			raw = raw[:idx+4]
+		}
+		if idx := strings.Index(strings.ToLower(raw), ".msi"); idx >= 0 {
+			raw = raw[:idx+4]
+		}
+		raw = strings.Trim(raw, `"`)
+		if st, err := os.Stat(raw); err == nil {
+			if st.IsDir() {
+				target = raw
+			} else {
+				selectFile = raw
+				target = filepath.Dir(raw)
+			}
+		}
+	}
+	if target == "" || !isValidInstallLocation(target) {
+		return map[string]interface{}{"ok": false, "message": "Папка установки не найдена"}
+	}
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		return map[string]interface{}{"ok": false, "message": err.Error()}
+	}
+	explorer := system32("explorer.exe")
+	var runErr error
+	if selectFile != "" {
+		runErr = runHiddenCommand(explorer, "/select,"+selectFile)
+	} else {
+		// Prefer selecting a file inside the folder when possible.
+		entries, _ := os.ReadDir(abs)
+		picked := ""
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			name := strings.ToLower(e.Name())
+			if strings.HasSuffix(name, ".exe") {
+				picked = filepath.Join(abs, e.Name())
+				break
+			}
+		}
+		if picked != "" {
+			runErr = runHiddenCommand(explorer, "/select,"+picked)
+		} else {
+			runErr = runHiddenCommand(explorer, abs)
+		}
+	}
+	if runErr != nil {
+		return map[string]interface{}{"ok": false, "message": runErr.Error()}
+	}
+	return map[string]interface{}{"ok": true, "message": abs, "path": abs}
+}
+
 func findProcessesUnder(installLocation string) []RunningAppProcess {
 	root := strings.TrimSpace(installLocation)
 	if root == "" {

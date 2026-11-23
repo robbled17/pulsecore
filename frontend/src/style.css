@@ -475,6 +475,32 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
 .tab { display: none; }
 .tab.active { display: block; animation: fadeIn 0.22s ease; }
 .section-head { margin-bottom: 18px; }
+
+.insight-host,
+.insight-list,
+.status-banner,
+.verdict-card,
+.net-progress {
+  margin-bottom: 14px;
+}
+.insight-host:empty,
+.insight-list:empty { margin-bottom: 0; }
+.insight-list { display: flex; flex-direction: column; gap: 10px; }
+.clean-panel-compact { margin-bottom: 16px; }
+.clean-panel-compact .clean-sub,
+.trace-sub { margin: 6px 0 8px; line-height: 1.4; font-size: 12.5px; }
+.metric-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.metric-temp {
+  font-size: 12px;
+  font-weight: 650;
+  color: #9eb6ff;
+  white-space: nowrap;
+}
+.metric-temp.hidden { display: none; }
 .section-head h1 {
   font-size: 24px;
   font-weight: 750;
@@ -594,13 +620,13 @@ html[data-theme="light"] .content::-webkit-scrollbar-thumb {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 .insight-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 0;
   max-height: none;
   overflow: visible;
@@ -728,11 +754,21 @@ html[data-theme="light"] .insight-body { color: #92400e; }
   .metric-card { min-height: 148px; }
 }
 .metric-card, .panel {
-  background: linear-gradient(165deg, rgba(32, 42, 72, 0.88), rgba(16, 22, 38, 0.92));
+  /* Opaque card fill so gaps between panels show solid app background, not nested glass strips. */
+  background: linear-gradient(165deg, #1b2438, #121826);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   /* No backdrop-filter on large cards/lists: WebView2 blur is costly on weak laptops. */
+}
+#tab-overview,
+#tab-lag,
+#tab-hardware,
+#tab-upgrade,
+#tab-uninstall,
+#tab-gamelab,
+#tab-settings {
+  background: transparent;
 }
 html[data-theme="light"] .metric-card,
 html[data-theme="light"] .panel {
@@ -1099,20 +1135,31 @@ html[data-theme="light"] .bar { background: rgba(15,23,42,0.08); }
 }
 .disk-tab {
   border: 1px solid var(--line);
-  background: var(--card-2);
+  background: #151b2b;
   color: var(--text);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 10px 12px;
   cursor: pointer;
   font-size: 12px;
-  min-width: 80px;
+  min-width: 108px;
+  max-width: 160px;
+  flex: 1 1 108px;
   font-family: var(--font);
   font-weight: 550;
+  text-align: left;
 }
 .disk-tab.active {
   background: var(--nav-active);
   border-color: rgba(91, 140, 255, 0.4);
 }
+.disk-tab-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.disk-tab-letter { font-weight: 700; font-size: 13px; }
+.disk-tab-pct { font-size: 12px; color: #dce6ff; }
 .disk-tab .fill {
   margin-top: 6px;
   height: 4px;
@@ -1125,6 +1172,22 @@ html[data-theme="light"] .bar { background: rgba(15,23,42,0.08); }
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.disk-tab-meta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.disk-tab-health { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-tab-temp { color: #9eb6ff; flex-shrink: 0; }
+.disk-smart-expand {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .hw-block {
@@ -1661,19 +1724,20 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
 
 .game-grid, .games-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 125px));
   justify-content: start;
-  gap: 12px;
+  gap: 10px;
 }
 .game-card {
   width: 100%;
+  max-width: 125px;
   height: auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  background: var(--card-2);
-  border-radius: 14px;
+  background: #151b2b;
+  border-radius: 12px;
   padding: 0;
   cursor: pointer;
   text-align: left;
@@ -1713,16 +1777,45 @@ html[data-theme="light"] .core-cell .mini-bar { background: rgba(15, 23, 42, 0.0
   background: #12161f;
   flex-shrink: 0;
 }
-.game-poster.fallback {
-  display: grid;
-  place-items: center;
+.game-poster.fallback,
+.game-cover.fallback,
+.logo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 10px;
   text-align: center;
   font-size: 12px;
   font-weight: 650;
   color: var(--text);
   background:
-    linear-gradient(145deg, rgba(91,140,255,0.35), rgba(124,108,240,0.2) 45%, #151922);
+    linear-gradient(145deg,
+      hsl(var(--logo-hue, 210), 42%, 28%),
+      hsl(calc(var(--logo-hue, 210) + 36), 38%, 16%) 55%,
+      #12161f);
+}
+.logo-initials {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.logo-title {
+  font-size: 11px;
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 .game-card-body {
   padding: 8px 10px;
