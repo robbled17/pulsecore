@@ -1,6 +1,6 @@
 /**
- * Assert sidebar and content share the same computed backgroundColor.
- * Walks parents on Uninstall + Overview; samples painted pixels in gaps.
+ * Assert shared full-window ambient layer: transparent content/wrappers,
+ * glass sidebar + capsules, continuous deep-blue gaps (no flat scrap seams).
  * Usage: node scripts/assert-sidebar-bg.mjs [baseUrl] [screenshotPath]
  */
 import { chromium } from 'playwright'
@@ -10,9 +10,10 @@ import path from 'node:path'
 const BASE = process.argv[2] || 'http://127.0.0.1:5173/demo.html'
 const SHOT =
   process.argv[3] ||
-  '/cursor/stores/bc-01a1f952-18e1-7825-8cd8-3e318e381534/media/match-sidebar-bg/uninstall.png'
+  '/cursor/stores/bc-01a1f952-18e1-7825-8cd8-3e318e381534/media/parallax-window-bg/uninstall.png'
 
 const TABS = ['overview', 'lag', 'hardware', 'upgrade', 'uninstall', 'gamelab', 'settings']
+const GLASS = 'rgba(13, 20, 36, 0.72)'
 
 async function openTab(page, tab) {
   const dataTab = tab === 'lag' ? 'lag' : tab
@@ -22,84 +23,85 @@ async function openTab(page, tab) {
 }
 
 async function probeTab(page, tab) {
-  return page.evaluate((tabName) => {
-    const sidebar = document.querySelector('.sidebar')
-    const content = document.querySelector('main.content, .content')
-    if (!sidebar || !content) throw new Error('missing sidebar/content')
+  return page.evaluate(
+    ({ tabName, glass }) => {
+      const sidebar = document.querySelector('.sidebar')
+      const content = document.querySelector('main.content, .content')
+      const ambient = document.querySelector('.ambient')
+      if (!sidebar || !content) throw new Error('missing sidebar/content')
+      if (!ambient) throw new Error('missing .ambient layer')
 
-    const sidebarBg = getComputedStyle(sidebar).backgroundColor
-    const contentBg = getComputedStyle(content).backgroundColor
-    const contentImg = getComputedStyle(content).backgroundImage
-    const sidebarImg = getComputedStyle(sidebar).backgroundImage
+      const sidebarBg = getComputedStyle(sidebar).backgroundColor
+      const contentBg = getComputedStyle(content).backgroundColor
+      const ambientPos = getComputedStyle(ambient).position
+      const ambientZ = getComputedStyle(ambient).zIndex
+      const ambientPe = getComputedStyle(ambient).pointerEvents
+      const ambientBgImg = getComputedStyle(ambient).backgroundImage
 
-    const tabEl = document.querySelector(`#tab-${tabName}`)
-    const card =
-      tabEl?.querySelector('.panel, .metric-card, .status-strip, .game-card') ||
-      content.querySelector('.panel, .metric-card')
+      const tabEl = document.querySelector(`#tab-${tabName}`)
+      const card =
+        tabEl?.querySelector('.panel, .metric-card, .status-strip, .game-card') ||
+        content.querySelector('.panel, .metric-card')
 
-    const chain = []
-    let el = card
-    while (el && el.nodeType === 1) {
-      const cs = getComputedStyle(el)
-      const before = getComputedStyle(el, '::before')
-      const after = getComputedStyle(el, '::after')
-      chain.push({
-        node: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${
-          el.className && typeof el.className === 'string'
-            ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.')
-            : ''
-        }`,
-        backgroundColor: cs.backgroundColor,
-        backgroundImage: cs.backgroundImage.slice(0, 100),
-        beforeBg: before.backgroundColor,
-        beforeImg: before.backgroundImage !== 'none' ? before.backgroundImage.slice(0, 80) : 'none',
-        afterBg: after.backgroundColor,
-        afterImg: after.backgroundImage !== 'none' ? after.backgroundImage.slice(0, 80) : 'none',
-      })
-      el = el.parentElement
-    }
+      const cardBg = card ? getComputedStyle(card).backgroundColor : null
+      const cardBorder = card ? getComputedStyle(card).borderTopColor : null
+      const cardBackdrop = card ? getComputedStyle(card).backdropFilter : null
 
-    // First opaque ancestor behind gaps (excluding the card itself)
-    let gapPainter = null
-    for (const row of chain.slice(1)) {
-      const opaque =
-        row.backgroundColor &&
-        row.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
-        row.backgroundColor !== 'transparent'
-      const hasImg = row.backgroundImage && row.backgroundImage !== 'none'
-      if (opaque || hasImg) {
-        gapPainter = row
-        break
+      const wrappers = []
+      let el = card?.parentElement
+      while (el && el !== content && el !== document.body) {
+        const cs = getComputedStyle(el)
+        wrappers.push({
+          node: `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}`,
+          backgroundColor: cs.backgroundColor,
+          backgroundImage: cs.backgroundImage.slice(0, 80),
+        })
+        el = el.parentElement
       }
-    }
 
-    const gap = getComputedStyle(tabEl || content).gap
+      const opaqueWrapper = wrappers.find((w) => {
+        const opaque =
+          w.backgroundColor &&
+          w.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+          w.backgroundColor !== 'transparent'
+        const hasImg = w.backgroundImage && w.backgroundImage !== 'none'
+        return opaque || hasImg
+      })
 
-    return {
-      tab: tabName,
-      sidebarBg,
-      contentBg,
-      sidebarImg,
-      contentImg,
-      match: sidebarBg === contentBg,
-      gap,
-      gapPainter,
-      chain,
-    }
-  }, tab)
+      return {
+        tab: tabName,
+        sidebarBg,
+        contentBg,
+        contentTransparent:
+          !contentBg ||
+          contentBg === 'transparent' ||
+          contentBg === 'rgba(0, 0, 0, 0)',
+        sidebarGlass: sidebarBg === glass || sidebarBg.replace(/\s+/g, '') === glass.replace(/\s+/g, ''),
+        cardBg,
+        cardBorder,
+        cardBackdrop,
+        ambient: {
+          position: ambientPos,
+          zIndex: ambientZ,
+          pointerEvents: ambientPe,
+          hasGradient: ambientBgImg.includes('linear-gradient') || ambientBgImg.includes('radial-gradient'),
+        },
+        gap: getComputedStyle(tabEl || content).gap,
+        opaqueWrapper: opaqueWrapper || null,
+        wrappers,
+      }
+    },
+    { tabName: tab, glass: GLASS },
+  )
 }
 
-async function paintedMatch(page) {
+async function gapPixelSample(page) {
   const coords = await page.evaluate(() => {
-    const sidebar = document.querySelector('.sidebar')
-    const cards = [...document.querySelectorAll('#tab-uninstall.tab.active .panel')].filter(
-      (el) => {
-        const r = el.getBoundingClientRect()
-        return r.height > 8 && r.width > 8
-      },
-    )
-    if (!sidebar || cards.length < 2) return null
-    const sb = sidebar.getBoundingClientRect()
+    const cards = [...document.querySelectorAll('#tab-uninstall.tab.active .panel')].filter((el) => {
+      const r = el.getBoundingClientRect()
+      return r.height > 8 && r.width > 8
+    })
+    if (cards.length < 2) return null
     const a = cards[0].getBoundingClientRect()
     const b = cards[1].getBoundingClientRect()
     let gx, gy
@@ -110,60 +112,48 @@ async function paintedMatch(page) {
       gx = (a.right + b.left) / 2
       gy = (a.top + a.bottom) / 2
     }
-    // Prefer empty sidebar chrome (not nav text / buttons)
-    const sideX = sb.left + 20
-    const sideY = sb.top + 10
-    const pad = document.querySelector('main.content')?.getBoundingClientRect()
     return {
-      sidebar: { x: sideX, y: sideY },
       gap: { x: gx, y: gy, size: b.top - a.bottom },
-      contentPad: pad ? { x: pad.right - 24, y: a.top - 8 } : null,
       hit: document.elementFromPoint(gx, gy)?.className || null,
     }
   })
   if (!coords) return { error: 'no coords' }
 
   const cdp = await page.context().newCDPSession(page)
-  async function pixelAt(x, y) {
-    const { data } = await cdp.send('Page.captureScreenshot', {
-      format: 'png',
-      clip: { x: Math.floor(x), y: Math.floor(y), width: 1, height: 1, scale: 1 },
-      fromSurface: true,
-    })
-    return page.evaluate(async (b64) => {
-      const img = new Image()
-      img.src = 'data:image/png;base64,' + b64
-      await img.decode()
-      const c = document.createElement('canvas')
-      c.width = 1
-      c.height = 1
-      const ctx = c.getContext('2d')
-      ctx.drawImage(img, 0, 0)
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
-      return { r, g, b, a, css: `rgb(${r}, ${g}, ${b})` }
-    }, data)
-  }
+  const { data } = await cdp.send('Page.captureScreenshot', {
+    format: 'png',
+    clip: {
+      x: Math.floor(coords.gap.x),
+      y: Math.floor(coords.gap.y),
+      width: 1,
+      height: 1,
+      scale: 1,
+    },
+    fromSurface: true,
+  })
+  const gapPixel = await page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = 'data:image/png;base64,' + b64
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = 1
+    c.height = 1
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+    return { r, g, b, a, css: `rgb(${r}, ${g}, ${b})` }
+  }, data)
 
-  const sidebarPixel = await pixelAt(coords.sidebar.x, coords.sidebar.y)
-  const gapPixel = await pixelAt(coords.gap.x, coords.gap.y)
-  const contentPadPixel = coords.contentPad
-    ? await pixelAt(coords.contentPad.x, coords.contentPad.y)
-    : null
-  return {
-    coords,
-    sidebarPixel,
-    gapPixel,
-    contentPadPixel,
-    pixelMatch:
-      sidebarPixel.r === gapPixel.r &&
-      sidebarPixel.g === gapPixel.g &&
-      sidebarPixel.b === gapPixel.b,
-    contentPadMatch: contentPadPixel
-      ? sidebarPixel.r === contentPadPixel.r &&
-        sidebarPixel.g === contentPadPixel.g &&
-        sidebarPixel.b === contentPadPixel.b
-      : null,
-  }
+  // Deep blue volume: dark navy, not flat black scrap (#000) or bright white.
+  const deepBlue =
+    gapPixel.b > gapPixel.r &&
+    gapPixel.b > gapPixel.g &&
+    gapPixel.r < 40 &&
+    gapPixel.g < 50 &&
+    gapPixel.b < 80 &&
+    gapPixel.r + gapPixel.g + gapPixel.b > 12
+
+  return { coords, gapPixel, deepBlue }
 }
 
 async function main() {
@@ -189,68 +179,51 @@ async function main() {
     const probe = await probeTab(page, tab === 'lag' ? 'lag' : tab)
     results.push(probe)
     console.log(
-      `[${tab}] sidebar=${probe.sidebarBg} content=${probe.contentBg} match=${probe.match} gap=${probe.gap} painter=${probe.gapPainter?.node || 'n/a'}`,
+      `[${tab}] sidebar=${probe.sidebarBg} contentTransparent=${probe.contentTransparent} glass=${probe.sidebarGlass} gap=${probe.gap} ambient=${probe.ambient.hasGradient}`,
     )
-    if (!probe.match) {
-      console.error('FAIL computed backgroundColor mismatch on', tab)
-      console.error(JSON.stringify({ sidebar: probe.sidebarBg, content: probe.contentBg }, null, 2))
+    if (!probe.contentTransparent) {
+      console.error('FAIL content must be transparent on', tab)
+      await browser.close()
+      process.exit(1)
+    }
+    if (!probe.sidebarGlass) {
+      console.error('FAIL sidebar glass fill expected', GLASS, 'got', probe.sidebarBg)
+      await browser.close()
+      process.exit(1)
+    }
+    if (!probe.ambient.hasGradient || probe.ambient.position !== 'fixed') {
+      console.error('FAIL ambient layer missing fixed gradient', probe.ambient)
+      await browser.close()
+      process.exit(1)
+    }
+    if (probe.opaqueWrapper) {
+      console.error('FAIL opaque wrapper under card', probe.opaqueWrapper)
+      await browser.close()
+      process.exit(1)
+    }
+    if (probe.gap !== '12px') {
+      console.error('FAIL tab gap expected 12px got', probe.gap)
       await browser.close()
       process.exit(1)
     }
   }
 
-  // Deep walk dump for Uninstall + Overview
   await openTab(page, 'uninstall')
-  const uninstall = results.find((r) => r.tab === 'uninstall')
-  console.log('\n=== UNINSTALL parent walk (gap painter) ===')
-  console.log(JSON.stringify(uninstall.chain, null, 2))
-
-  await openTab(page, 'overview')
-  const overview = results.find((r) => r.tab === 'overview')
-  console.log('\n=== OVERVIEW parent walk (gap painter) ===')
-  console.log(JSON.stringify(overview.chain, null, 2))
-
-  await openTab(page, 'uninstall')
-  const pixels = await paintedMatch(page)
-  console.log('\n=== PAINTED PIXELS (uninstall gap vs sidebar) ===')
+  const pixels = await gapPixelSample(page)
+  console.log('\n=== GAP PIXEL (should be deep blue ambient) ===')
   console.log(JSON.stringify(pixels, null, 2))
 
   await page.screenshot({ path: SHOT, fullPage: false })
   console.log('\nScreenshot saved:', SHOT)
 
-  const summary = {
-    before: {
-      note: 'Prior: sidebar rgba(14, 18, 32, 0.66) translucent; content transparent over body blue gradient + ambient',
-      sidebarBg: 'rgba(14, 18, 32, 0.66)',
-      contentBg: 'rgba(0, 0, 0, 0)',
-    },
-    after: {
-      sidebarBg: uninstall.sidebarBg,
-      contentBg: uninstall.contentBg,
-      match: uninstall.sidebarBg === uninstall.contentBg,
-      tabGap: uninstall.gap,
-      painted: pixels,
-    },
-    allTabsMatch: results.every((r) => r.match),
-  }
-  console.log('\n=== ASSERTION SUMMARY ===')
-  console.log(JSON.stringify(summary, null, 2))
-
-  const pixelOk = Boolean(pixels?.pixelMatch)
-  if (!summary.allTabsMatch || !pixelOk) {
-    console.error('FAIL painted gap pixel must match sidebar (pixelMatch=true)')
-    console.error(JSON.stringify({
-      allTabsMatch: summary.allTabsMatch,
-      pixelMatch: pixels?.pixelMatch,
-      sidebarPixel: pixels?.sidebarPixel,
-      gapPixel: pixels?.gapPixel,
-    }, null, 2))
+  if (!pixels?.deepBlue) {
+    console.error('FAIL gap pixel is not deep blue volumetric ambient')
     await browser.close()
     process.exit(1)
   }
 
   await browser.close()
-  console.log('\nPASS: computed + painted gap pixels match sidebar on all tabs')
+  console.log('\nPASS: continuous ambient + glass sidebar/capsules + transparent wrappers')
 }
 
 main().catch((e) => {
